@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
 	isLikelyPersonName,
 	looksLikePersonSearch,
+	researchExternalPerson,
 } from "../agent/lib/external-person";
 
 describe("automatic external person discovery", () => {
@@ -22,6 +23,14 @@ describe("automatic external person discovery", () => {
 	it("requires an actual first and last name for external discovery", () => {
 		expect(isLikelyPersonName("Drew Sepeczi")).toBe(true);
 		expect(isLikelyPersonName("Find a company")).toBe(false);
+	});
+
+	it("blocks non-name external research before checking provider keys", async () => {
+		expect(await researchExternalPerson({ name: "Comp AI" })).toEqual({
+			found: false,
+			reason:
+				"I need the person's actual first and last name before searching LinkedIn.",
+		});
 	});
 
 	it("respects an explicit company or deal-only search", () => {
