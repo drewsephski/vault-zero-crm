@@ -159,6 +159,7 @@ export function outcomeTone(part: EveMessagePart): Tone {
 	)
 		return "success";
 	if (result.stored === false || result.written === false) return "warning";
+	if (result.created === false || result.updated === false) return "warning";
 
 	return "neutral";
 }
@@ -263,10 +264,7 @@ export function pendingLinkedInFallback(
 		}
 
 		const query = result.query.trim();
-		const personLike =
-			query.split(/\s+/).length >= 2 &&
-			!query.includes("@") &&
-			!/[/.][a-z]{2,}(?:\/|$)/i.test(query);
+		const personLike = looksLikePersonQuery(query);
 		const oldAgentNoMatch =
 			/\b(no contacts?|no one|couldn't find|no match)/i.test(said);
 
@@ -282,6 +280,35 @@ export function pendingLinkedInFallback(
 	}
 
 	return null;
+}
+
+function looksLikePersonQuery(value: string): boolean {
+	const nonPersonTerms = new Set([
+		"a",
+		"agent",
+		"ai",
+		"company",
+		"contact",
+		"corp",
+		"deal",
+		"find",
+		"for",
+		"inc",
+		"linkedin",
+		"llc",
+		"person",
+		"research",
+		"the",
+	]);
+	const words = value.trim().split(/\s+/);
+	if (words.length < 2 || words.length > 5) return false;
+	if (words.some((word) => nonPersonTerms.has(word.toLowerCase())))
+		return false;
+	if (words.some((word) => !/^[A-Za-z][A-Za-z.'-]*$/.test(word))) return false;
+
+	const first = words[0] ?? "";
+	const last = words.at(-1) ?? "";
+	return first.length >= 2 && last.length >= 3 && !/^[A-Z]{2,5}$/.test(last);
 }
 
 function output(part: EveMessagePart): Record<string, unknown> | null {

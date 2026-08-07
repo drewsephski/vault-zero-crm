@@ -17,7 +17,10 @@ export default defineTool({
 		expectedName: z.string().trim().min(2).optional(),
 		expectedCompany: z.string().trim().min(2).optional(),
 		expectedDomain: z.string().trim().min(3).optional(),
-		includeHistory: z.boolean().default(false),
+		includeHistory: z
+			.boolean()
+			.default(true)
+			.describe("Also fetch the person's full work history. Defaults to true."),
 	}),
 	async execute({
 		profile,
@@ -73,7 +76,7 @@ export default defineTool({
 			experience: history?.ok ? history.data : null,
 			sourceUrl: result.data.profileUrl,
 			matchSignals: { nameMatches, employerMatches },
-			note: "These fields were observed on the supplied LinkedIn profile. Confirm the person before creating or updating a CRM record.",
+			note: "These fields and the work history were observed on the supplied LinkedIn profile. Summarize the headline, location, current role, prior roles and other observed profile details, then confirm the person before creating or updating a CRM record.",
 		};
 	},
 });

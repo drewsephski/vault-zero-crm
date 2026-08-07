@@ -1,6 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { enabled, unavailable } from "../lib/capabilities";
+import { isLikelyPersonName } from "../lib/external-person";
 import { spend } from "../lib/focus";
 import { lookupCompany, searchPeople } from "../lib/linkdapi";
 import { normalise } from "../lib/names";
@@ -25,6 +26,14 @@ export default defineTool({
 		limit: z.number().int().min(1).max(10).default(5),
 	}),
 	async execute({ name, companyName, title, limit }) {
+		if (!isLikelyPersonName(name)) {
+			return {
+				found: false as const,
+				reason:
+					"I need the person's actual first and last name before searching LinkedIn.",
+			};
+		}
+
 		if (!(await enabled("RAPIDAPI_KEY"))) {
 			return { found: false as const, ...unavailable("RAPIDAPI_KEY") };
 		}

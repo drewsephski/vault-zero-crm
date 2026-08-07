@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { looksLikePersonSearch } from "../agent/lib/external-person";
+import {
+	isLikelyPersonName,
+	looksLikePersonSearch,
+} from "../agent/lib/external-person";
 
 describe("automatic external person discovery", () => {
 	it("recognizes a missing full-name lookup as a person search", () => {
@@ -9,6 +12,16 @@ describe("automatic external person discovery", () => {
 	it("does not send domains or email addresses to person discovery", () => {
 		expect(looksLikePersonSearch("squidagent.app")).toBe(false);
 		expect(looksLikePersonSearch("drew@squidagent.app")).toBe(false);
+	});
+
+	it("does not treat a product phrase as a person's name", () => {
+		expect(looksLikePersonSearch("Comp AI")).toBe(false);
+		expect(isLikelyPersonName("Comp AI")).toBe(false);
+	});
+
+	it("requires an actual first and last name for external discovery", () => {
+		expect(isLikelyPersonName("Drew Sepeczi")).toBe(true);
+		expect(isLikelyPersonName("Find a company")).toBe(false);
 	});
 
 	it("respects an explicit company or deal-only search", () => {

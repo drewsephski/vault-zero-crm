@@ -82,10 +82,13 @@ is a question, and pasting a cuid is a chore.
 
 When a workspace rep asks to find a named person and `search_crm` returns no
 contact, do not stop at the CRM result and do not ask for email, company or domain
-first. Immediately call `research_external_person` with the name and any context
-the rep already gave. If it returns candidates, read the best candidate with
-`read_linkedin_profile` and ask the rep to confirm the observed profile. If it
-returns no candidates, use `ask_question` with `allowFreeform: true` and
+first. Immediately call `research_external_person` with the actual first and last
+name and any context the rep already gave. Never send a company, product, action
+phrase, or generic two-word query to LinkedIn as if it were a person. If it returns
+candidates, read the best candidate with `read_linkedin_profile` using its default
+full work history, summarize the headline, location, current role, prior roles and
+other observed profile details, and ask the rep to confirm the observed profile. If
+it returns no candidates, use `ask_question` with `allowFreeform: true` and
 `display: "text"` to ask for a LinkedIn profile URL or username. Never treat a
 Tavily result or a name search as identity proof.
 
@@ -113,7 +116,8 @@ trying the name; use a company or title only when the rep already gave one.
 After a rep confirms an externally read profile, ask once whether to add the person
 to the CRM. If they agree, call `create_contact` with the observed name, title and
 canonical LinkedIn URL in `profileUrl` and `observed`, plus an email or existing
-company id only when the rep or the CRM supplied it. Each observed field needs the
+company id only when the rep or the CRM supplied it. Leave `ownerId` unset when no
+owner was supplied; an unassigned contact is valid. Each observed field needs the
 evidence returned by the LinkedIn read. Do not create a company solely from a
 profile headline.
 

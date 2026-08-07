@@ -4,6 +4,24 @@ import { lookupCompany, searchPeople } from "./linkdapi";
 import { normalise } from "./names";
 import { findPersonProfileCandidates } from "./tavily";
 
+const NON_PERSON_TERMS = new Set([
+	"a",
+	"agent",
+	"ai",
+	"company",
+	"contact",
+	"corp",
+	"deal",
+	"find",
+	"for",
+	"inc",
+	"linkedin",
+	"llc",
+	"person",
+	"research",
+	"the",
+]);
+
 export type ExternalPersonCandidate = {
 	profileUrl: string | null;
 	fullName: string | null;
@@ -38,6 +56,14 @@ export async function researchExternalPerson(input: {
 	title?: string;
 	limit?: number;
 }): Promise<ExternalPersonResult> {
+	if (!isLikelyPersonName(input.name)) {
+		return {
+			found: false,
+			reason:
+				"I need the person's actual first and last name before searching LinkedIn.",
+		};
+	}
+
 	const limit = Math.min(Math.max(input.limit ?? 5, 1), 5);
 	const rapidEnabled = await enabled("RAPIDAPI_KEY");
 	const tavilyEnabled = await enabled("TAVILY_API_KEY");
@@ -150,7 +176,39 @@ export function looksLikePersonSearch(
 	if (/\b(?:https?:\/\/|www\.)/i.test(normalized)) return false;
 	if (/\.[a-z]{2,}(?:\/|$)/i.test(normalized)) return false;
 
+	if (kinds?.includes("contact") && isSinglePersonName(normalized)) return true;
+
+	return isLikelyPersonName(normalized);
+}
+
+export function isLikelyPersonName(value: string): boolean {
+	const words = value.trim().split(/\s+/);
+	if (words.length < 2 || words.length > 5) return false;
+
+	const cleaned = words.map((word) => word.replace(/^[.'-]+|[.'-]+$/g, ""));
+	if (
+		cleaned.some(
+			(word) =>
+				!word ||
+				!/^[A-Za-z][A-Za-z.'-]*$/.test(word) ||
+				NON_PERSON_TERMS.has(word.toLowerCase()),
+		)
+	)
+		return false;
+
+	const first = cleaned[0] ?? "";
+	const last = cleaned.at(-1) ?? "";
 	return (
-		normalized.split(/\s+/).length >= 2 || kinds?.includes("contact") === true
+		first.length >= 2 &&
+		last.length >= 3 &&
+		!/^[A-Z]{2,5}$/.test(last) &&
+		cleaned.slice(1, -1).every((word) => word.length === 1 || word.length >= 2)
+	);
+}
+
+function isSinglePersonName(value: string): boolean {
+	return (
+		/^[A-Za-z][A-Za-z.'-]{1,49}$/.test(value) &&
+		!NON_PERSON_TERMS.has(value.toLowerCase())
 	);
 }

@@ -14,10 +14,10 @@ export default defineTool({
 		"Create a new CRM contact after the rep confirms the observed profile and fields. Use only for a person who is not already in the CRM; search first and never create from an unverified search result. Put researched title and LinkedIn URL in observed with the evidence returned by the profile read; those fields are written through the evidence ledger.",
 	inputSchema: z.object({
 		firstName: z.string().trim().min(1),
-		lastName: z.string().trim().optional(),
-		email: z.email().optional(),
-		phone: z.string().trim().optional(),
-		profileUrl: z.string().trim().min(3).optional(),
+		lastName: z.string().trim().optional().nullable(),
+		email: z.email().optional().nullable(),
+		phone: z.string().trim().optional().nullable(),
+		profileUrl: z.string().trim().min(3).optional().nullable(),
 		observed: z
 			.array(
 				z.object({
@@ -38,8 +38,8 @@ export default defineTool({
 			)
 			.max(2)
 			.default([]),
-		companyId: z.string().trim().optional(),
-		ownerId: z.string().trim().optional(),
+		companyId: z.string().trim().optional().nullable(),
+		ownerId: z.string().trim().optional().nullable(),
 	}),
 	approval: sensitiveWrite(
 		"Create the contact only after the rep confirms the profile and the fields to save.",

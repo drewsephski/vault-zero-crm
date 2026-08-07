@@ -123,6 +123,11 @@ describe("outcomeTone", () => {
 		expect(
 			outcomeTone(tool("write_brief", { output: { written: false } }) as never),
 		).toBe("warning");
+		expect(
+			outcomeTone(
+				tool("create_contact", { output: { created: false } }) as never,
+			),
+		).toBe("warning");
 	});
 
 	it("reads a failed call as a warning", () => {
@@ -277,6 +282,23 @@ describe("pendingLinkedInFallback", () => {
 							query: "Drew Sepeczi",
 							total: 0,
 							externalResearch: { found: true },
+						},
+					}),
+				]),
+			]),
+		).toBeNull();
+	});
+
+	it("does not offer LinkedIn for a company-like two-word query", () => {
+		expect(
+			pendingLinkedInFallback([
+				message([
+					{ type: "text", text: "I found no contacts by that name." },
+					tool("search_crm", {
+						output: {
+							query: "Comp AI",
+							total: 0,
+							externalResearch: { found: false },
 						},
 					}),
 				]),
