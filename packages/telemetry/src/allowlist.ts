@@ -123,6 +123,7 @@ export const AGENT_TOOLS = [
 	"resolve_linkedin_profile",
 	"schedule_recheck",
 	"search_crm",
+	"search_linkedin_people",
 	"set_contact_socials",
 	"write_brief",
 	"write_workspace_profile",

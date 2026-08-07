@@ -24,6 +24,7 @@ const VERBS: Record<string, string> = {
 	read_company_history: "Read everything we have on the company",
 	read_deal_history: "Read the deal and where it has been",
 	search_crm: "Looked the record up in the CRM",
+	search_linkedin_people: "Searched LinkedIn for people",
 	resolve_linkedin_profile: "Searched for their LinkedIn profile",
 	get_linkedin_profile: "Read a LinkedIn profile",
 	get_contact_work_history: "Read their work history",

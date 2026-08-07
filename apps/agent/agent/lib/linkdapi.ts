@@ -3,7 +3,7 @@ const TIMEOUT_MS = 20_000;
 
 export type Profile = {
 	slug: string;
-	profileUrl: string;
+	profileUrl: string | null;
 	fullName: string | null;
 	firstName: string | null;
 	lastName: string | null;
@@ -32,13 +32,24 @@ export type Experience = {
 	location: string | null;
 };
 
+export type PeopleSearchCandidate = {
+	slug: string | null;
+	profileUrl: string | null;
+	fullName: string | null;
+	headline: string | null;
+	location: string | null;
+	urn: string | null;
+	photoUrl: string | null;
+};
+
 type Outcome<T> =
 	| { ok: true; data: T }
 	| { ok: false; missing: true }
 	| { ok: false; missing: false; reason: string };
 
 function key(): string | null {
-	return process.env.RAPIDAPI_KEY ?? null;
+	const value = process.env.RAPIDAPI_KEY?.trim();
+	return value || null;
 }
 
 export function linkedinEnabled(): boolean {
@@ -69,25 +80,38 @@ export async function getProfile(slug: string): Promise<Outcome<Profile>> {
 	});
 	if (!result.ok) return result;
 
-	const d = result.data;
+	return { ok: true, data: profileFrom(result.data, slug) };
+}
+
+export async function getProfileByUrn(urn: string): Promise<Outcome<Profile>> {
+	const result = await call<RawProfile>("/api/v1/profile/full", { urn });
+	if (!result.ok) return result;
+
+	const slug =
+		linkedinSlug(
+			str(result.data.username) ??
+				str(result.data.publicIdentifier) ??
+				str(result.data.vanityName),
+		) ?? "";
+	return { ok: true, data: profileFrom(result.data, slug) };
+}
+
+function profileFrom(raw: RawProfile, slug: string): Profile {
 	return {
-		ok: true,
-		data: {
-			slug,
-			profileUrl: `https://www.linkedin.com/in/${slug}`,
-			fullName: str(d.fullName),
-			firstName: str(d.firstName),
-			lastName: str(d.lastName),
-			headline: str(d.headline),
-			location: str(d.location),
-			urn: str(d.urn),
-			followerCount: int(d.followerCount),
-			connectionsCount: int(d.connectionsCount),
-			photoUrl: profilePhotoUrl(d),
-			positions: (d.CurrentPositions ?? []).flatMap((p) =>
-				p?.name ? [{ name: p.name, url: str(p.url) }] : [],
-			),
-		},
+		slug,
+		profileUrl: slug ? `https://www.linkedin.com/in/${slug}` : null,
+		fullName: str(raw.fullName),
+		firstName: str(raw.firstName),
+		lastName: str(raw.lastName),
+		headline: str(raw.headline),
+		location: locationText(raw.location),
+		urn: str(raw.urn),
+		followerCount: int(raw.followerCount),
+		connectionsCount: int(raw.connectionsCount),
+		photoUrl: profilePhotoUrl(raw),
+		positions: positionRows(raw).flatMap((position) =>
+			position.name ? [{ name: position.name, url: str(position.url) }] : [],
+		),
 	};
 }
 
@@ -114,6 +138,37 @@ export async function getExperience(
 				location: str(row?.location),
 			}),
 		),
+	};
+}
+
+export async function searchPeople(input: {
+	keyword?: string;
+	firstName?: string;
+	lastName?: string;
+	title?: string;
+	currentCompany?: string;
+	count?: number;
+}): Promise<Outcome<PeopleSearchCandidate[]>> {
+	const params = Object.fromEntries(
+		Object.entries({
+			keyword: input.keyword,
+			firstName: input.firstName,
+			lastName: input.lastName,
+			title: input.title,
+			currentCompany: input.currentCompany,
+			count: input.count ?? 10,
+		}).flatMap(([key, value]) =>
+			value === undefined || value === "" ? [] : [[key, String(value)]],
+		),
+	) as Record<string, string>;
+	const result = await call<RawPeopleSearch>("/api/v1/search/people", params);
+	if (!result.ok) return result;
+
+	return {
+		ok: true,
+		data: peopleFrom(result.data)
+			.map(searchCandidate)
+			.flatMap((candidate) => (candidate ? [candidate] : [])),
 	};
 }
 
@@ -204,6 +259,9 @@ async function call<T>(
 }
 
 type RawProfile = {
+	username?: unknown;
+	publicIdentifier?: unknown;
+	vanityName?: unknown;
 	fullName?: unknown;
 	firstName?: unknown;
 	lastName?: unknown;
@@ -214,6 +272,22 @@ type RawProfile = {
 	connectionsCount?: unknown;
 	CurrentPositions?: { name?: string; url?: unknown }[] | null;
 } & Record<string, unknown>;
+
+function positionRows(raw: RawProfile): { name?: string; url?: unknown }[] {
+	const candidates = [
+		raw.CurrentPositions,
+		raw.currentPositions,
+		raw.positions,
+	];
+	for (const value of candidates) {
+		if (!Array.isArray(value)) continue;
+		return value.filter(
+			(entry): entry is { name?: string; url?: unknown } =>
+				Boolean(entry) && typeof entry === "object" && !Array.isArray(entry),
+		);
+	}
+	return [];
+}
 
 const PHOTO_KEYS = [
 	"profilePictureURL",
@@ -286,6 +360,7 @@ type RawExperience =
 	| RawExperienceRow[]
 	| { experience?: RawExperienceRow[]; experiences?: RawExperienceRow[] };
 type RawLookup = { companies?: { id?: string; displayName?: string }[] | null };
+type RawPeopleSearch = Record<string, unknown> | unknown[];
 type RawCompany = {
 	id?: unknown;
 	name?: unknown;
@@ -294,6 +369,92 @@ type RawCompany = {
 	description?: unknown;
 	linkedinUrl?: unknown;
 };
+
+function peopleFrom(value: RawPeopleSearch): Record<string, unknown>[] {
+	if (Array.isArray(value)) {
+		return value.filter(
+			(entry): entry is Record<string, unknown> =>
+				Boolean(entry) && typeof entry === "object" && !Array.isArray(entry),
+		);
+	}
+
+	for (const key of ["people", "profiles", "results", "items"]) {
+		const entries = value[key];
+		if (Array.isArray(entries)) return peopleFrom(entries);
+	}
+
+	const nested = value.data;
+	if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+		return peopleFrom(nested as Record<string, unknown>);
+	}
+
+	return [];
+}
+
+function searchCandidate(
+	raw: Record<string, unknown>,
+): PeopleSearchCandidate | null {
+	const profileUrl = firstHttpUrl([raw.profileUrl, raw.linkedinUrl, raw.url]);
+	const slug =
+		slugFromProfileUrl(profileUrl) ??
+		linkedinSlug(
+			str(raw.username) ?? str(raw.publicIdentifier) ?? str(raw.vanityName),
+		);
+
+	if (!slug && !str(raw.urn)) return null;
+
+	return {
+		slug,
+		profileUrl: slug ? `https://www.linkedin.com/in/${slug}` : profileUrl,
+		fullName: str(raw.fullName ?? raw.name),
+		headline: str(raw.headline ?? raw.title),
+		location: locationText(raw.location),
+		urn: str(raw.urn),
+		photoUrl: profilePhotoUrl(raw),
+	};
+}
+
+function linkedinSlug(value: string | null): string | null {
+	if (!value) return null;
+	const slug = value.trim().replace(/^\/+|\/+$/g, "");
+	return /^[A-Za-z0-9][A-Za-z0-9_%~-]*$/.test(slug) ? slug : null;
+}
+
+function firstHttpUrl(values: unknown[]): string | null {
+	for (const value of values) {
+		const candidate = str(value);
+		if (!candidate) continue;
+		try {
+			const url = new URL(candidate);
+			if (
+				url.protocol === "https:" &&
+				(url.hostname === "linkedin.com" ||
+					url.hostname.endsWith(".linkedin.com"))
+			) {
+				return url.toString();
+			}
+		} catch {}
+	}
+	return null;
+}
+
+function locationText(value: unknown): string | null {
+	const direct = str(value);
+	if (direct) return direct;
+	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+	const record = value as Record<string, unknown>;
+	return (
+		str(record.name) ??
+		str(record.city) ??
+		([record.city, record.region, record.country]
+			.filter(
+				(part): part is string =>
+					typeof part === "string" && Boolean(part.trim()),
+			)
+			.join(", ") ||
+			null)
+	);
+}
 
 function str(value: unknown): string | null {
 	return typeof value === "string" && value.trim() ? value.trim() : null;

@@ -77,7 +77,8 @@ is a question, and pasting a cuid is a chore.
 
 1. **The CRM first, always.** A reply from their own address, a signature block,
    a meeting they attended. No data vendor can sell us any of that.
-2. **LinkedIn** (`resolve_linkedin_profile` → `get_linkedin_profile`) for
+2. **LinkedIn** (`search_linkedin_people` for a name search, or
+   `resolve_linkedin_profile` → `get_linkedin_profile` for a CRM contact) for
    identity: name, current title, employer, tenure. Self-reported, and
    authoritative for who someone is.
 3. **The open web** (`web_search`, `web_fetch`, `research_person`,
@@ -87,6 +88,10 @@ is a question, and pasting a cuid is a chore.
 
 Search results are not evidence. A search for "Paula Marchetti" once returned
 Brightwater's CEO. A search tells you where to look.
+
+If a rep says to use LinkedIn after the CRM has no match, use the name they
+already supplied with `search_linkedin_people`. Do not ask for a company before
+trying the name; use a company or title only when the rep already gave one.
 
 **Not every install has 2 and 3.** They each need an API key, and plenty of
 copies of this CRM run with none. Your session instructions list what this one

@@ -2,7 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { enabled, unavailable } from "../lib/capabilities";
 import { spend } from "../lib/focus";
-import { getExperience, getProfile } from "../lib/linkdapi";
+import { getExperience, getProfile, getProfileByUrn } from "../lib/linkdapi";
 import { looksLikeSameCompany, nameMatchesLocalPart } from "../lib/names";
 import { storePortrait } from "../lib/portrait";
 
@@ -10,7 +10,14 @@ export default defineTool({
 	description:
 		"Read a LinkedIn profile by slug and check whether it is really the person behind an email address. Returns the profile plus an explicit verdict.",
 	inputSchema: z.object({
-		slug: z.string().describe("The linkedin.com/in/<slug> handle."),
+		slug: z
+			.string()
+			.optional()
+			.describe("The linkedin.com/in/<slug> handle from a candidate result."),
+		urn: z
+			.string()
+			.optional()
+			.describe("The LinkedIn URN from a People Search candidate."),
 		email: z.string().describe("The address we are trying to identify."),
 		companyName: z.string(),
 		companyDomain: z.string(),
@@ -27,12 +34,20 @@ export default defineTool({
 	}),
 	async execute({
 		slug,
+		urn,
 		email,
 		companyName,
 		companyDomain,
 		includeHistory,
 		contactId,
 	}) {
+		if (!slug && !urn) {
+			return {
+				found: false as const,
+				reason: "A LinkedIn slug or URN is required.",
+			};
+		}
+
 		if (!(await enabled("RAPIDAPI_KEY"))) {
 			return { found: false as const, ...unavailable("RAPIDAPI_KEY") };
 		}
@@ -40,7 +55,9 @@ export default defineTool({
 		const charge = spend(includeHistory ? 2 : 1);
 		if (!charge.ok) return { found: false as const, reason: charge.reason };
 
-		const result = await getProfile(slug);
+		const result = slug
+			? await getProfile(slug)
+			: await getProfileByUrn(urn ?? "");
 		if (!result.ok) {
 			return result.missing
 				? { found: false as const, reason: "No such profile." }
