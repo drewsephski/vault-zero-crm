@@ -1,5 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
 import { readCompanyHistory } from "../lib/accounts";
 import { focusOn } from "../lib/focus";
 
@@ -25,8 +26,14 @@ export default defineTool({
 	}),
 	async execute({ companyId, threads, people }) {
 		focusOn({ companyId });
+		if (!(await enabled(CRM))) return unavailableCapability("CRM database");
 
-		const history = await readCompanyHistory(companyId, { threads, people });
+		let history;
+		try {
+			history = await readCompanyHistory(companyId, { threads, people });
+		} catch {
+			return unavailableCapability("CRM database");
+		}
 		if (!history) return { found: false as const, reason: "No such company." };
 
 		return {

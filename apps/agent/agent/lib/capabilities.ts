@@ -4,6 +4,7 @@ import { db } from "@crm/db";
 import { readContextDevKey } from "@crm/db/settings";
 
 export const CONTEXT_DEV = "CONTEXT_DEV";
+export const CRM = "CRM";
 
 export type Capability = {
 	readonly id: string;
@@ -28,11 +29,13 @@ export async function contextDevKey(): Promise<string | null> {
 }
 
 export async function capabilities(): Promise<readonly Capability[]> {
-	return capabilitiesFrom(await contextDevKey());
+	const [contextDev, crm] = await Promise.all([contextDevKey(), crmReady()]);
+	return capabilitiesFrom(contextDev, crm);
 }
 
 export function capabilitiesFrom(
 	contextDev: string | null,
+	crm = true,
 ): readonly Capability[] {
 	const fromEnv = (id: string) => ({
 		id,
@@ -41,6 +44,13 @@ export function capabilitiesFrom(
 	});
 
 	return [
+		{
+			id: CRM,
+			from: "CRM database",
+			label: "CRM records",
+			gives: "read and update the contacts, companies and deals already in this CRM",
+			enabled: crm,
+		},
 		{
 			...fromEnv("RAPIDAPI_KEY"),
 			label: "LinkedIn",
@@ -69,6 +79,15 @@ export function capabilitiesFrom(
 	];
 }
 
+async function crmReady(): Promise<boolean> {
+	try {
+		await db.$queryRaw`SELECT 1`;
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 export async function enabled(id: string): Promise<boolean> {
 	return (await capabilities()).some(
 		(capability) => capability.id === id && capability.enabled,
@@ -89,6 +108,18 @@ export function unavailable(env: string): {
 	};
 }
 
+export function unavailableCapability(label: string): {
+	ok: false;
+	configured: true;
+	reason: string;
+} {
+	return {
+		ok: false,
+		configured: true,
+		reason: `The ${label} is not reachable right now. No record was changed. Try again when it is available.`,
+	};
+}
+
 export async function logCapabilities(): Promise<void> {
 	for (const capability of await capabilities()) {
 		console.log(
@@ -102,10 +133,21 @@ export async function capabilitiesMarkdown(): Promise<string> {
 }
 
 export function markdownFor(all: readonly Capability[]): string {
-	const on = all.filter((capability) => capability.enabled);
-	const off = all.filter((capability) => !capability.enabled);
+	const core = all.filter((capability) => capability.id === CRM);
+	const on = all.filter(
+		(capability) => capability.id !== CRM && capability.enabled,
+	);
+	const off = all.filter(
+		(capability) => capability.id !== CRM && !capability.enabled,
+	);
 
 	const lines = ["## What you can use here", ""];
+
+	for (const capability of core) {
+		lines.push(
+			`${capability.enabled ? "The CRM is available" : "The CRM is unavailable"}: ${capability.gives}.`,
+		);
+	}
 
 	if (on.length === 0) {
 		lines.push(

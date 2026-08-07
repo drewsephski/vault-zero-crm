@@ -1,5 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
 import { readDealHistory } from "../lib/accounts";
 import { focusOn } from "../lib/focus";
 
@@ -17,7 +18,14 @@ export default defineTool({
 			.describe("How many recent threads to read."),
 	}),
 	async execute({ dealId, threads }) {
-		const history = await readDealHistory(dealId, { threads });
+		if (!(await enabled(CRM))) return unavailableCapability("CRM database");
+
+		let history;
+		try {
+			history = await readDealHistory(dealId, { threads });
+		} catch {
+			return unavailableCapability("CRM database");
+		}
 		if (!history) return { found: false as const, reason: "No such deal." };
 
 		focusOn({ companyId: history.company.id });

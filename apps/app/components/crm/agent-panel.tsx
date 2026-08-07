@@ -26,7 +26,12 @@ import {
 	EmptyTitle,
 } from "@crm/ui/components/empty";
 import { type CarbonIcon, Icon } from "@crm/ui/components/icon";
-import { Input } from "@crm/ui/components/input";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupButton,
+	InputGroupTextarea,
+} from "@crm/ui/components/input-group";
 import Logo from "@crm/ui/components/logo";
 import { Markdown } from "@crm/ui/components/markdown";
 import { Marker, MarkerContent, MarkerIcon } from "@crm/ui/components/marker";
@@ -44,6 +49,7 @@ import {
 	MessageScrollerViewport,
 } from "@crm/ui/components/message-scroller";
 import { Spinner } from "@crm/ui/components/spinner";
+import { StatusIndicator } from "@crm/ui/components/status-indicator";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEveAgent } from "eve/react";
 import { useEffect, useRef, useState } from "react";
@@ -96,6 +102,7 @@ export function AgentChat({
 	onThreadChange: (thread: string | null) => void;
 }) {
 	const conversations = useConversations(recordFilter(scope));
+	const [busy, setBusy] = useState(false);
 
 	const history = conversations.data ?? [];
 
@@ -117,9 +124,15 @@ export function AgentChat({
 			<ConversationPicker
 				conversations={history}
 				current={current}
-				onSelect={(conversation) => onThreadChange(conversation.id)}
-				onNew={() => onThreadChange(NEW_THREAD)}
-				busy={false}
+				onSelect={(conversation) => {
+					setBusy(false);
+					onThreadChange(conversation.id);
+				}}
+				onNew={() => {
+					setBusy(false);
+					onThreadChange(NEW_THREAD);
+				}}
+				busy={busy}
 			/>
 
 			<ThreadWithHistory
@@ -127,6 +140,7 @@ export function AgentChat({
 				scope={scope}
 				conversation={current}
 				onNewThread={() => onThreadChange(NEW_THREAD)}
+				onBusyChange={setBusy}
 			/>
 		</div>
 	);
@@ -139,10 +153,12 @@ function ThreadWithHistory({
 	scope,
 	conversation,
 	onNewThread,
+	onBusyChange,
 }: {
 	scope: AgentScope;
 	conversation: Conversation | null;
 	onNewThread: () => void;
+	onBusyChange: (busy: boolean) => void;
 }) {
 	const trpc = useTRPC();
 
@@ -177,6 +193,7 @@ function ThreadWithHistory({
 				offline ? offlineThread((archive.data ?? []) as never) : thread.data
 			}
 			onNewThread={onNewThread}
+			onBusyChange={onBusyChange}
 		/>
 	);
 }
@@ -194,11 +211,13 @@ function Thread({
 	conversation,
 	thread,
 	onNewThread,
+	onBusyChange,
 }: {
 	scope: AgentScope;
 	conversation: Conversation | null;
 	thread: ThreadState | undefined;
 	onNewThread: () => void;
+	onBusyChange: (busy: boolean) => void;
 }) {
 	const copy = recordCopy(scope.kind);
 	const agent = useEveAgent({
@@ -220,10 +239,20 @@ function Thread({
 	});
 
 	const busy = agent.status === "submitted" || agent.status === "streaming";
+	const working = busy || thread?.status === "working";
 	const messages = toTranscript(agent.data.messages);
 	const question = pendingQuestion(agent.data.messages);
+	const latestMessage = messages.at(-1);
+	const hasStreamingText =
+		working && latestMessage?.mine === false
+			? latestMessage.items.some((item) => item.kind === "said")
+			: false;
 
 	const { locked, ended } = composerState(thread, busy);
+
+	useEffect(() => {
+		onBusyChange(working);
+	}, [onBusyChange, working]);
 
 	const ask = (message: string) => {
 		if (!message.trim() || locked) return;
@@ -237,7 +266,7 @@ function Thread({
 			<MessageScrollerProvider autoScroll defaultScrollPosition="end">
 				<MessageScroller className="flex-1">
 					<MessageScrollerViewport>
-						<MessageScrollerContent className="gap-3 px-5 py-4">
+						<MessageScrollerContent className="mx-auto w-full max-w-4xl gap-6 px-4 py-6 sm:px-6">
 							{messages.length === 0 && !busy ? (
 								<Idle kind={scope.kind} onAsk={ask} />
 							) : null}
@@ -246,11 +275,27 @@ function Thread({
 								<MessageScrollerItem key={message.id} messageId={message.id}>
 									<div className="space-y-3">
 										{message.items.map((item) => (
-											<Item key={item.id} item={item} />
+											<Item
+												key={item.id}
+												item={item}
+												streaming={
+													working &&
+													message.id === latestMessage?.id &&
+													!message.mine &&
+													item.kind === "said" &&
+													hasStreamingText
+												}
+											/>
 										))}
 									</div>
 								</MessageScrollerItem>
 							))}
+
+							{working && !hasStreamingText ? (
+								<MessageScrollerItem messageId="agent-working">
+									<WorkingState />
+								</MessageScrollerItem>
+							) : null}
 
 							{question ? (
 								<MessageScrollerItem messageId={question.requestId}>
@@ -285,27 +330,42 @@ function Thread({
 			) : null}
 
 			<form
-				className="flex items-center gap-2 border-t px-5 py-3"
+				className="mx-auto w-full max-w-4xl border-t px-4 py-4 sm:px-6"
 				onSubmit={(event) => {
 					event.preventDefault();
 					ask(draft);
 				}}
 			>
-				<Input
-					value={draft}
-					onChange={(event) => setDraft(event.target.value)}
-					placeholder={copy.placeholder}
-					disabled={locked}
-				/>
-				<Button
-					type="submit"
-					size="icon-sm"
-					variant="outline"
-					disabled={locked}
-				>
-					{busy ? <Spinner /> : <Icon icon={Send} />}
-					<span className="sr-only">Ask</span>
-				</Button>
+				<InputGroup>
+					<InputGroupTextarea
+						aria-label={copy.placeholder}
+						disabled={locked}
+						maxLength={4000}
+						onChange={(event) => setDraft(event.target.value)}
+						onKeyDown={(event) => {
+							if (event.key === "Enter" && !event.shiftKey) {
+								event.preventDefault();
+								event.currentTarget.form?.requestSubmit();
+							}
+						}}
+						placeholder={copy.placeholder}
+						value={draft}
+					/>
+					<InputGroupAddon align="inline-end">
+						<InputGroupButton
+							aria-label="Ask the agent"
+							disabled={locked || !draft.trim()}
+							size="icon-sm"
+							type="submit"
+							variant="default"
+						>
+							{busy ? <Spinner /> : <Icon icon={Send} />}
+						</InputGroupButton>
+					</InputGroupAddon>
+				</InputGroup>
+				<p className="mt-2 text-muted-foreground text-[11px]">
+					Press Enter to send · Shift + Enter for a new line
+				</p>
 			</form>
 		</div>
 	);
@@ -321,7 +381,7 @@ function Idle({
 	const copy = recordCopy(kind);
 
 	return (
-		<Empty width="wide">
+		<Empty className="min-h-full border-0 py-16" width="wide">
 			<EmptyHeader>
 				<EmptyMedia>
 					<span className="flex size-8 items-center justify-center bg-foreground text-background">
@@ -375,7 +435,13 @@ const SOURCE_ICONS: Record<Source["network"], CarbonIcon> = {
 	web: Document,
 };
 
-function Item({ item }: { item: TranscriptItem }) {
+function Item({
+	item,
+	streaming = false,
+}: {
+	item: TranscriptItem;
+	streaming?: boolean;
+}) {
 	if (item.kind === "said") {
 		return item.mine ? (
 			<Message align="end">
@@ -391,7 +457,15 @@ function Item({ item }: { item: TranscriptItem }) {
 				<MessageContent>
 					<Bubble variant="ghost">
 						<BubbleContent>
-							<Markdown>{item.text}</Markdown>
+							<div aria-live={streaming ? "polite" : undefined}>
+								<Markdown>{item.text}</Markdown>
+								{streaming ? (
+									<span
+										aria-hidden="true"
+										className="ml-1 inline-block h-3.5 w-px translate-y-0.5 animate-pulse bg-primary align-middle"
+									/>
+								) : null}
+							</div>
 						</BubbleContent>
 					</Bubble>
 				</MessageContent>
@@ -410,6 +484,17 @@ function Item({ item }: { item: TranscriptItem }) {
 
 			{item.sources.length > 0 ? <Sources sources={item.sources} /> : null}
 		</div>
+	);
+}
+
+function WorkingState() {
+	return (
+		<Message>
+			<AgentAvatar />
+			<MessageContent>
+				<StatusIndicator busy label="Working through the request" size="sm" />
+			</MessageContent>
+		</Message>
 	);
 }
 

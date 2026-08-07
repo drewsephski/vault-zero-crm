@@ -1,5 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
 import { readCrmHistory } from "../lib/crm";
 import { focusOn } from "../lib/focus";
 
@@ -18,8 +19,14 @@ export default defineTool({
 	}),
 	async execute({ contactId, threads }) {
 		focusOn({ contactId });
+		if (!(await enabled(CRM))) return unavailableCapability("CRM database");
 
-		const history = await readCrmHistory(contactId, { threads });
+		let history;
+		try {
+			history = await readCrmHistory(contactId, { threads });
+		} catch {
+			return unavailableCapability("CRM database");
+		}
 		if (!history) return { found: false as const, reason: "No such contact." };
 
 		const evidence =

@@ -1,5 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
 import { searchCrm } from "../lib/lookup";
 
 export default defineTool({
@@ -19,7 +20,14 @@ export default defineTool({
 		limit: z.number().int().min(1).max(25).default(10),
 	}),
 	async execute({ query, kinds, limit }) {
-		const result = await searchCrm(query, { kinds, limit });
+		if (!(await enabled(CRM))) return unavailableCapability("CRM database");
+
+		let result;
+		try {
+			result = await searchCrm(query, { kinds, limit });
+		} catch {
+			return unavailableCapability("CRM database");
+		}
 
 		return {
 			...result,
