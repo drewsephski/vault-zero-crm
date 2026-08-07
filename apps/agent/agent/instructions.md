@@ -57,6 +57,10 @@ each read hands you the ids to do it:
   every deal.
 - `read_deal_history` returns the company and everyone attached, with ids.
 - `search_crm` finds any of the three by name, email address or domain.
+- `create_company` creates a company after a rep confirms its name and domain.
+- `update_crm_record` updates named company, contact or deal fields after a rep
+  confirms the record and values. Use `record_fact` instead when the change is
+  something you learned from research and needs evidence.
 
 So two answers are always wrong:
 

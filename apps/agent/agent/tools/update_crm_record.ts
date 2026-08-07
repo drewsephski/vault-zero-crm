@@ -73,7 +73,6 @@ export default defineTool({
 			}
 
 			const updated = await updateDeal(input.recordId, input);
-			focusOn({ dealId: updated.id });
 			return { updated: true as const, kind: input.kind, ...updated };
 		} catch (error) {
 			return {

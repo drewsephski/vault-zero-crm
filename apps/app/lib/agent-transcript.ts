@@ -40,6 +40,8 @@ const VERBS: Record<string, string> = {
 	schedule_recheck: "Decided when to look again",
 	record_job_change: "Raised a job change",
 	list_outstanding_work: "Looked for outstanding work",
+	create_company: "Created a company",
+	update_crm_record: "Updated the CRM record",
 
 	load_skill: "Read its instructions for this",
 	web_search: "Searched the web",
@@ -140,7 +142,13 @@ export function outcomeTone(part: EveMessagePart): Tone {
 	const result = output(part);
 	if (!result) return "neutral";
 
-	if (result.applied === true || result.written === true) return "success";
+	if (
+		result.applied === true ||
+		result.written === true ||
+		result.created === true ||
+		result.updated === true
+	)
+		return "success";
 	if (result.stored === false || result.written === false) return "warning";
 
 	return "neutral";
