@@ -25,11 +25,13 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@crm/ui/components/empty";
+import { Field, FieldLabel } from "@crm/ui/components/field";
 import { type CarbonIcon, Icon } from "@crm/ui/components/icon";
 import {
 	InputGroup,
 	InputGroupAddon,
 	InputGroupButton,
+	InputGroupInput,
 	InputGroupTextarea,
 } from "@crm/ui/components/input-group";
 import Logo from "@crm/ui/components/logo";
@@ -52,7 +54,7 @@ import { Spinner } from "@crm/ui/components/spinner";
 import { StatusIndicator } from "@crm/ui/components/status-indicator";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEveAgent } from "eve/react";
-import { useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import {
 	type Conversation,
 	ConversationPicker,
@@ -538,6 +540,33 @@ function Question({
 	question: NonNullable<ReturnType<typeof pendingQuestion>>;
 	agent: ReturnType<typeof useEveAgent>;
 }) {
+	const [value, setValue] = useState("");
+	const [error, setError] = useState<string | null>(null);
+	const [submitted, setSubmitted] = useState(false);
+	const inputId = useId();
+	const freeform =
+		question.allowFreeform === true || question.display === "text";
+	const linkedin = question.prompt.toLowerCase().includes("linkedin");
+
+	const answer = (response: { optionId?: string; text?: string }) => {
+		setSubmitted(true);
+		void agent.send({
+			inputResponses: [{ requestId: question.requestId, ...response }],
+		});
+	};
+
+	const submit = (event: FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		const trimmed = value.trim();
+		if (!trimmed) return;
+		if (linkedin && !looksLikeLinkedinInput(trimmed)) {
+			setError("Enter a linkedin.com/in profile URL or username.");
+			return;
+		}
+		setError(null);
+		answer({ text: trimmed });
+	};
+
 	return (
 		<Message>
 			<AgentAvatar />
@@ -546,19 +575,63 @@ function Question({
 					<BubbleContent>{question.prompt}</BubbleContent>
 				</Bubble>
 
+				{freeform ? (
+					<form className="space-y-2" onSubmit={submit}>
+						{linkedin ? (
+							<Field>
+								<FieldLabel htmlFor={inputId}>LinkedIn profile</FieldLabel>
+							</Field>
+						) : null}
+						<InputGroup aria-invalid={Boolean(error)}>
+							<InputGroupInput
+								aria-describedby={error ? `${inputId}-error` : undefined}
+								aria-invalid={Boolean(error)}
+								autoComplete="url"
+								autoFocus
+								disabled={submitted}
+								id={inputId}
+								inputMode="url"
+								onChange={(event) => {
+									setValue(event.target.value);
+									if (error) setError(null);
+								}}
+								placeholder={
+									linkedin ? "linkedin.com/in/username" : "Type your answer"
+								}
+								value={value}
+							/>
+							<InputGroupAddon align="inline-end">
+								<InputGroupButton
+									aria-label="Submit answer"
+									disabled={submitted || !value.trim()}
+									size="icon-sm"
+									type="submit"
+									variant="default"
+								>
+									{submitted ? <Spinner /> : <Icon icon={Send} />}
+								</InputGroupButton>
+							</InputGroupAddon>
+						</InputGroup>
+						{error ? (
+							<p
+								className="text-destructive text-xs"
+								id={`${inputId}-error`}
+								role="alert"
+							>
+								{error}
+							</p>
+						) : null}
+					</form>
+				) : null}
+
 				<div className="flex flex-wrap gap-2">
 					{(question.options ?? []).map((option) => (
 						<Button
+							disabled={submitted}
 							key={option.id}
 							variant="outline"
 							size="sm"
-							onClick={() =>
-								void agent.send({
-									inputResponses: [
-										{ requestId: question.requestId, optionId: option.id },
-									],
-								})
-							}
+							onClick={() => answer({ optionId: option.id })}
 						>
 							{option.label}
 						</Button>
@@ -567,6 +640,21 @@ function Question({
 			</MessageContent>
 		</Message>
 	);
+}
+
+function looksLikeLinkedinInput(value: string): boolean {
+	if (/^[A-Za-z0-9][A-Za-z0-9_%-]{2,100}$/.test(value)) return true;
+
+	try {
+		const url = new URL(value.includes("://") ? value : `https://${value}`);
+		return (
+			(url.hostname === "linkedin.com" ||
+				url.hostname.endsWith(".linkedin.com")) &&
+			/^\/in\/[A-Za-z0-9_%-]+\/?$/.test(url.pathname)
+		);
+	} catch {
+		return false;
+	}
 }
 
 function useSavedConversation({

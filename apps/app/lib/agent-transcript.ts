@@ -37,11 +37,14 @@ const VERBS: Record<string, string> = {
 	write_workspace_profile: "Wrote up who we are",
 	research_person: "Researched them on the web",
 	research_company: "Read the company's site",
+	research_external_person: "Looked for the person outside the CRM",
 	enrich_company: "Looked up the company",
+	read_linkedin_profile: "Read the supplied LinkedIn profile",
 	schedule_recheck: "Decided when to look again",
 	record_job_change: "Raised a job change",
 	list_outstanding_work: "Looked for outstanding work",
 	create_company: "Created a company",
+	create_contact: "Added the person to the CRM",
 	update_crm_record: "Updated the CRM record",
 
 	load_skill: "Read its instructions for this",
@@ -159,22 +162,38 @@ export function sourcesOf(part: EveMessagePart): Source[] {
 	const result = output(part);
 	if (!result) return [];
 
-	const urls = new Set<string>();
+	const sources = new Map<string, string>();
+	const add = (value: unknown, title?: string) => {
+		if (typeof value !== "string" || !/^https?:\/\//.test(value)) return;
+		if (!sources.has(value)) sources.set(value, title || hostOf(value));
+	};
+
 	for (const key of ["sourceUrl", "profileUrl", "url"]) {
-		const value = result[key];
-		if (typeof value === "string" && /^https?:\/\//.test(value)) {
-			urls.add(value);
+		add(result[key]);
+	}
+
+	if (Array.isArray(result.candidates)) {
+		for (const candidate of result.candidates) {
+			if (!candidate || typeof candidate !== "object") continue;
+			const row = candidate as Record<string, unknown>;
+			const title =
+				typeof row.fullName === "string"
+					? row.fullName
+					: typeof row.title === "string"
+						? row.title
+						: undefined;
+			add(row.profileUrl, title);
 		}
 	}
 
-	return [...urls].map((url) => {
-		const title = hostOf(url);
+	return [...sources].map(([url, title]) => {
+		const host = hostOf(url);
 		return {
 			url,
 			title,
-			network: title.includes("linkedin")
+			network: host.includes("linkedin")
 				? ("linkedin" as const)
-				: title.includes("github")
+				: host.includes("github")
 					? ("github" as const)
 					: ("web" as const),
 		};

@@ -28,6 +28,7 @@ const WORKSPACE_COPY: ScopeCopy = {
 	suggestions: [
 		"What research is waiting?",
 		"Find a company or person",
+		"Research someone outside the CRM",
 		"What can you help me with?",
 	],
 };

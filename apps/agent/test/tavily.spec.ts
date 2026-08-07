@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { ask, findProfileUrls } from "../agent/lib/tavily";
+import {
+	ask,
+	findPersonProfileCandidates,
+	findProfileUrls,
+} from "../agent/lib/tavily";
 
 const realFetch = globalThis.fetch;
 const realKey = process.env.TAVILY_API_KEY;
@@ -103,6 +107,34 @@ describe("Tavily search", () => {
 		expect(await findProfileUrls(["Drew"], "Acme")).toEqual(["drew-example"]);
 		expect(JSON.parse(String(requests[0]?.init?.body)).include_domains).toEqual(
 			["linkedin.com"],
+		);
+	});
+
+	it("finds named LinkedIn profile candidates through Tavily", async () => {
+		stub({
+			results: [
+				{
+					title: "Drew Sepeczi | LinkedIn",
+					url: "https://www.linkedin.com/in/drew-sepeczi",
+					content: "Software Engineer at Squid Agent",
+					score: 0.8,
+				},
+			],
+		});
+
+		expect(
+			await findPersonProfileCandidates("Drew Sepeczi", "Squid Agent"),
+		).toEqual([
+			{
+				slug: "drew-sepeczi",
+				profileUrl: "https://www.linkedin.com/in/drew-sepeczi",
+				title: "Drew Sepeczi | LinkedIn",
+				content: "Software Engineer at Squid Agent",
+				score: 0.8,
+			},
+		]);
+		expect(JSON.parse(String(requests[0]?.init?.body)).query).toContain(
+			"Drew Sepeczi",
 		);
 	});
 });

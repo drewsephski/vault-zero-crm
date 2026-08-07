@@ -14,6 +14,14 @@ export type Answer = {
 	sources: SearchSource[];
 };
 
+export type ProfileSearchCandidate = {
+	slug: string;
+	profileUrl: string;
+	title: string;
+	content: string;
+	score: number | null;
+};
+
 type Outcome<T> = { ok: true; data: T } | { ok: false; reason: string };
 
 export type AskOptions = {
@@ -157,4 +165,42 @@ export async function findProfileUrls(
 	}
 
 	return slugs;
+}
+
+export async function findPersonProfileCandidates(
+	name: string,
+	companyName?: string,
+	title?: string,
+): Promise<ProfileSearchCandidate[]> {
+	const query = [
+		`Find the LinkedIn profile for ${name}`,
+		companyName ? `who works at ${companyName}` : "",
+		title ? `and has the title ${title}` : "",
+	]
+		.filter(Boolean)
+		.join(" ");
+	const answer = await ask(query, {
+		domains: ["linkedin.com"],
+		maxResults: 5,
+	});
+
+	if (!answer.ok) return [];
+
+	return answer.data.sources.flatMap((item) => {
+		const match = item.url.match(
+			/^https?:\/\/(?:[^/]+)\/in\/([A-Za-z0-9_%-]+)/i,
+		);
+		const slug = match?.[1];
+		if (!slug) return [];
+
+		return [
+			{
+				slug,
+				profileUrl: `https://www.linkedin.com/in/${slug}`,
+				title: item.title,
+				content: item.content,
+				score: item.score,
+			},
+		];
+	});
 }

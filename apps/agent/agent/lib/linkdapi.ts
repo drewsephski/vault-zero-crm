@@ -74,6 +74,20 @@ export function slugFromProfileUrl(raw: string | null): string | null {
 	}
 }
 
+export function slugFromLinkedinInput(raw: string): string | null {
+	const trimmed = raw.trim();
+	if (!trimmed) return null;
+
+	const fromUrl = slugFromProfileUrl(
+		trimmed.includes("://") ? trimmed : `https://${trimmed}`,
+	);
+	if (fromUrl) return fromUrl;
+
+	return /^[A-Za-z0-9][A-Za-z0-9_%-]{2,100}$/.test(trimmed)
+		? decodeURIComponent(trimmed)
+		: null;
+}
+
 export async function getProfile(slug: string): Promise<Outcome<Profile>> {
 	const result = await call<RawProfile>("/api/v1/profile/overview", {
 		username: slug,

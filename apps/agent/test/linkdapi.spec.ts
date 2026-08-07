@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { searchPeople } from "../agent/lib/linkdapi";
+import { searchPeople, slugFromLinkedinInput } from "../agent/lib/linkdapi";
 
 const realFetch = globalThis.fetch;
 const realKey = process.env.RAPIDAPI_KEY;
@@ -31,6 +31,14 @@ function stub(body: unknown, status = 200): void {
 }
 
 describe("LinkdAPI people search", () => {
+	it("normalizes a LinkedIn URL or username to a profile slug", () => {
+		expect(slugFromLinkedinInput("drew-sepeczi")).toBe("drew-sepeczi");
+		expect(
+			slugFromLinkedinInput("https://www.linkedin.com/in/drew-sepeczi/"),
+		).toBe("drew-sepeczi");
+		expect(slugFromLinkedinInput("https://example.com/in/drew")).toBeNull();
+	});
+
 	it("sends RapidAPI search filters and normalizes candidate profiles", async () => {
 		stub({
 			success: true,

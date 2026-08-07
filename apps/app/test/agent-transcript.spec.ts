@@ -170,6 +170,29 @@ describe("sourcesOf", () => {
 		expect(sources[0]?.network).toBe("github");
 	});
 
+	it("offers candidate profile links from a people search", () => {
+		const sources = sourcesOf(
+			tool("research_external_person", {
+				output: {
+					candidates: [
+						{
+							fullName: "Drew Sepeczi",
+							profileUrl: "https://www.linkedin.com/in/drew-sepeczi",
+						},
+					],
+				},
+			}) as never,
+		);
+
+		expect(sources).toEqual([
+			{
+				url: "https://www.linkedin.com/in/drew-sepeczi",
+				title: "Drew Sepeczi",
+				network: "linkedin",
+			},
+		]);
+	});
+
 	it("ignores anything that is not a link", () => {
 		const sources = sourcesOf(
 			tool("record_fact", {

@@ -106,6 +106,8 @@ export function permitted(
 }
 
 export const AGENT_TOOLS = [
+	"create_company",
+	"create_contact",
 	"enrich_company",
 	"fetch_contact_photo",
 	"find_contact_socials",
@@ -119,12 +121,15 @@ export const AGENT_TOOLS = [
 	"record_fact",
 	"record_job_change",
 	"research_company",
+	"research_external_person",
 	"research_person",
+	"read_linkedin_profile",
 	"resolve_linkedin_profile",
 	"schedule_recheck",
 	"search_crm",
 	"search_linkedin_people",
 	"set_contact_socials",
+	"update_crm_record",
 	"write_brief",
 	"write_workspace_profile",
 	"web_search",

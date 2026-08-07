@@ -1,4 +1,5 @@
 import { db, Prisma } from "@crm/db";
+import { slugFromLinkedinInput } from "./linkdapi";
 
 export type CompanyUpdate = {
 	name?: string;
@@ -24,6 +25,17 @@ export type ContactUpdate = {
 	twitterUrl?: string | null;
 	githubUrl?: string | null;
 	companyId?: string | null;
+};
+
+export type ContactCreate = {
+	firstName: string;
+	lastName?: string | null;
+	email?: string | null;
+	phone?: string | null;
+	title?: string | null;
+	linkedinUrl?: string | null;
+	companyId?: string | null;
+	ownerId?: string | null;
 };
 
 export type DealUpdate = {
@@ -98,6 +110,90 @@ export async function createCompany(input: {
 
 		return company;
 	});
+}
+
+export async function createContact(input: ContactCreate): Promise<{
+	id: string;
+	firstName: string;
+	lastName: string | null;
+	email: string | null;
+	linkedinUrl: string | null;
+}> {
+	const firstName = input.firstName.trim();
+	const lastName = nullable(input.lastName);
+	const email = normalizeEmail(input.email);
+	const linkedinSlug = input.linkedinUrl
+		? slugFromLinkedinInput(input.linkedinUrl)
+		: null;
+	if (input.linkedinUrl && !linkedinSlug) {
+		throw new Error("That is not a LinkedIn profile URL or username.");
+	}
+	const linkedinUrl = linkedinSlug
+		? `https://www.linkedin.com/in/${linkedinSlug}`
+		: null;
+
+	if (!firstName) throw new Error("A contact needs a first name.");
+
+	const existing = await db.contact.findFirst({
+		where: {
+			OR: [
+				...(email
+					? [{ email: { equals: email, mode: "insensitive" as const } }]
+					: []),
+				...(linkedinUrl ? [{ linkedinUrl }] : []),
+			],
+		},
+		select: { id: true, firstName: true, lastName: true },
+	});
+	if (existing) {
+		throw new Error(
+			`${[existing.firstName, existing.lastName].filter(Boolean).join(" ")} is already in the CRM.`,
+		);
+	}
+
+	const contact = await db.$transaction(async (tx) => {
+		const created = await tx.contact.create({
+			data: {
+				firstName,
+				lastName,
+				email,
+				phone: nullable(input.phone),
+				title: nullable(input.title),
+				linkedinUrl,
+				companyId: input.companyId ?? null,
+				ownerId: input.ownerId ?? null,
+			},
+			select: {
+				id: true,
+				firstName: true,
+				lastName: true,
+				email: true,
+				linkedinUrl: true,
+			},
+		});
+
+		const pending = await tx.agentTask.findFirst({
+			where: { contactId: created.id, kind: "identify", finishedAt: null },
+			select: { id: true },
+		});
+		if (!pending) {
+			await tx.agentTask.create({
+				data: {
+					contactId: created.id,
+					companyId: null,
+					kind: "identify",
+					reason: "Added by the research agent after profile confirmation",
+					priority: 100,
+					budget: 4,
+					dueAt: new Date(),
+				},
+			});
+		}
+
+		return created;
+	});
+
+	return contact;
 }
 
 export async function updateCompany(
@@ -236,12 +332,12 @@ export async function updateDeal(
 	});
 }
 
-function nullable(value: string | null): string | null {
+function nullable(value: string | null | undefined): string | null {
 	const trimmed = value?.trim() ?? "";
 	return trimmed || null;
 }
 
-function normalizeEmail(value: string | null): string | null {
+function normalizeEmail(value: string | null | undefined): string | null {
 	return nullable(value)?.toLowerCase() ?? null;
 }
 
