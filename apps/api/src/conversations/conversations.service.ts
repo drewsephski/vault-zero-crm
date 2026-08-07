@@ -25,10 +25,26 @@ export interface ConversationSummary {
 	lastMessageAt: string;
 }
 
+type ScopeInput = {
+	scope?: "workspace";
+	contactId?: string;
+	companyId?: string;
+	dealId?: string;
+};
+
+type Scope = {
+	key: string;
+	fields: {
+		contactId?: string | null;
+		companyId?: string | null;
+		dealId?: string | null;
+	};
+};
+
 const LIST_TTL_MS = 10 * 60_000;
 
-const listKey = (userId: string, recordId: string) =>
-	`agent:conversations:${userId}:${recordId}`;
+const listKey = (userId: string, scope: string) =>
+	`agent:conversations:${userId}:${scope}`;
 
 @Injectable()
 export class ConversationsService {
@@ -43,20 +59,21 @@ export class ConversationsService {
 		input: ConversationListInput,
 		userId: string,
 	): Promise<ConversationSummary[]> {
-		const recordId = this.recordId(input);
-		const key = listKey(userId, recordId);
+		const scope = this.scope(input);
+		const key = listKey(userId, scope.key);
 
 		const cached = await this.cache.get<ConversationSummary[]>(key);
 		if (cached) return cached;
 
-		this.logger.debug({ message: "Conversation list cache miss", recordId });
+		this.logger.debug({
+			message: "Conversation list cache miss",
+			scope: scope.key,
+		});
 
 		const rows = await this.db.agentConversation.findMany({
 			where: {
 				userId,
-				...(input.contactId ? { contactId: input.contactId } : {}),
-				...(input.companyId ? { companyId: input.companyId } : {}),
-				...(input.dealId ? { dealId: input.dealId } : {}),
+				...scope.fields,
 			},
 			orderBy: { lastMessageAt: "desc" },
 			take: 20,
@@ -85,37 +102,57 @@ export class ConversationsService {
 		input: ConversationSaveInput,
 		userId: string,
 	): Promise<{ id: string }> {
-		const recordId = this.recordId(input);
-
-		const conversation = await this.db.agentConversation.upsert({
+		const scope = this.scope(input);
+		const existing = await this.db.agentConversation.findUnique({
 			where: { sessionId: input.sessionId },
-			create: {
-				sessionId: input.sessionId,
-				continuationToken: input.continuationToken ?? null,
-				streamIndex: input.streamIndex ?? 0,
-				title: input.title?.slice(0, 120) ?? null,
-				messageCount: input.messageCount ?? 0,
-				userId,
-				contactId: input.contactId ?? null,
-				companyId: input.companyId ?? null,
-				dealId: input.dealId ?? null,
+			select: {
+				id: true,
+				userId: true,
+				contactId: true,
+				companyId: true,
+				dealId: true,
 			},
-			update: {
-				continuationToken: input.continuationToken ?? null,
-				streamIndex: input.streamIndex ?? 0,
-				messageCount: input.messageCount ?? 0,
-				lastMessageAt: new Date(),
-			},
-			select: { id: true, userId: true },
 		});
 
-		if (conversation.userId !== userId) {
+		if (existing && existing.userId !== userId) {
 			throw new BadRequestException(
 				"That conversation belongs to someone else.",
 			);
 		}
 
-		await this.cache.del(listKey(userId, recordId));
+		if (existing && this.storedScope(existing).key !== scope.key) {
+			throw new BadRequestException(
+				"That conversation already belongs to another scope.",
+			);
+		}
+
+		const data = {
+			continuationToken: input.continuationToken ?? null,
+			streamIndex: input.streamIndex ?? 0,
+			messageCount: input.messageCount ?? 0,
+			lastMessageAt: new Date(),
+		};
+
+		const conversation = existing
+			? await this.db.agentConversation.update({
+					where: { id: existing.id },
+					data,
+					select: { id: true },
+				})
+			: await this.db.agentConversation.create({
+					data: {
+						sessionId: input.sessionId,
+						...data,
+						title: input.title?.slice(0, 120) ?? null,
+						userId,
+						contactId: scope.fields.contactId ?? null,
+						companyId: scope.fields.companyId ?? null,
+						dealId: scope.fields.dealId ?? null,
+					},
+					select: { id: true },
+				});
+
+		await this.cache.del(listKey(userId, scope.key));
 
 		return { id: conversation.id };
 	}
@@ -168,34 +205,67 @@ export class ConversationsService {
 			this.db.agentConversation.delete({ where: { id } }),
 		]);
 
-		await this.cache.del(
-			listKey(
-				userId,
-				conversation.contactId ??
-					conversation.companyId ??
-					conversation.dealId ??
-					"",
-			),
-		);
+		const scope = this.storedScope(conversation);
+		await this.cache.del(listKey(userId, scope.key));
 
 		this.logger.log({ message: "Conversation removed", conversationId: id });
 
 		return { id };
 	}
 
-	private recordId(input: {
-		contactId?: string;
-		companyId?: string;
-		dealId?: string;
-	}): string {
-		const recordId = input.contactId ?? input.companyId ?? input.dealId;
+	private scope(input: ScopeInput): Scope {
+		const choices = [
+			input.scope === "workspace",
+			Boolean(input.contactId),
+			Boolean(input.companyId),
+			Boolean(input.dealId),
+		].filter(Boolean).length;
 
-		if (!recordId) {
+		if (choices !== 1) {
 			throw new BadRequestException(
-				"A conversation belongs to a contact, a company or a deal.",
+				"A conversation belongs to the workspace, a contact, a company or a deal.",
 			);
 		}
 
-		return recordId;
+		if (input.scope === "workspace") {
+			return {
+				key: "workspace",
+				fields: { contactId: null, companyId: null, dealId: null },
+			};
+		}
+
+		if (input.contactId) {
+			return {
+				key: `contact:${input.contactId}`,
+				fields: { contactId: input.contactId },
+			};
+		}
+
+		if (input.companyId) {
+			return {
+				key: `company:${input.companyId}`,
+				fields: { companyId: input.companyId },
+			};
+		}
+
+		return {
+			key: `deal:${input.dealId}`,
+			fields: { dealId: input.dealId },
+		};
+	}
+
+	private storedScope(fields: {
+		contactId: string | null;
+		companyId: string | null;
+		dealId: string | null;
+	}): Scope {
+		return this.scope({
+			...(fields.contactId ? { contactId: fields.contactId } : {}),
+			...(fields.companyId ? { companyId: fields.companyId } : {}),
+			...(fields.dealId ? { dealId: fields.dealId } : {}),
+			...(!fields.contactId && !fields.companyId && !fields.dealId
+				? { scope: "workspace" as const }
+				: {}),
+		});
 	}
 }

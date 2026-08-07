@@ -122,9 +122,67 @@ describe("ConversationsService", () => {
 		expect(await service.list({ contactId }, "somebody-else")).toEqual([]);
 	});
 
-	it("refuses a conversation that belongs to a record of neither kind", async () => {
+	it("keeps workspace conversations separate from record conversations", async () => {
+		await service.save(
+			{
+				scope: "workspace",
+				sessionId: `ses_${suffix}_workspace`,
+				title: "What needs attention?",
+				messageCount: 2,
+			},
+			userId,
+		);
+
+		const workspace = await service.list({ scope: "workspace" }, userId);
+
+		expect(workspace).toHaveLength(1);
+		expect(workspace[0]).toMatchObject({
+			sessionId: `ses_${suffix}_workspace`,
+			title: "What needs attention?",
+		});
+		expect(
+			(await service.list({ contactId }, userId)).some((conversation) =>
+				conversation.sessionId.endsWith("_workspace"),
+			),
+		).toBe(false);
+	});
+
+	it("scopes workspace conversations to the signed-in rep", async () => {
+		expect(await service.list({ scope: "workspace" }, "somebody-else")).toEqual(
+			[],
+		);
+	});
+
+	it("does not let a session move between reps or scopes", async () => {
+		const sessionId = `ses_${suffix}_workspace`;
+
+		expect(
+			service.save(
+				{ scope: "workspace", sessionId, messageCount: 99 },
+				"somebody-else",
+			),
+		).rejects.toThrow();
+		expect(
+			service.save({ contactId, sessionId, messageCount: 99 }, userId),
+		).rejects.toThrow();
+
+		const [conversation] = await service.list({ scope: "workspace" }, userId);
+		expect(conversation?.messageCount).toBe(2);
+	});
+
+	it("refuses a conversation with no scope or more than one scope", async () => {
 		expect(
 			service.save({ sessionId: `ses_${suffix}_3` }, userId),
+		).rejects.toThrow();
+		expect(
+			service.save(
+				{
+					scope: "workspace",
+					contactId,
+					sessionId: `ses_${suffix}_4`,
+				},
+				userId,
+			),
 		).rejects.toThrow();
 	});
 

@@ -1,10 +1,11 @@
-# The Agent panel — read when touching the record sheet's Agent tab
+# The Agent chat — read when touching the Agent page or a record's Agent tab
 
 
-`lib/agent-record.ts` maps a record kind to everything downstream: the header sent, the
-claim minted, the field a conversation is filed under, the empty-thread questions.
-`AgentConversation` holds only the handle (session id + cursor); the transcript is in
-`AgentEvent` from the audit hook.
+`lib/agent-record.ts` maps a workspace or record scope to everything downstream: the
+optional header sent, the claim minted, the field a conversation is filed under, and
+the empty-thread questions. `AgentConversation` holds only the handle (session id +
+cursor); the transcript is in `AgentEvent` from the audit hook. Workspace conversations
+are scoped to the rep and have all three record foreign keys set to null.
 
 - **Load with `session.snapshot()`, never by hand** — one call returns the event
   prefix, the cursor, and a continuation token *iff* eve will accept another turn.
@@ -44,11 +45,13 @@ claim minted, the field a conversation is filed under, the empty-thread question
 - **Nothing mounts until the list has loaded**, or a new session starts and remounts.
 - **The landed thread is captured once** (`resolveThread`), or the first save swaps the
   open conversation out from under a live answer. It lives in `?thread=`.
+- **The dedicated `/agent` page sends no record header.** The signed principal still
+  names the rep, and eve's no-record instructions make the CRM-wide tools available.
 - **`keepMounted` on the tab descriptor** (`detail-sheet.tsx`) — Radix drops an inactive
   tab, aborting the stream mid-answer.
 - **`autoScroll` and nothing else**; `scrollAnchor` stops it following the bottom.
 - **One `MessageScrollerItem` per message, not per part**; ids prefer `toolCallId`.
-- **Scoped to the rep** — a session id in a body decides which row, never whose.
+- **Scoped to the rep and one context** — a session id in a body decides which row,
+  never whose, and an existing session cannot move between workspace and record scopes.
 
 This lives in the API and is not a breach of rule one: listing history decides nothing.
-

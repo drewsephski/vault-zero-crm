@@ -11,16 +11,19 @@ are in `docs/setup.md`.
 
 ## Model
 
-Default `zai/glm-5.2-fast`; `DEFAULT_AGENT_MODEL` in `@crm/db/settings` because the
-agent and the API both need it.
+Default `google/gemini-2.5-flash-lite` through OpenRouter;
+`DEFAULT_AGENT_MODEL` in `@crm/db/settings` because the agent and the API both need
+the same ID and context window.
 
-- **A row (`AppSetting`), not an env var**, via `defineDynamic` on `session.started`.
-  Open conversations keep their model — prompt caches are per model.
+- **A row (`AppSetting`), not an env var**, via `defineDynamic` on `step.started`.
+  Eve can return a direct provider model only at that event, so a settings change
+  applies to the next model step.
 - **`lib/model.ts` always sends `modelContextWindowTokens`**; eve never inherits it.
 - **A failed read logs and keeps the compiled fallback.** Never throws.
-- **The chooser offers only `tool-use` models** (`ModelCatalogService`).
-- **Not a frontier model, deliberately** — refusing wrong answers is enforced by the
-  tools and evidence model, not model strength.
+- **The chooser offers only OpenRouter models that advertise tool support**
+  (`ModelCatalogService`).
+- **`OPENROUTER_API_KEY` is required for model-backed sessions.** Search and CRM
+  sources remain independently optional.
 
 ## Pictures are copied, never linked
 
@@ -205,7 +208,7 @@ egress:
 
 `agent/sandbox/sandbox.ts`: `bash`, file tools, `/workspace`, **`deny-all` egress on
 the backend factory** so it cannot be forgotten per session. Costs nothing —
-`web_fetch` runs in the app runtime, `web_search` at the provider.
+`web_fetch` and the Tavily-backed `web_search` run in the app runtime.
 
 **Never give the sandbox `DATABASE_URL`.** CRM access is authored tools. A shell with
 credentials and network is exfiltration-shaped; with neither it is a text processor.
@@ -213,15 +216,15 @@ credentials and network is exfiltration-shaped; with neither it is a text proces
 ## The bridge
 
 ```
-browser → /eve/v1/*  (same origin, session cookie, x-crm-contact header)
+browser → /eve/v1/*  (same origin, session cookie, optional x-crm-* header)
         → apps/app/app/eve/v1/[...path]/route.ts
             checks the Better Auth session, strips the cookie,
-            mints a 2-minute HS256 token naming the rep + record
+            mints a 2-minute HS256 token naming the rep + optional record
         → AGENT_URL/eve/v1/* → channels/eve.ts repFromCrm()
                              → instructions/task.ts reads attributes.contactId
 ```
 
-- **The record travels in the token, never in the message.**
+- **When present, the record travels in the token, never in the message.**
 - **Mounted at `/eve/v1/*`** because that is where `useEveAgent()` looks — no `host`,
   no CORS, no cross-site cookie.
 - **The proxy is an enforcement point, not a passthrough** — the agent never sees the
@@ -234,10 +237,11 @@ browser → /eve/v1/*  (same origin, session cookie, x-crm-contact header)
 
 ### The panel
 
-`lib/agent-record.ts` maps a record kind to everything downstream. The panel's own
-rules — snapshot loading, composer state, thread capture, scrolling — are in
-**`docs/agent-panel.md`**. It lives in the API and is not a breach of rule one:
-listing history decides nothing.
+`lib/agent-record.ts` maps either the workspace or a record to everything downstream.
+The dedicated `/agent` page sends no record header; record tabs send the matching
+signed context. The chat's own rules — snapshot loading, composer state, thread
+capture, scrolling — are in **`docs/agent-panel.md`**. Conversation history lives in
+the API and is not a breach of rule one: listing history decides nothing.
 
 ## Continuation tokens are namespaced
 

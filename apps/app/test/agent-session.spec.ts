@@ -137,6 +137,14 @@ describe("record context", () => {
 			"companyId",
 		]);
 	});
+
+	it("uses an unscoped agent session for the workspace", () => {
+		expect(recordCopy("workspace").title).toBe("Ask across your CRM");
+		expect(recordHeader({ kind: "workspace" })).toEqual({});
+		expect(recordFilter({ kind: "workspace" })).toEqual({
+			scope: "workspace",
+		});
+	});
 });
 
 describe("the panel", () => {

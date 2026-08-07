@@ -3,7 +3,7 @@ import { z } from "zod";
 import { enabled, unavailable } from "../lib/capabilities";
 import { spend } from "../lib/focus";
 import { searchTerms } from "../lib/names";
-import { findProfileUrls } from "../lib/perplexity";
+import { findProfileUrls } from "../lib/tavily";
 
 export default defineTool({
 	description:
@@ -13,8 +13,8 @@ export default defineTool({
 		companyName: z.string().describe("The company the CRM has them at."),
 	}),
 	async execute({ email, companyName }) {
-		if (!(await enabled("PERPLEXITY_API_KEY"))) {
-			return { candidateSlugs: [], ...unavailable("PERPLEXITY_API_KEY") };
+		if (!(await enabled("TAVILY_API_KEY"))) {
+			return { candidateSlugs: [], ...unavailable("TAVILY_API_KEY") };
 		}
 
 		const charge = spend();

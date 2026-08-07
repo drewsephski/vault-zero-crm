@@ -18,7 +18,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
 				<div className="relative flex max-w-lg flex-col gap-8">
 					<div className="flex flex-col gap-4">
 						<p className="font-mono text-xs/4 text-muted-foreground uppercase">
-							CRM
+							Vault Zero CRM
 						</p>
 						<h1 className="max-w-[14ch] text-5xl/14 font-semibold text-balance">
 							Every customer, one place.
@@ -29,12 +29,12 @@ export function AuthShell({ children }: { children: ReactNode }) {
 				<p className="relative font-mono text-xs/4 text-muted-foreground">
 					Made with love by{" "}
 					<a
-						href="https://trycomp.ai"
+						href="https://www.vaultzero.dev"
 						target="_blank"
 						rel="noreferrer"
 						className="underline underline-offset-4 hover:text-foreground"
 					>
-						Comp AI
+						Vault Zero
 					</a>
 				</p>
 			</section>

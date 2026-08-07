@@ -133,6 +133,13 @@ enum RecordSource {
   IMPORT
   EMAIL
   CALENDAR
+  VAULT_ZERO
+}
+
+enum VaultZeroEventStatus {
+  PROCESSING
+  PROCESSED
+  FAILED
 }
 
 model Company {
@@ -348,6 +355,64 @@ model AgentEvent {
   @@index([sessionId, emittedAt])
   @@index([contactId, emittedAt])
   @@map("agentEvent")
+}
+
+model VaultZeroLead {
+  id           String   @id @default(cuid())
+  submissionId String   @unique
+  source       String
+  status       String
+  payload      Json
+  companyId    String?
+  contactId    String?
+  dealId       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([dealId])
+  @@map("vaultZeroLead")
+}
+
+model VaultZeroProposal {
+  id              String   @id @default(cuid())
+  proposalId      String   @unique
+  leadSubmissionId String?
+  status          String
+  payload         Json
+  companyId       String?
+  contactId       String?
+  dealId          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([leadSubmissionId])
+  @@index([companyId])
+  @@index([contactId])
+  @@index([dealId])
+  @@map("vaultZeroProposal")
+}
+
+model VaultZeroEvent {
+  id           String               @id @default(cuid())
+  externalId   String               @unique
+  eventType    String
+  occurredAt   DateTime
+  status       VaultZeroEventStatus @default(PROCESSING)
+  payload      Json
+  vapiCallId   String?              @unique
+  companyId    String?
+  contactId    String?
+  dealId       String?
+  attempts     Int                  @default(0)
+  lastError    String?
+  receivedAt   DateTime             @default(now())
+  processedAt  DateTime?
+
+  @@index([eventType, receivedAt])
+  @@index([status, receivedAt])
+  @@map("vaultZeroEvent")
 }
 
 model AgentConversation {

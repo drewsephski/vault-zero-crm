@@ -27,8 +27,10 @@
 				"DATABASE_URL",
 				"GOOGLE_CLIENT_ID",
 				"GOOGLE_CLIENT_SECRET",
+				"OPENROUTER_API_KEY",
 				"PORT",
-				"REDIS_URL"
+				"REDIS_URL",
+				"TAVILY_API_KEY"
 			]
 		},
 		"test": {
@@ -42,8 +44,10 @@
 				"DATABASE_URL",
 				"GOOGLE_CLIENT_ID",
 				"GOOGLE_CLIENT_SECRET",
+				"OPENROUTER_API_KEY",
 				"PORT",
-				"REDIS_URL"
+				"REDIS_URL",
+				"TAVILY_API_KEY"
 			]
 		}
 	}

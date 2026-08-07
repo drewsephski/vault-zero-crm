@@ -4,13 +4,13 @@ import { workspaceLabel } from "../components/app-header";
 
 describe("what the header calls this install", () => {
 	it("does not say CRM twice before anybody has named the workspace", () => {
-		expect(workspaceLabel(DEFAULT_WORKSPACE_NAME)).toBe("CRM");
+		expect(workspaceLabel(DEFAULT_WORKSPACE_NAME)).toBe("Vault Zero CRM");
 	});
 
 	it("falls back to CRM while the workspace is still loading", () => {
-		expect(workspaceLabel(undefined)).toBe("CRM");
-		expect(workspaceLabel("")).toBe("CRM");
-		expect(workspaceLabel("   ")).toBe("CRM");
+		expect(workspaceLabel(undefined)).toBe("Vault Zero CRM");
+		expect(workspaceLabel("")).toBe("Vault Zero CRM");
+		expect(workspaceLabel("   ")).toBe("Vault Zero CRM");
 	});
 
 	it("names the company once it has one", () => {

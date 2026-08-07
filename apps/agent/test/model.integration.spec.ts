@@ -54,10 +54,10 @@ describe("the configured model", () => {
 			contextWindowTokens: 200_000,
 		});
 
-		expect(await selectedModel()).toEqual({
-			model: "anthropic/claude-sonnet-5",
-			modelContextWindowTokens: 200_000,
-		});
+		const selection = await selectedModel();
+
+		expect(selection?.model.modelId).toBe("anthropic/claude-sonnet-5");
+		expect(selection?.modelContextWindowTokens).toBe(200_000);
 	});
 
 	it("goes back to the fallback when the choice is cleared", async () => {

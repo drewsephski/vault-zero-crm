@@ -10,7 +10,7 @@ export function LandingFooter() {
 				<div className="flex w-[280px] max-w-full shrink-0 flex-col gap-[14px]">
 					<Wordmark />
 					<p className="text-[13px]/[21px] text-muted-foreground">
-						The open source agentic CRM.
+						The open source CRM for agent-assisted teams.
 					</p>
 				</div>
 
@@ -39,11 +39,11 @@ export function LandingFooter() {
 						Built with love by
 						<Logo className="size-[13px] shrink-0 text-foreground" />
 						<Link
-							href="https://trycomp.ai?utm_source=crm_landing_footer&utm_medium=referral"
+							href="https://www.vaultzero.dev?utm_source=crm_landing_footer&utm_medium=referral"
 							target="_blank"
 							className="font-medium text-foreground"
 						>
-							Comp AI
+							Vault Zero
 						</Link>
 					</p>
 

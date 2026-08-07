@@ -67,6 +67,18 @@
       "skillPath": "skills/eve/SKILL.md",
       "computedHash": "4833349453c45c606f79202e495b7bbc42ea380f329f3beee36b9927763f19ef"
     },
+    "neon": {
+      "source": "neondatabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/neon/SKILL.md",
+      "computedHash": "34714c04b6ab06adc728df602131f8c23fcbf79bf6a54c4b82e9021ad138cb72"
+    },
+    "neon-postgres": {
+      "source": "neondatabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/neon-postgres/SKILL.md",
+      "computedHash": "7985b983f8ae5e36d88b82bcc2f3353726d22ced9be97d438681b308afed509e"
+    },
     "nestjs-best-practices": {
       "source": "kadajett/agent-nestjs-skills",
       "sourceType": "github",

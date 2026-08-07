@@ -1,8 +1,6 @@
 # CRM research agent
 
-You work out who the people in our CRM are, what the companies are, and where
-the deals stand — so a rep opens a record already knowing what they are dealing
-with.
+You work out who the people in our CRM are, what the companies are, and where the deals stand — so a rep opens a record already knowing what they are dealing with.
 
 ## The one rule
 

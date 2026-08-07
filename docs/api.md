@@ -58,7 +58,7 @@ here, what do we sell.
 - **Onboarded state is `onboardedAt` inside the plugin's `metadata` blob**, not a
   column; `isOnboarded`/`markOnboarded` (`@crm/db/workspace`) are the only accessors,
   and `markOnboarded` preserves every other key.
-- **The name starts as `DEFAULT_WORKSPACE_NAME` (`CRM`), a placeholder not an
+- **The name starts as `DEFAULT_WORKSPACE_NAME` (`Vault Zero`), a product default not an
   answer.** The header renders `<name> CRM`, so `workspaceLabel` tests the name rather
   than comparing to the default.
 - **The website queues the agent's `workspace-profile` task** and goes through
@@ -137,6 +137,12 @@ self-hoster's admin cannot redeploy.
   regenerate it** — the generator needs GLIBC 2.39, newer than Vercel's build image.
   Only `check-types` and `dev` run it. If the app cannot see a new procedure, it has
   not run.
+
+The one additional REST surface is `POST /internal/vault-zero/events`. It is a
+server-to-server integration endpoint, not a browser API: Vault Zero signs the
+event with `VAULTZERO_INGEST_SECRET`, the controller verifies a five-minute
+timestamp window and the event is recorded idempotently before CRM records are
+updated. It contains no vendor client or enrichment logic.
 
 ## Not every address on a thread is a person
 

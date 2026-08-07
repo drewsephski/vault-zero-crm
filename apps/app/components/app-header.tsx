@@ -29,16 +29,10 @@ import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 
 type User = { name: string; email: string; image: string | null };
 
-/**
- * The workspace arrives named `CRM` until somebody types something else — the
- * deliberate placeholder — so appending the product name to it read "CRM CRM".
- * A workspace genuinely called "Acme CRM" has the same problem, which is why
- * this tests the name rather than comparing it to the default.
- */
 export function workspaceLabel(name: string | undefined): string {
 	const trimmed = name?.trim();
 
-	if (!trimmed) return "CRM";
+	if (!trimmed) return "Vault Zero CRM";
 
 	return /\bcrm$/i.test(trimmed) ? trimmed : `${trimmed} CRM`;
 }

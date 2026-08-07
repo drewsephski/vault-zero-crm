@@ -113,6 +113,7 @@ export function DashboardSummary() {
 	return (
 		<div className="flex flex-col gap-6">
 			<SalesDashboard summary={summary} />
+			<VaultZeroPipeline summary={summary.vaultZero} />
 
 			<div className="grid gap-6 @3xl/page-content:grid-cols-2">
 				<Card className="min-w-0">
@@ -294,6 +295,171 @@ export function DashboardSummary() {
 				)}
 			</Card>
 		</div>
+	);
+}
+
+function VaultZeroPipeline({
+	summary,
+}: {
+	summary: {
+		leads: {
+			count: number;
+			items: Array<{
+				submissionId: string;
+				status: string;
+				title: string;
+				detail: string | null;
+				companyId: string | null;
+				contactId: string | null;
+				dealId: string | null;
+				createdAt: string;
+			}>;
+		};
+		proposals: {
+			count: number;
+			items: Array<{
+				proposalId: string;
+				status: string;
+				title: string;
+				detail: string | null;
+				annualValueCents: number | null;
+				companyId: string | null;
+				contactId: string | null;
+				dealId: string | null;
+				updatedAt: string;
+			}>;
+		};
+	};
+}) {
+	const openRecord = useOpenRecord();
+	const workspaceUrl = useWorkspaceUrl();
+	const leadColumns: SimpleTableColumn[] = [
+		{ header: "Lead" },
+		{ header: "Status", width: "w-28", align: "right" },
+	];
+	const proposalColumns: SimpleTableColumn[] = [
+		{ header: "Proposal" },
+		{ header: "Value", width: "w-24", align: "right" },
+	];
+	const isEmpty =
+		summary.leads.items.length === 0 && summary.proposals.items.length === 0;
+
+	return (
+		<Card className="min-w-0">
+			<CardHeader>
+				<CardTitle>Vault Zero pipeline</CardTitle>
+				<CardDescription>
+					{summary.leads.count + summary.proposals.count === 0
+						? "New intake and proposals will appear here"
+						: `${formatCount(summary.leads.count, "active lead")} and ${formatCount(summary.proposals.count, "proposal")} need attention`}
+				</CardDescription>
+				<CardAction>
+					<Button asChild variant="contrast" size="sm">
+						<Link href={workspaceUrl("/deals")}>Open pipeline</Link>
+					</Button>
+				</CardAction>
+			</CardHeader>
+			{isEmpty ? (
+				<CardPanelEmpty>No active Vault Zero intake right now.</CardPanelEmpty>
+			) : (
+				<CardPanel className="grid gap-6 @3xl/page-content:grid-cols-2">
+					<div className="min-w-0">
+						<p className="mb-2 font-medium text-sm">Needs attention</p>
+						{summary.leads.items.length === 0 ? (
+							<p className="text-muted-foreground text-sm">No active leads.</p>
+						) : (
+							<SimpleTable variant="panel" surface="page" columns={leadColumns}>
+								{summary.leads.items.map((lead) => (
+									<SimpleTableRow
+										key={lead.submissionId}
+										clickable={Boolean(
+											lead.dealId ?? lead.companyId ?? lead.contactId,
+										)}
+										onClick={() => {
+											if (lead.dealId)
+												openRecord({ kind: "deal", id: lead.dealId });
+											else if (lead.companyId)
+												openRecord({ kind: "company", id: lead.companyId });
+											else if (lead.contactId)
+												openRecord({ kind: "contact", id: lead.contactId });
+										}}
+									>
+										<TableCell className={CELL}>
+											<span className="flex min-w-0 flex-col">
+												<span className="truncate font-medium">
+													{lead.title}
+												</span>
+												<span className="truncate text-muted-foreground">
+													{lead.detail ?? relativeTimeFromIso(lead.createdAt)}
+												</span>
+											</span>
+										</TableCell>
+										<TableCell className={`${CELL} text-right`}>
+											<StatusIndicator
+												tone="warning"
+												size="sm"
+												label={lead.status}
+											/>
+										</TableCell>
+									</SimpleTableRow>
+								))}
+							</SimpleTable>
+						)}
+					</div>
+					<div className="min-w-0">
+						<p className="mb-2 font-medium text-sm">Proposals</p>
+						{summary.proposals.items.length === 0 ? (
+							<p className="text-muted-foreground text-sm">
+								No proposals awaiting a response.
+							</p>
+						) : (
+							<SimpleTable
+								variant="panel"
+								surface="page"
+								columns={proposalColumns}
+							>
+								{summary.proposals.items.map((proposal) => (
+									<SimpleTableRow
+										key={proposal.proposalId}
+										clickable={Boolean(
+											proposal.dealId ??
+												proposal.companyId ??
+												proposal.contactId,
+										)}
+										onClick={() => {
+											if (proposal.dealId)
+												openRecord({ kind: "deal", id: proposal.dealId });
+											else if (proposal.companyId)
+												openRecord({ kind: "company", id: proposal.companyId });
+											else if (proposal.contactId)
+												openRecord({ kind: "contact", id: proposal.contactId });
+										}}
+									>
+										<TableCell className={CELL}>
+											<span className="flex min-w-0 flex-col">
+												<span className="truncate font-medium">
+													{proposal.title}
+												</span>
+												<span className="truncate text-muted-foreground">
+													{proposal.detail ?? proposal.status}
+												</span>
+											</span>
+										</TableCell>
+										<TableCell className={`${CELL} text-right tabular-nums`}>
+											{proposal.annualValueCents === null ? (
+												<EmptyCellValue />
+											) : (
+												formatMoneyCompact(proposal.annualValueCents, "USD")
+											)}
+										</TableCell>
+									</SimpleTableRow>
+								))}
+							</SimpleTable>
+						)}
+					</div>
+				</CardPanel>
+			)}
+		</Card>
 	);
 }
 

@@ -25,6 +25,7 @@ import { SsoModule } from "./sso/sso.module";
 import { TelemetryModule } from "./telemetry/telemetry.module";
 import { TrpcModule } from "./trpc/trpc.module";
 import { UsersModule } from "./users/users.module";
+import { VaultZeroModule } from "./vault-zero/vault-zero.module";
 import { WorkspaceModule } from "./workspace/workspace.module";
 
 @Module({
@@ -43,6 +44,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		HealthModule,
 		TrpcModule,
 		UsersModule,
+		VaultZeroModule,
 		CompaniesModule,
 		ContactsModule,
 		ConversationsModule,

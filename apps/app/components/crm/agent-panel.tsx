@@ -54,6 +54,7 @@ import {
 } from "@/components/crm/agent-conversations";
 import {
 	type AgentRecord,
+	type AgentScope,
 	recordCopy,
 	recordFilter,
 	recordHeader,
@@ -78,8 +79,23 @@ import { useTRPC } from "@/lib/trpc/client";
 import { useRecordSheetView } from "./record-sheet/record-stack";
 
 export function AgentPanel({ record }: { record: AgentRecord }) {
-	const conversations = useConversations(recordFilter(record));
 	const { thread, setThread } = useRecordSheetView("overview");
+
+	return (
+		<AgentChat scope={record} thread={thread} onThreadChange={setThread} />
+	);
+}
+
+export function AgentChat({
+	scope,
+	thread,
+	onThreadChange,
+}: {
+	scope: AgentScope;
+	thread: string | null;
+	onThreadChange: (thread: string | null) => void;
+}) {
+	const conversations = useConversations(recordFilter(scope));
 
 	const history = conversations.data ?? [];
 
@@ -101,16 +117,16 @@ export function AgentPanel({ record }: { record: AgentRecord }) {
 			<ConversationPicker
 				conversations={history}
 				current={current}
-				onSelect={(conversation) => setThread(conversation.id)}
-				onNew={() => setThread(NEW_THREAD)}
+				onSelect={(conversation) => onThreadChange(conversation.id)}
+				onNew={() => onThreadChange(NEW_THREAD)}
 				busy={false}
 			/>
 
 			<ThreadWithHistory
 				key={openId ?? NEW_THREAD}
-				record={record}
+				scope={scope}
 				conversation={current}
-				onNewThread={() => setThread(NEW_THREAD)}
+				onNewThread={() => onThreadChange(NEW_THREAD)}
 			/>
 		</div>
 	);
@@ -120,11 +136,11 @@ const WORKING_POLL_MS = 3000;
 const SETTLED_TTL_MS = 60_000;
 
 function ThreadWithHistory({
-	record,
+	scope,
 	conversation,
 	onNewThread,
 }: {
-	record: AgentRecord;
+	scope: AgentScope;
 	conversation: Conversation | null;
 	onNewThread: () => void;
 }) {
@@ -138,7 +154,7 @@ function ThreadWithHistory({
 		refetchInterval: (query) =>
 			query.state.data?.status === "working" ? WORKING_POLL_MS : false,
 		queryFn: ({ signal }) =>
-			loadThread(conversation?.sessionId ?? "", recordHeader(record), signal),
+			loadThread(conversation?.sessionId ?? "", recordHeader(scope), signal),
 	});
 
 	const offline = thread.data?.status === "offline";
@@ -155,7 +171,7 @@ function ThreadWithHistory({
 	return (
 		<Thread
 			key={thread.data?.status === "working" ? "working" : "settled"}
-			record={record}
+			scope={scope}
 			conversation={conversation}
 			thread={
 				offline ? offlineThread((archive.data ?? []) as never) : thread.data
@@ -174,19 +190,19 @@ function Loading() {
 }
 
 function Thread({
-	record,
+	scope,
 	conversation,
 	thread,
 	onNewThread,
 }: {
-	record: AgentRecord;
+	scope: AgentScope;
 	conversation: Conversation | null;
 	thread: ThreadState | undefined;
 	onNewThread: () => void;
 }) {
-	const copy = recordCopy(record.kind);
+	const copy = recordCopy(scope.kind);
 	const agent = useEveAgent({
-		headers: recordHeader(record),
+		headers: recordHeader(scope),
 		...(thread && "session" in thread
 			? { initialSession: thread.session, initialEvents: eventsOf(thread) }
 			: { initialEvents: eventsOf(thread) }),
@@ -196,7 +212,7 @@ function Thread({
 	const opening = useRef<string | null>(conversation?.title ?? null);
 
 	useSavedConversation({
-		record: recordFilter(record),
+		scope: recordFilter(scope),
 		conversation,
 		opening,
 		session: agent.session ?? null,
@@ -223,7 +239,7 @@ function Thread({
 					<MessageScrollerViewport>
 						<MessageScrollerContent className="gap-3 px-5 py-4">
 							{messages.length === 0 && !busy ? (
-								<Idle kind={record.kind} onAsk={ask} />
+								<Idle kind={scope.kind} onAsk={ask} />
 							) : null}
 
 							{messages.map((message) => (
@@ -299,7 +315,7 @@ function Idle({
 	kind,
 	onAsk,
 }: {
-	kind: AgentRecord["kind"];
+	kind: AgentScope["kind"];
 	onAsk: (question: string) => void;
 }) {
 	const copy = recordCopy(kind);
@@ -469,13 +485,18 @@ function Question({
 }
 
 function useSavedConversation({
-	record,
+	scope,
 	conversation,
 	opening,
 	session,
 	messages,
 }: {
-	record: { contactId?: string; companyId?: string; dealId?: string };
+	scope: {
+		scope?: "workspace";
+		contactId?: string;
+		companyId?: string;
+		dealId?: string;
+	};
 	conversation: Conversation | null;
 	opening: React.RefObject<string | null>;
 	session: {
@@ -492,7 +513,7 @@ function useSavedConversation({
 	const sessionId = session?.sessionId ?? null;
 	const token = session?.continuationToken ?? null;
 	const streamIndex = session?.streamIndex ?? 0;
-	const { contactId, companyId, dealId } = record;
+	const { scope: conversationScope, contactId, companyId, dealId } = scope;
 
 	const isNew = conversation === null || conversation.sessionId !== sessionId;
 
@@ -517,6 +538,7 @@ function useSavedConversation({
 
 		mutation.mutate(
 			{
+				...(conversationScope ? { scope: conversationScope } : {}),
 				...(contactId ? { contactId } : {}),
 				...(companyId ? { companyId } : {}),
 				...(dealId ? { dealId } : {}),
@@ -540,6 +562,7 @@ function useSavedConversation({
 		token,
 		streamIndex,
 		messages,
+		conversationScope,
 		contactId,
 		companyId,
 		dealId,

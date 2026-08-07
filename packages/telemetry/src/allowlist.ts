@@ -10,14 +10,14 @@ export const ALLOWED_PROPERTIES = [
 	"seed_only",
 
 	"cap_rapidapi",
-	"cap_perplexity",
+	"cap_tavily",
 	"cap_context_dev",
 	"cap_blob",
 	"cap_github",
 	"cap_redis",
 	"cap_agent_bridge",
 	"cap_cron_secret",
-	"cap_ai_gateway",
+	"cap_openrouter",
 	"cap_google_oauth",
 	"cap_sso_provider",
 	"is_marketing",
@@ -126,6 +126,7 @@ export const AGENT_TOOLS = [
 	"set_contact_socials",
 	"write_brief",
 	"write_workspace_profile",
+	"web_search",
 ] as const;
 
 export const EVE_TOOLS = [
@@ -139,7 +140,6 @@ export const EVE_TOOLS = [
 	"read_file",
 	"todo",
 	"web_fetch",
-	"web_search",
 	"write_file",
 ] as const;
 

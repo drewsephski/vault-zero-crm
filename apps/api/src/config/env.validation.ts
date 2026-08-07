@@ -90,6 +90,14 @@ export class EnvironmentVariables {
 	BLOB_READ_WRITE_TOKEN?: string;
 
 	@IsOptional()
+	@IsString()
+	OPENROUTER_API_KEY?: string;
+
+	@IsOptional()
+	@IsString()
+	TAVILY_API_KEY?: string;
+
+	@IsOptional()
 	@IsUrl(
 		{ require_tld: false, require_protocol: true },
 		{
@@ -102,6 +110,13 @@ export class EnvironmentVariables {
 	@IsOptional()
 	@IsString()
 	AGENT_BRIDGE_SECRET?: string;
+
+	@IsOptional()
+	@IsString()
+	@MinLength(32, {
+		message: "VAULTZERO_INGEST_SECRET must be at least 32 characters.",
+	})
+	VAULTZERO_INGEST_SECRET?: string;
 
 	@IsOptional()
 	@IsString()

@@ -20,10 +20,11 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
 	title: {
-		default: "Comp AI - CRM",
-		template: "%s · Comp AI CRM",
+		default: "Vault Zero CRM",
+		template: "%s · Vault Zero CRM",
 	},
-	description: "Customer Relationship Management for Comp AI",
+	description:
+		"Vault Zero CRM: customer records, revenue, and agent workflows in one place.",
 	icons: {
 		icon: [
 			{ url: "/favicon.svg", type: "image/svg+xml" },

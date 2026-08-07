@@ -2,7 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { analyticsAllowed } from "../lib/analytics";
 
 describe("analyticsAllowed", () => {
-	it("allows the two hosts the landing page is served from", () => {
+	it("allows the Vault Zero marketing hosts and legacy hosts", () => {
+		expect(analyticsAllowed("vaultzero.dev")).toBe(true);
+		expect(analyticsAllowed("www.vaultzero.dev")).toBe(true);
+		expect(analyticsAllowed("crm.vaultzero.dev")).toBe(true);
 		expect(analyticsAllowed("trycrm.ai")).toBe(true);
 		expect(analyticsAllowed("www.trycrm.ai")).toBe(true);
 	});

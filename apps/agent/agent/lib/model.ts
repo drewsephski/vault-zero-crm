@@ -1,8 +1,9 @@
 import { db } from "@crm/db";
 import { readAgentModel } from "@crm/db/settings";
+import { openRouterModel } from "./openrouter";
 
 export interface ModelSelection {
-	model: string;
+	model: ReturnType<typeof openRouterModel>;
 	modelContextWindowTokens: number;
 }
 
@@ -13,7 +14,7 @@ export async function selectedModel(): Promise<ModelSelection | null> {
 		if (setting.isDefault) return null;
 
 		return {
-			model: setting.id,
+			model: openRouterModel(setting.id),
 			modelContextWindowTokens: setting.contextWindowTokens,
 		};
 	} catch (error) {

@@ -59,6 +59,10 @@ export class DashboardService {
 			overdueTasks,
 			recentActivity,
 			unconverted,
+			vaultZeroLeads,
+			vaultZeroLeadCount,
+			vaultZeroProposals,
+			vaultZeroProposalCount,
 		] = await Promise.all([
 			this.db.deal.groupBy({
 				by: ["stage"],
@@ -165,6 +169,41 @@ export class DashboardService {
 				},
 			}),
 			this.conversion.unconverted(owned),
+			this.db.vaultZeroLead.findMany({
+				where: { status: { notIn: ["won", "lost"] } },
+				orderBy: [{ createdAt: "desc" }],
+				take: 6,
+				select: {
+					submissionId: true,
+					source: true,
+					status: true,
+					payload: true,
+					companyId: true,
+					contactId: true,
+					dealId: true,
+					createdAt: true,
+				},
+			}),
+			this.db.vaultZeroLead.count({
+				where: { status: { notIn: ["won", "lost"] } },
+			}),
+			this.db.vaultZeroProposal.findMany({
+				where: { status: { in: ["sent", "viewed"] } },
+				orderBy: [{ updatedAt: "desc" }],
+				take: 6,
+				select: {
+					proposalId: true,
+					status: true,
+					payload: true,
+					companyId: true,
+					contactId: true,
+					dealId: true,
+					updatedAt: true,
+				},
+			}),
+			this.db.vaultZeroProposal.count({
+				where: { status: { in: ["sent", "viewed"] } },
+			}),
 		]);
 
 		const stages = OPEN_DEAL_STAGES.map((stage) => {
@@ -284,6 +323,59 @@ export class DashboardService {
 				createdAt: createdAt.toISOString(),
 				meta: meta as Record<string, unknown> | null,
 			})),
+			vaultZero: {
+				leads: {
+					count: vaultZeroLeadCount,
+					items: vaultZeroLeads.map(({ createdAt, payload, ...lead }) => ({
+						...lead,
+						title: payloadText(payload, "name") ?? "New lead",
+						detail:
+							payloadText(payload, "company") ?? payloadText(payload, "email"),
+						createdAt: createdAt.toISOString(),
+					})),
+				},
+				proposals: {
+					count: vaultZeroProposalCount,
+					items: vaultZeroProposals.map(
+						({ updatedAt, payload, ...proposal }) => ({
+							...proposal,
+							title: payloadText(payload, "clientCompany") ?? "Proposal",
+							detail: payloadText(payload, "packageName"),
+							annualValueCents: proposalValueCents(payload),
+							updatedAt: updatedAt.toISOString(),
+						}),
+					),
+				},
+			},
 		};
 	}
+}
+
+function payloadText(payload: unknown, key: string): string | null {
+	if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+		return null;
+	}
+
+	const value = (payload as Record<string, unknown>)[key];
+	return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function proposalValueCents(payload: unknown): number | null {
+	if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+		return null;
+	}
+
+	const value = payload as Record<string, unknown>;
+	const setupFeeCents = value.setupFeeCents;
+	const monthlyFeeCents = value.monthlyFeeCents;
+	if (
+		typeof setupFeeCents !== "number" ||
+		typeof monthlyFeeCents !== "number" ||
+		!Number.isSafeInteger(setupFeeCents) ||
+		!Number.isSafeInteger(monthlyFeeCents)
+	) {
+		return null;
+	}
+
+	return setupFeeCents + monthlyFeeCents * 12;
 }

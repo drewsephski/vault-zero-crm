@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const conversationListInput = z.object({
+	scope: z.literal("workspace").optional(),
 	contactId: z.string().optional(),
 	companyId: z.string().optional(),
 	dealId: z.string().optional(),
@@ -9,6 +10,7 @@ export const conversationListInput = z.object({
 export type ConversationListInput = z.infer<typeof conversationListInput>;
 
 export const conversationSaveInput = z.object({
+	scope: z.literal("workspace").optional(),
 	contactId: z.string().optional(),
 	companyId: z.string().optional(),
 	dealId: z.string().optional(),

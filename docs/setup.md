@@ -41,6 +41,28 @@ AGENT_BRIDGE_SECRET="$(openssl rand -base64 32)"
 the bridge — send `-H 'Host: agent.example.com'`. `GET /eve/v1/info` is the whole
 inventory, including a `diagnostics` count that finds files eve silently ignored.
 
+## Agent providers
+
+Model-backed sessions use OpenRouter directly through the AI SDK, while open-web
+research uses Tavily:
+
+```sh
+OPENROUTER_API_KEY="sk-or-v1-..."
+TAVILY_API_KEY="tvly-..."
+```
+
+Create the keys at [OpenRouter](https://openrouter.ai/keys) and
+[Tavily](https://app.tavily.com). The default OpenRouter model is Gemini 2.5
+Flash-Lite, currently priced at $0.10 per million input tokens and $0.40 per million
+output tokens, so add a small OpenRouter credit balance. Tavily's free plan includes
+1,000 search credits per month. Model pricing and provider data policies can change,
+so review the OpenRouter provider and privacy settings before sending production CRM
+data.
+
+`OPENROUTER_API_KEY` is required for a conversation or research task that invokes the
+model. `TAVILY_API_KEY` is optional: without it, the agent uses CRM history and other
+configured sources and explicitly reports that open-web research was unavailable.
+
 ## Running the agent
 
 **`bun run dev` is `eve dev --no-ui`** — turbo gives each task a pty, so the
@@ -70,7 +92,9 @@ bun run --filter=agent dispatch    # exact production path, both lanes, real cre
 ```
 
 Its printed `sessionIds` are research rows only, so a run that resolved forty logos
-prints an empty list and was not idle. `eve start` and Vercel do run the schedule.
+prints an empty list and was not idle. Production uses
+`.github/workflows/vault-zero-scheduler.yml` to call the authenticated dispatch
+route every five minutes, so the Vercel deployment does not require Vercel Cron.
 
 ## `vercel env pull` writes `.env.local`, which wins
 

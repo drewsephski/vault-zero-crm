@@ -4,16 +4,35 @@ export type AgentRecordKind = "contact" | "company" | "deal";
 
 export type AgentRecord = { kind: AgentRecordKind; id: string };
 
-type RecordCopy = {
-	header: string;
-	field: "contactId" | "companyId" | "dealId";
+export type AgentScope = AgentRecord | { kind: "workspace" };
+
+export type AgentScopeKind = AgentScope["kind"];
+
+type ScopeCopy = {
 	title: string;
 	blurb: string;
 	placeholder: string;
 	suggestions: string[];
 };
 
-const COPY: Record<AgentRecordKind, RecordCopy> = {
+type RecordCopy = ScopeCopy & {
+	header: string;
+	field: "contactId" | "companyId" | "dealId";
+};
+
+const WORKSPACE_COPY: ScopeCopy = {
+	title: "Ask across your CRM",
+	blurb:
+		"Find any contact, company or deal, and see what research needs attention.",
+	placeholder: "What needs attention?",
+	suggestions: [
+		"What research is waiting?",
+		"Find a company or person",
+		"What can you help me with?",
+	],
+};
+
+const RECORD_COPY: Record<AgentRecordKind, RecordCopy> = {
 	contact: {
 		header: "x-crm-contact",
 		field: "contactId",
@@ -55,20 +74,23 @@ const COPY: Record<AgentRecordKind, RecordCopy> = {
 	},
 };
 
-export function recordCopy(kind: AgentRecordKind): RecordCopy {
-	return COPY[kind];
+export function recordCopy(kind: AgentScopeKind) {
+	return kind === "workspace" ? WORKSPACE_COPY : RECORD_COPY[kind];
 }
 
-export function recordHeader(record: AgentRecord): Record<string, string> {
-	return { [COPY[record.kind].header]: record.id };
+export function recordHeader(scope: AgentScope): Record<string, string> {
+	if (scope.kind === "workspace") return {};
+	return { [RECORD_COPY[scope.kind].header]: scope.id };
 }
 
-export function recordFilter(record: AgentRecord): {
+export function recordFilter(scope: AgentScope): {
+	scope?: "workspace";
 	contactId?: string;
 	companyId?: string;
 	dealId?: string;
 } {
-	return { [COPY[record.kind].field]: record.id };
+	if (scope.kind === "workspace") return { scope: "workspace" };
+	return { [RECORD_COPY[scope.kind].field]: scope.id };
 }
 
 export type { CarbonIcon };

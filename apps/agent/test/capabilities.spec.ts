@@ -9,7 +9,7 @@ import {
 
 const KEYS = [
 	"RAPIDAPI_KEY",
-	"PERPLEXITY_API_KEY",
+	"TAVILY_API_KEY",
 	"BLOB_READ_WRITE_TOKEN",
 ] as const;
 
@@ -36,9 +36,9 @@ describe("capabilities", () => {
 	});
 
 	it("turns one on without turning on the others", async () => {
-		process.env.PERPLEXITY_API_KEY = "pplx-test";
+		process.env.TAVILY_API_KEY = "tvly-test";
 
-		expect(await enabled("PERPLEXITY_API_KEY")).toBe(true);
+		expect(await enabled("TAVILY_API_KEY")).toBe(true);
 		expect(await enabled("RAPIDAPI_KEY")).toBe(false);
 	});
 

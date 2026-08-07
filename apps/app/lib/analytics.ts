@@ -1,4 +1,7 @@
 export const ANALYTICS_HOSTS: readonly string[] = [
+	"vaultzero.dev",
+	"www.vaultzero.dev",
+	"crm.vaultzero.dev",
 	"trycrm.ai",
 	"www.trycrm.ai",
 ];

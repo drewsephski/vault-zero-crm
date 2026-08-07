@@ -2,7 +2,7 @@ import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Cache } from "cache-manager";
 
-const CATALOG_URL = "https://ai-gateway.vercel.sh/v1/models";
+const CATALOG_URL = "https://openrouter.ai/api/v1/models";
 
 const CATALOG_TTL_MS = 30 * 60_000;
 
@@ -18,14 +18,12 @@ export interface CatalogModel {
 	pricing: { input: number; output: number } | null;
 }
 
-interface GatewayModel {
+interface OpenRouterModel {
 	id?: unknown;
 	name?: unknown;
-	owned_by?: unknown;
-	type?: unknown;
-	tags?: unknown;
-	context_window?: unknown;
-	pricing?: { input?: unknown; output?: unknown } | null;
+	context_length?: unknown;
+	supported_parameters?: unknown;
+	pricing?: { prompt?: unknown; completion?: unknown } | null;
 }
 
 function rate(value: unknown): number | null {
@@ -33,14 +31,25 @@ function rate(value: unknown): number | null {
 	return typeof parsed === "number" && Number.isFinite(parsed) ? parsed : null;
 }
 
-function usable(model: GatewayModel): boolean {
-	const tags = Array.isArray(model.tags) ? model.tags : [];
+function usable(model: OpenRouterModel): boolean {
+	const parameters = Array.isArray(model.supported_parameters)
+		? model.supported_parameters
+		: [];
 	return (
 		typeof model.id === "string" &&
-		model.type === "language" &&
-		tags.includes("tool-use") &&
-		typeof model.context_window === "number"
+		parameters.includes("tools") &&
+		typeof model.context_length === "number" &&
+		model.context_length > 0
 	);
+}
+
+function providerName(id: string, name: unknown): string {
+	if (typeof name === "string") {
+		const separator = name.indexOf(":");
+		if (separator > 0) return name.slice(0, separator);
+	}
+
+	return id.split("/")[0] ?? id;
 }
 
 @Injectable()
@@ -82,22 +91,19 @@ export class ModelCatalogService {
 
 			const body = (await response.json()) as { data?: unknown };
 			const rows = Array.isArray(body.data)
-				? (body.data as GatewayModel[])
+				? (body.data as OpenRouterModel[])
 				: [];
 
 			const models = rows.filter(usable).map((model): CatalogModel => {
 				const id = model.id as string;
-				const input = rate(model.pricing?.input);
-				const output = rate(model.pricing?.output);
+				const input = rate(model.pricing?.prompt);
+				const output = rate(model.pricing?.completion);
 
 				return {
 					id,
 					name: typeof model.name === "string" && model.name ? model.name : id,
-					provider:
-						typeof model.owned_by === "string" && model.owned_by
-							? model.owned_by
-							: (id.split("/")[0] ?? id),
-					contextWindowTokens: model.context_window as number,
+					provider: providerName(id, model.name),
+					contextWindowTokens: model.context_length as number,
 					pricing: input !== null && output !== null ? { input, output } : null,
 				};
 			});

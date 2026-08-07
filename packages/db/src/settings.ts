@@ -8,8 +8,8 @@ import {
 export const SETTINGS_ID = "app";
 
 export const DEFAULT_AGENT_MODEL = {
-	id: "zai/glm-5.2-fast",
-	contextWindowTokens: 1_000_000,
+	id: "google/gemini-2.5-flash-lite",
+	contextWindowTokens: 1_048_576,
 } as const;
 
 export interface AgentModelSetting {

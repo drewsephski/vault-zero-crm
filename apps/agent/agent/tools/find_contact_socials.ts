@@ -1,5 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { enabled, unavailable } from "../lib/capabilities";
 import { personForVerification, stampSocialsChecked } from "../lib/crm";
 import { focusOn, spend } from "../lib/focus";
 import { findSocialCandidates } from "../lib/socials";
@@ -12,6 +13,9 @@ export default defineTool({
 	}),
 	async execute({ contactId }) {
 		focusOn({ contactId });
+		if (!(await enabled("TAVILY_API_KEY"))) {
+			return { searched: false as const, ...unavailable("TAVILY_API_KEY") };
+		}
 
 		const person = await personForVerification(contactId);
 		if (!person) {

@@ -48,7 +48,7 @@ export function capabilitiesFrom(
 				"a person's real name, current title, employer and tenure, self-reported, and so authoritative on identity",
 		},
 		{
-			...fromEnv("PERPLEXITY_API_KEY"),
+			...fromEnv("TAVILY_API_KEY"),
 			label: "Web research",
 			gives:
 				"open-web context with citations, and the search that finds a LinkedIn slug in the first place",

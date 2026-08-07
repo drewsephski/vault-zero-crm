@@ -11,10 +11,10 @@
   <img alt="stars" height="21" src="https://afterglow.watch/badge/trycompai/crm">
 </p>
 
-<h1 align="center">CRM</h1>
+<h1 align="center">Vault Zero CRM</h1>
 
 <p align="center">
-  <strong>An open-source, agentic-first CRM.</strong><br>
+  <strong>An open-source CRM for agent-assisted teams.</strong><br>
   A durable research agent is the product. The database is just where it writes things down.
 </p>
 
@@ -83,7 +83,7 @@ stopped.
 
 | | |
 | --- | --- |
-| **18 authored tools** | `read_crm_history`, `search_crm`, `identify_contact`, `research_person`, `enrich_company`, `record_fact`, `schedule_recheck`… |
+| **21 authored tools** | `read_crm_history`, `search_crm`, `web_search`, `identify_contact`, `research_person`, `enrich_company`, `record_fact`, `schedule_recheck`… |
 | **4 skills** | `evidence.md`, `identity-matching.md`, `data-boundaries.md`, `writing-a-brief.md` — prose the agent reads, versioned like code |
 | **1 schedule** | `dispatch.ts`, which decides nothing. It leases what is due and starts a session per row. |
 | **A sandbox** | `bash`, `grep`, `glob` and a `/workspace`, with **`deny-all` egress** |
@@ -106,7 +106,7 @@ failed call at a time, and it prints the list at startup:
 
 ```
 [agent] on   LinkedIn (RAPIDAPI_KEY)
-[agent] off  Web research (PERPLEXITY_API_KEY)
+[agent] off  Web research (TAVILY_API_KEY)
 [agent] off  Company brand data (Settings → General)
 ```
 
@@ -122,19 +122,21 @@ variable.
 a shell — the difference between a tool-caller and something that can keep a dossier,
 diff this month's profile against last month's, and grep a thread for a signature
 block. `deny-all` egress costs nothing, because `web_fetch` runs in the app runtime
-and `web_search` at the model provider. What it removes is the only path by which a
+and the Tavily-backed `web_search` runs in the app runtime. What it removes is the only path by which a
 customer's email body could leave through a shell command. The other half of that rule
 is an absence: **the sandbox is never given `DATABASE_URL`.** A shell with credentials
 and egress is exfiltration-shaped even in an internal tool; a shell with neither is a
 text processor.
 
-**You can talk to it, and watch it work.** Every contact, company and deal has an
-**Agent** tab — the steps as it takes them, the leads it throws away and why, and its
-questions answered in place when it cannot decide between two people. Conversations
-are durable and survive a reload; the record travels in a signed token rather than
-being bolted onto the front of your message. Set `AGENT_BRIDGE_SECRET` to the same
-value in both processes to turn it on. Without it the tab reports that it is not
-configured, and the agent carries on running its own schedule.
+**You can talk to it, and watch it work.** The dedicated **Agent** page can search
+across the CRM, continue recent conversations and surface research that needs
+attention. Every contact, company and deal also has a scoped **Agent** tab — the steps
+as it takes them, the leads it throws away and why, and its questions answered in
+place when it cannot decide between two people. Conversations are durable and survive
+a reload; record context travels in a signed token rather than being bolted onto the
+front of your message. Set `AGENT_BRIDGE_SECRET` to the same value in both processes
+to turn it on. Without it the chat reports that it is not configured, and the agent
+carries on running its own schedule.
 
 [`docs/agent.md`](./docs/agent.md) is the full write-up.
 
@@ -146,7 +148,7 @@ A [Turborepo](https://turborepo.dev) monorepo on [Bun](https://bun.com), deploye
 | | |
 | --- | --- |
 | **Agent** | [eve](https://eve.dev) — durable sessions, tools, skills, schedules, sandboxes |
-| **Model** | [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) — no provider SDK, and OIDC on Vercel means no key to manage |
+| **Model** | [OpenRouter](https://openrouter.ai) through the AI SDK — one key and catalog across providers, with Gemini 2.5 Flash-Lite as the low-cost default |
 | **Sandbox** | [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox) in production, Docker or microsandbox locally |
 | **Front end** | [Next.js](https://nextjs.org) App Router · [shadcn/ui](https://ui.shadcn.com) · [nuqs](https://nuqs.dev) for URL state |
 | **API** | [NestJS](https://nestjs.com) with [nestjs-trpc](https://nestjs-trpc.io) — HTTP, auth, tRPC, Google sync |
@@ -251,16 +253,18 @@ ALLOWED_SIGN_IN="you@gmail.com"                  # a one-person install
 environment variables always win, so on a hosting platform you configure it there and
 the file is purely a local convenience.
 
-Beyond the four values above, everything is optional and the app runs without any
-of it. [`.env.example`](./.env.example) is the full list with a note on each; the
-short version:
+Beyond the four values above, the CRM runs without any of it. Model-backed agent
+sessions additionally need `OPENROUTER_API_KEY`; the other integrations only add
+capabilities. [`.env.example`](./.env.example) is the full list with a note on each;
+the short version:
 
 | | |
 | --- | --- |
 | `API_URL` / `APP_URL` | Where the two halves are served. Only needed off localhost. |
-| `PERPLEXITY_API_KEY` | Lets the agent search the open web, with citations. |
+| `OPENROUTER_API_KEY` | Runs the agent model; the default is Gemini 2.5 Flash-Lite. |
+| `TAVILY_API_KEY` | Lets the agent search the open web, with citations. |
 | `RAPIDAPI_KEY` | Lets the agent read LinkedIn profiles for identity. |
-| `AGENT_BRIDGE_SECRET` | Lets a rep talk to the agent from a contact's **Agent** tab. |
+| `AGENT_BRIDGE_SECRET` | Lets a rep talk to the agent from the **Agent** page and record tabs. |
 | `REDIS_URL` | A shared cache. Without it, per-instance and in-memory. |
 | `CRON_SECRET` | Guards the Gmail/Calendar sync route. Required to use it. |
 | `CRM_TELEMETRY_DISABLED` | Set to `1` and this install reports nothing. `DO_NOT_TRACK` too. |
@@ -296,8 +300,9 @@ mismatch is a redirect loop rather than an error.
 Set `API_URL` and `APP_URL` to the real origins, and if the two are on different
 subdomains of one parent, set `AUTH_COOKIE_DOMAIN` to the parent so one cookie covers
 both. Add `http://your-api-host/api/auth/callback/google` to the OAuth client's
-redirect URIs. Set `CRON_SECRET` and point a scheduler at
-`POST /internal/sync/google` to keep the mailbox sync running.
+redirect URIs. Set `CRON_SECRET`; the production scheduler in
+`.github/workflows/vault-zero-scheduler.yml` calls the sync, rates, telemetry, and
+agent dispatch routes without requiring Vercel Cron.
 
 `apps/api/src/generated/server.ts` is committed and `build` must never regenerate it —
 the generator needs a newer GLIBC than most build images have. Regenerate locally and

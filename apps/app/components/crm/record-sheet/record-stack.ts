@@ -8,6 +8,10 @@ import {
 } from "nuqs";
 import { useCallback, useMemo } from "react";
 import {
+	AGENT_THREAD_PARAM,
+	agentThreadParser,
+} from "@/components/crm/agent-search-params";
+import {
 	TIMELINE_PARAM,
 	timelineTabParser,
 } from "@/components/crm/timeline/timeline-search-params";
@@ -31,7 +35,7 @@ const params = {
 	record: parseAsArrayOf(parseAsString, ",").withDefault([]),
 	tab: parseAsString,
 	add: parseAsStringLiteral(RECORD_FORMS),
-	thread: parseAsString,
+	[AGENT_THREAD_PARAM]: agentThreadParser,
 	[TIMELINE_PARAM]: timelineTabParser,
 };
 

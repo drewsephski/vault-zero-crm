@@ -5,6 +5,7 @@ import { onTelemetryProblem, syncVersion } from "@crm/telemetry";
 import { defineAgent, defineDynamic } from "eve";
 import { logCapabilities } from "./lib/capabilities";
 import { selectedModel } from "./lib/model";
+import { openRouterModel } from "./lib/openrouter";
 
 void logCapabilities();
 
@@ -14,7 +15,8 @@ void syncVersion();
 
 export default defineAgent({
 	model: defineDynamic({
-		fallback: DEFAULT_AGENT_MODEL.id,
-		events: { "session.started": () => selectedModel() },
+		fallback: openRouterModel(DEFAULT_AGENT_MODEL.id),
+		events: { "step.started": () => selectedModel() },
 	}),
+	modelContextWindowTokens: DEFAULT_AGENT_MODEL.contextWindowTokens,
 });

@@ -67,22 +67,26 @@ and lists every variable the API reads and nothing else.
 
 ## Optional: what the agent can do
 
-Every outside source is optional and the agent runs with none. A missing key removes a
+Every outside source is optional and the agent can research with none. A missing key removes a
 place to look; **never an error, never throws**. `agent/lib/capabilities.ts` is the
 single place that knows what is set.
 
 | Variable | What it adds |
 | --- | --- |
-| `PERPLEXITY_API_KEY` | Open-web research with citations; finds a LinkedIn slug |
+| `TAVILY_API_KEY` | Open-web research with citations; finds a LinkedIn slug |
 | `RAPIDAPI_KEY` | LinkedIn profiles via LinkDAPI |
 | `GITHUB_TOKEN` | Raises the GitHub rate limit from 60/hour |
 | `BLOB_READ_WRITE_TOKEN` | Mirrors logos and photos into Blob |
-| `AI_GATEWAY_API_KEY` | The model. Not needed on Vercel (OIDC) |
 | `AGENT_BRIDGE_SECRET` | The rep-facing Agent panel — see `agent.md` |
 
 `BLOB_READ_WRITE_TOKEN` is also in `env.validation.ts` and `apps/api/turbo.json`
 because the API and the seed write pictures too. The Next.js app is deliberately
 excluded — recognising our URL for the image optimizer needs no token.
+
+`OPENROUTER_API_KEY` is the agent's model credential. The default is the low-cost
+Gemini 2.5 Flash-Lite, so the OpenRouter account needs credits. Without a key or
+credits the CRM and direct research lanes run, while model-backed agent sessions
+cannot produce a response.
 
 ### The Context key is asked for, not configured
 
@@ -122,9 +126,15 @@ Connections, posting the same `linkSocial` call.
 imports nothing; Calendar reads from `now`.
 
 **`CRON_SECRET`** (min 16 chars) guards `POST /internal/sync/google` and
-`/internal/sync/rates`; both **fail closed when unset**. **Crons live in
-`apps/api/vercel.json`** — Google `*/5 * * * *`, rates daily. Minute-level schedules
-need a Pro plan; on Hobby it silently becomes daily.
+`/internal/sync/rates`; both **fail closed when unset**. The production scheduler is
+`.github/workflows/vault-zero-scheduler.yml`, so the API and agent do not depend on
+Vercel Cron or a paid Vercel plan. The workflow runs Google sync and agent dispatch
+every five minutes, rates at 06:17 UTC, and telemetry at 07:23 UTC.
+
+`VAULTZERO_INGEST_SECRET` is optional and guards the internal Vault Zero event
+endpoint. When set, Vault Zero can deliver signed intake, proposal, and call
+events without receiving the CRM database URL. Keep the same value in Vault
+Zero's `VAULTZERO_CRM_INGEST_SECRET`; neither variable belongs in browser code.
 
 Deliberate absences: **no `GOOGLE_SYNC_ENABLED`** (a switch that can disable a mandatory
 feature is only ever wrong), **no `GOOGLE_WORKSPACE_DOMAIN`** (`ALLOWED_SIGN_IN` already
@@ -137,7 +147,7 @@ says who is internal — two sources is how a colleague becomes a lead), **no
 is sent. No client is constructed, so there is no queue waiting to flush later.
 
 - **Server side only**, `posthog-node` in the API and the agent. **`posthog-js`
-  appears once, on the `trycrm.ai` landing page**, and nowhere a record can be
+  appears once, on the `vaultzero.dev` landing page**, and nowhere a record can be
   reached: autocapture on a CRM would lift contact names and deal amounts out of
   somebody else's database. That one import is gated on
   `window.location.hostname`, not on `IS_MARKETING` — turning the landing page on
