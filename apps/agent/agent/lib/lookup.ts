@@ -41,6 +41,7 @@ export type SearchResult = {
 	companies: CompanyHit[];
 	deals: DealHit[];
 	total: number;
+	needsQuery?: boolean;
 };
 
 export async function searchCrm(
@@ -53,6 +54,17 @@ export async function searchCrm(
 
 	if (term.length < 2) {
 		return { query: term, contacts: [], companies: [], deals: [], total: 0 };
+	}
+
+	if (isSearchIntent(term)) {
+		return {
+			query: term,
+			contacts: [],
+			companies: [],
+			deals: [],
+			total: 0,
+			needsQuery: true,
+		};
 	}
 
 	const wants = (kind: RecordKind) => kinds.includes(kind);
@@ -253,4 +265,16 @@ function bareDomain(term: string): string | null {
 		.toLowerCase()
 		.replace(/^https?:\/\//, "");
 	return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(candidate) ? candidate : null;
+}
+
+function isSearchIntent(term: string): boolean {
+	const normalized = term
+		.toLowerCase()
+		.replace(/[?!.,]/g, "")
+		.replace(/\s+/g, " ")
+		.trim();
+
+	return /^(?:find|search|look up|lookup)(?: for)? (?:a )?(?:company|person|contact|deal|someone)(?: or (?:a )?(?:company|person|contact|deal|someone))?$/.test(
+		normalized,
+	);
 }

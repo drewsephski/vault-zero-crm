@@ -163,4 +163,14 @@ describe("searchCrm", () => {
 	it("refuses a query too short to mean anything", async () => {
 		expect((await searchCrm("a")).total).toBe(0);
 	});
+
+	it("does not search the CRM for a generic action phrase", async () => {
+		const result = await searchCrm("Find a company or person");
+
+		expect(result).toMatchObject({
+			query: "Find a company or person",
+			total: 0,
+			needsQuery: true,
+		});
+	});
 });

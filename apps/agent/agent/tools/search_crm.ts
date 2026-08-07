@@ -34,15 +34,18 @@ export default defineTool({
 		}
 
 		const externalResearch =
-			result.total === 0 && looksLikePersonSearch(query, kinds)
+			result.total === 0 &&
+			!result.needsQuery &&
+			looksLikePersonSearch(query, kinds)
 				? await researchExternalPerson({ name: query, limit: 5 })
 				: null;
 
 		return {
 			...result,
 			...(externalResearch ? { externalResearch } : {}),
-			note:
-				result.total === 0
+			note: result.needsQuery
+				? "This is a search action, not a search target. Ask the rep for the person's name, email address, or company domain before calling search_crm again."
+				: result.total === 0
 					? externalResearch?.found
 						? "Nothing in the CRM matched, so external person discovery has already started. Read the best candidate before asking the rep for more information."
 						: externalResearch
