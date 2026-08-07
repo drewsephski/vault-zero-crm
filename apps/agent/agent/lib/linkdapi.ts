@@ -83,9 +83,13 @@ export function slugFromLinkedinInput(raw: string): string | null {
 	);
 	if (fromUrl) return fromUrl;
 
-	return /^[A-Za-z0-9][A-Za-z0-9_%-]{2,100}$/.test(trimmed)
-		? decodeURIComponent(trimmed)
-		: null;
+	if (!/^[A-Za-z0-9][A-Za-z0-9_%-]{2,100}$/.test(trimmed)) return null;
+
+	try {
+		return decodeURIComponent(trimmed);
+	} catch {
+		return null;
+	}
 }
 
 export async function getProfile(slug: string): Promise<Outcome<Profile>> {

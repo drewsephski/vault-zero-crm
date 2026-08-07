@@ -8,7 +8,7 @@ import { findPersonProfileCandidates } from "../lib/tavily";
 
 export default defineTool({
 	description:
-		"Research a person who is not in the CRM. Search LinkedIn through RapidAPI when configured, then fall back to Tavily to find candidate LinkedIn profiles. Candidates are unverified; read a profile and ask the rep to confirm before writing anything.",
+		"Research a person who is not in the CRM. Use Tavily first to find candidate LinkedIn profiles by name, then use LinkedIn's professional index when Tavily is unavailable or returns nothing. Candidates are unverified; read a profile and ask the rep to confirm before writing anything.",
 	inputSchema: z.object({
 		name: z.string().trim().min(2),
 		companyName: z.string().trim().min(2).optional(),
@@ -18,6 +18,30 @@ export default defineTool({
 	async execute({ name, companyName, title, limit }) {
 		const rapidEnabled = await enabled("RAPIDAPI_KEY");
 		const tavilyEnabled = await enabled("TAVILY_API_KEY");
+
+		if (tavilyEnabled) {
+			const charge = spend();
+			if (!charge.ok) return { found: false as const, reason: charge.reason };
+
+			const candidates = await findPersonProfileCandidates(
+				name,
+				companyName,
+				title,
+			);
+			if (candidates.length > 0) {
+				return {
+					found: true as const,
+					candidates: candidates.slice(0, limit),
+					discovery: "web" as const,
+					searchedFor: {
+						name,
+						companyName: companyName ?? null,
+						title: title ?? null,
+					},
+					note: "Tavily found these profile candidates. Search results are not identity evidence; read a profile before asking the rep to confirm it.",
+				};
+			}
+		}
 
 		if (rapidEnabled) {
 			let currentCompany: string | undefined;
@@ -60,30 +84,6 @@ export default defineTool({
 						title: title ?? null,
 					},
 					note: "These are candidates only. Read the selected profile and corroborate it before treating it as the person being researched.",
-				};
-			}
-		}
-
-		if (tavilyEnabled) {
-			const charge = spend();
-			if (!charge.ok) return { found: false as const, reason: charge.reason };
-
-			const candidates = await findPersonProfileCandidates(
-				name,
-				companyName,
-				title,
-			);
-			if (candidates.length > 0) {
-				return {
-					found: true as const,
-					candidates: candidates.slice(0, limit),
-					discovery: "web" as const,
-					searchedFor: {
-						name,
-						companyName: companyName ?? null,
-						title: title ?? null,
-					},
-					note: "Tavily found these profile candidates. Search results are not identity evidence; read a profile before asking the rep to confirm it.",
 				};
 			}
 		}

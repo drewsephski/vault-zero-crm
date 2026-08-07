@@ -152,6 +152,10 @@ export async function createContact(input: ContactCreate): Promise<{
 	}
 
 	const contact = await db.$transaction(async (tx) => {
+		if (email) {
+			await tx.suppressedContact.deleteMany({ where: { email } });
+		}
+
 		const created = await tx.contact.create({
 			data: {
 				firstName,
