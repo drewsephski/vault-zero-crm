@@ -22,7 +22,7 @@ export default defineTool({
 	async execute({ query, kinds, limit }) {
 		if (!(await enabled(CRM))) return unavailableCapability("CRM database");
 
-		let result;
+		let result: Awaited<ReturnType<typeof searchCrm>>;
 		try {
 			result = await searchCrm(query, { kinds, limit });
 		} catch {

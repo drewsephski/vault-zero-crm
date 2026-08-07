@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
 	CONTEXT_DEV,
+	CRM,
 	capabilitiesFrom,
 	enabled,
 	markdownFor,
@@ -31,7 +32,15 @@ afterEach(() => {
 
 describe("capabilities", () => {
 	it("reports everything off on a bare install", async () => {
-		expect(capabilitiesFrom(null).every((c) => !c.enabled)).toBe(true);
+		const capabilities = capabilitiesFrom(null);
+		expect(
+			capabilities.find((capability) => capability.id === CRM)?.enabled,
+		).toBe(true);
+		expect(
+			capabilities
+				.filter((capability) => capability.id !== CRM)
+				.every((capability) => !capability.enabled),
+		).toBe(true);
 		expect(await enabled("RAPIDAPI_KEY")).toBe(false);
 	});
 

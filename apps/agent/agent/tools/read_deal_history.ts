@@ -1,7 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
 import { readDealHistory } from "../lib/accounts";
+import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
 import { focusOn } from "../lib/focus";
 
 export default defineTool({
@@ -20,7 +20,7 @@ export default defineTool({
 	async execute({ dealId, threads }) {
 		if (!(await enabled(CRM))) return unavailableCapability("CRM database");
 
-		let history;
+		let history: Awaited<ReturnType<typeof readDealHistory>>;
 		try {
 			history = await readDealHistory(dealId, { threads });
 		} catch {

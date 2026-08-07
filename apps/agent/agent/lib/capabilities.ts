@@ -48,7 +48,8 @@ export function capabilitiesFrom(
 			id: CRM,
 			from: "CRM database",
 			label: "CRM records",
-			gives: "read and update the contacts, companies and deals already in this CRM",
+			gives:
+				"read and update the contacts, companies and deals already in this CRM",
 			enabled: crm,
 		},
 		{

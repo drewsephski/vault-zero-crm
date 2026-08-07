@@ -33,7 +33,9 @@ export type DealUpdate = {
 	companyId?: string;
 };
 
-export function normalizeDomain(input: string | null | undefined): string | null {
+export function normalizeDomain(
+	input: string | null | undefined,
+): string | null {
 	const trimmed = input?.trim().toLowerCase();
 	if (!trimmed) return null;
 
@@ -103,7 +105,8 @@ export async function updateCompany(
 	input: CompanyUpdate,
 ): Promise<{ id: string; name: string; domain: string | null }> {
 	const data: Prisma.CompanyUpdateInput = {};
-	const domain = input.domain === undefined ? undefined : normalizeDomain(input.domain);
+	const domain =
+		input.domain === undefined ? undefined : normalizeDomain(input.domain);
 
 	if (input.name !== undefined) data.name = input.name.trim();
 	if (input.website !== undefined) data.website = nullable(input.website);
@@ -126,6 +129,9 @@ export async function updateCompany(
 		}
 		data.domain = domain;
 	}
+	if (Object.keys(data).length === 0) {
+		throw new Error("Name at least one field to update.");
+	}
 
 	return db.$transaction(async (tx) => {
 		const current = await tx.company.findUnique({
@@ -134,7 +140,8 @@ export async function updateCompany(
 		});
 		if (!current) throw new Error("No such company.");
 
-		const domainChanged = input.domain !== undefined && current.domain !== domain;
+		const domainChanged =
+			input.domain !== undefined && current.domain !== domain;
 		if (domainChanged) {
 			data.enrichmentStatus = "PENDING";
 			data.enrichmentError = null;
@@ -170,12 +177,16 @@ export async function updateContact(
 	if (input.title !== undefined) data.title = nullable(input.title);
 	if (input.linkedinUrl !== undefined)
 		data.linkedinUrl = nullable(input.linkedinUrl);
-	if (input.twitterUrl !== undefined) data.twitterUrl = nullable(input.twitterUrl);
+	if (input.twitterUrl !== undefined)
+		data.twitterUrl = nullable(input.twitterUrl);
 	if (input.githubUrl !== undefined) data.githubUrl = nullable(input.githubUrl);
 	if (input.companyId !== undefined) {
 		data.company = input.companyId
 			? { connect: { id: input.companyId } }
 			: { disconnect: true };
+	}
+	if (Object.keys(data).length === 0) {
+		throw new Error("Name at least one field to update.");
 	}
 
 	return db.$transaction(async (tx) => {
@@ -185,9 +196,11 @@ export async function updateContact(
 			select: { id: true, firstName: true, lastName: true },
 		});
 
-		if (input.email !== undefined) {
+		const email =
+			input.email === undefined ? null : normalizeEmail(input.email);
+		if (email) {
 			await tx.suppressedContact.deleteMany({
-				where: { email: normalizeEmail(input.email) ?? undefined },
+				where: { email },
 			});
 		}
 
@@ -211,6 +224,9 @@ export async function updateDeal(
 		data.expectedCloseDate = input.expectedCloseDate
 			? parseDate(input.expectedCloseDate)
 			: null;
+	}
+	if (Object.keys(data).length === 0) {
+		throw new Error("Name at least one field to update.");
 	}
 
 	return db.deal.update({

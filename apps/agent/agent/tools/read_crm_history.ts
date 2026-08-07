@@ -21,7 +21,7 @@ export default defineTool({
 		focusOn({ contactId });
 		if (!(await enabled(CRM))) return unavailableCapability("CRM database");
 
-		let history;
+		let history: Awaited<ReturnType<typeof readCrmHistory>>;
 		try {
 			history = await readCrmHistory(contactId, { threads });
 		} catch {
