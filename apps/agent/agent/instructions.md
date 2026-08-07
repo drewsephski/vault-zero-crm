@@ -75,7 +75,8 @@ So two answers are always wrong:
 
 **"Could you paste the contact's name or email address?"** Never ask a rep for
 an id, and never ask them to search for you. Call `search_crm`. If it returns
-nothing, say so — that is a real answer. If it returns four Marchettis, name all
+nothing for a person-like query, follow the `externalResearch` result in that
+same tool response instead of stopping. If it returns four Marchettis, name all
 four with their titles and ask which one they mean; choosing between candidates
 is a question, and pasting a cuid is a chore.
 
@@ -111,8 +112,10 @@ trying the name; use a company or title only when the rep already gave one.
 
 After a rep confirms an externally read profile, ask once whether to add the person
 to the CRM. If they agree, call `create_contact` with the observed name, title and
-canonical LinkedIn URL, plus an email or existing company id only when the rep or
-the CRM supplied it. Do not create a company solely from a profile headline.
+canonical LinkedIn URL in `profileUrl` and `observed`, plus an email or existing
+company id only when the rep or the CRM supplied it. Each observed field needs the
+evidence returned by the LinkedIn read. Do not create a company solely from a
+profile headline.
 
 **Not every install has 2 and 3.** They each need an API key, and plenty of
 copies of this CRM run with none. Your session instructions list what this one

@@ -32,8 +32,7 @@ export type ContactCreate = {
 	lastName?: string | null;
 	email?: string | null;
 	phone?: string | null;
-	title?: string | null;
-	linkedinUrl?: string | null;
+	profileUrl?: string | null;
 	companyId?: string | null;
 	ownerId?: string | null;
 };
@@ -117,15 +116,15 @@ export async function createContact(input: ContactCreate): Promise<{
 	firstName: string;
 	lastName: string | null;
 	email: string | null;
-	linkedinUrl: string | null;
+	profileUrl: string | null;
 }> {
 	const firstName = input.firstName.trim();
 	const lastName = nullable(input.lastName);
 	const email = normalizeEmail(input.email);
-	const linkedinSlug = input.linkedinUrl
-		? slugFromLinkedinInput(input.linkedinUrl)
+	const linkedinSlug = input.profileUrl
+		? slugFromLinkedinInput(input.profileUrl)
 		: null;
-	if (input.linkedinUrl && !linkedinSlug) {
+	if (input.profileUrl && !linkedinSlug) {
 		throw new Error("That is not a LinkedIn profile URL or username.");
 	}
 	const linkedinUrl = linkedinSlug
@@ -162,8 +161,6 @@ export async function createContact(input: ContactCreate): Promise<{
 				lastName,
 				email,
 				phone: nullable(input.phone),
-				title: nullable(input.title),
-				linkedinUrl,
 				companyId: input.companyId ?? null,
 				ownerId: input.ownerId ?? null,
 			},
@@ -172,7 +169,6 @@ export async function createContact(input: ContactCreate): Promise<{
 				firstName: true,
 				lastName: true,
 				email: true,
-				linkedinUrl: true,
 			},
 		});
 
@@ -197,7 +193,7 @@ export async function createContact(input: ContactCreate): Promise<{
 		return created;
 	});
 
-	return contact;
+	return { ...contact, profileUrl: linkedinUrl };
 }
 
 export async function updateCompany(

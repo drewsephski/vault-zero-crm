@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { DealStage, db } from "@crm/db";
 import {
 	createCompany,
+	createContact,
 	updateCompany,
 	updateContact,
 	updateDeal,
@@ -12,6 +13,7 @@ const domain = `agent-writes-${suffix}.test`;
 const updatedDomain = `agent-writes-updated-${suffix}.test`;
 const createdDomain = `created-${suffix}.test`;
 const email = `agent-writes-${suffix}@example.test`;
+const createdContactEmail = `created-contact-${suffix}@example.test`;
 const suppressedEmail = `agent-suppressed-${suffix}@example.test`;
 
 let userId: string;
@@ -73,9 +75,22 @@ async function cleanup(): Promise<void> {
 		await db.company.deleteMany({ where: { id: { in: companyIds } } });
 	}
 
-	await db.contact.deleteMany({ where: { email } });
+	const standaloneContacts = await db.contact.findMany({
+		where: { email: { in: [email, createdContactEmail] } },
+		select: { id: true },
+	});
+	if (standaloneContacts.length > 0) {
+		await db.agentTask.deleteMany({
+			where: {
+				contactId: { in: standaloneContacts.map((contact) => contact.id) },
+			},
+		});
+		await db.contact.deleteMany({
+			where: { id: { in: standaloneContacts.map((contact) => contact.id) } },
+		});
+	}
 	await db.suppressedContact.deleteMany({
-		where: { email: { in: [email, suppressedEmail] } },
+		where: { email: { in: [email, createdContactEmail, suppressedEmail] } },
 	});
 	await db.user.deleteMany({
 		where: { email: `agent-writes-user-${suffix}@example.test` },
@@ -101,6 +116,38 @@ describe("record writes", () => {
 
 		await db.agentTask.deleteMany({ where: { companyId: company.id } });
 		await db.company.delete({ where: { id: company.id } });
+	});
+
+	it("creates a contact with profile identity reserved for the evidence ledger", async () => {
+		const contact = await createContact({
+			firstName: "Created",
+			lastName: "Contact",
+			email: createdContactEmail,
+			profileUrl: "created-contact",
+		});
+
+		const row = await db.contact.findUnique({
+			where: { id: contact.id },
+			select: { firstName: true, email: true, title: true, linkedinUrl: true },
+		});
+		const tasks = await db.agentTask.findMany({
+			where: { contactId: contact.id },
+			select: { kind: true, priority: true, budget: true },
+		});
+
+		expect(contact.profileUrl).toBe(
+			"https://www.linkedin.com/in/created-contact",
+		);
+		expect(row).toMatchObject({
+			firstName: "Created",
+			email: createdContactEmail,
+			title: null,
+			linkedinUrl: null,
+		});
+		expect(tasks).toEqual([{ kind: "identify", priority: 100, budget: 4 }]);
+
+		await db.agentTask.deleteMany({ where: { contactId: contact.id } });
+		await db.contact.delete({ where: { id: contact.id } });
 	});
 
 	it("resets company enrichment and queues work when its domain changes", async () => {
