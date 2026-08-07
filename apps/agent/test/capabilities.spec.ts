@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe("capabilities", () => {
-	it("reports everything off on a bare install", async () => {
+	it("keeps the CRM available on a bare install", async () => {
 		const capabilities = capabilitiesFrom(null);
 		expect(
 			capabilities.find((capability) => capability.id === CRM)?.enabled,
