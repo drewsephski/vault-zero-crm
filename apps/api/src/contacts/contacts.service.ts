@@ -1,6 +1,7 @@
 import {
 	type ContactBriefSections,
 	type Db,
+	EnrichmentStatus,
 	type FactEvidence,
 	FactStatus,
 	type Prisma,
@@ -70,6 +71,8 @@ export type ContactRow = {
 	lastName: string | null;
 	email: string | null;
 	title: string | null;
+	enrichmentStatus: EnrichmentStatus;
+	queued: boolean;
 	imageUrl: string | null;
 	company: {
 		id: string;
@@ -131,6 +134,7 @@ export class ContactsService {
 					lastName: true,
 					email: true,
 					title: true,
+					enrichmentStatus: true,
 					imageUrl: true,
 					source: true,
 					company: { select: COMPANY_SELECT },
@@ -143,9 +147,12 @@ export class ContactsService {
 			this.facetCounts(input),
 		]);
 
+		const queued = await this.queue.queuedContacts(rows.map((row) => row.id));
+
 		return {
 			rows: rows.map((row) => ({
 				...row,
+				queued: queued.has(row.id),
 				lastActivityAt: row.lastActivityAt?.toISOString() ?? null,
 				createdAt: row.createdAt.toISOString(),
 			})),
@@ -611,6 +618,10 @@ export class ContactsService {
 			where.companyId = input.company === NO_COMPANY ? null : input.company;
 		}
 
+		if (input.enrichment !== FACET_ALL) {
+			where.enrichmentStatus = input.enrichment as EnrichmentStatus;
+		}
+
 		if (input.source !== FACET_ALL) {
 			where.source = input.source as RecordSource;
 		}
@@ -621,7 +632,7 @@ export class ContactsService {
 	private async facetCounts(input: ContactListInput) {
 		const where = this.searchFilter(input.q);
 
-		const [owners, companies, sources] = await Promise.all([
+		const [owners, companies, enrichment, sources] = await Promise.all([
 			this.db.contact.groupBy({
 				by: ["ownerId"],
 				where,
@@ -629,6 +640,11 @@ export class ContactsService {
 			}),
 			this.db.contact.groupBy({
 				by: ["companyId"],
+				where,
+				_count: { _all: true },
+			}),
+			this.db.contact.groupBy({
+				by: ["enrichmentStatus"],
 				where,
 				_count: { _all: true },
 			}),
@@ -642,6 +658,7 @@ export class ContactsService {
 		return {
 			owner: countsByKey(owners, "ownerId", FACET_UNASSIGNED),
 			company: countsByKey(companies, "companyId", NO_COMPANY),
+			enrichment: countsByKey(enrichment, "enrichmentStatus"),
 			source: countsByKey(sources, "source"),
 		};
 	}

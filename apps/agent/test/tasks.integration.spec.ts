@@ -4,6 +4,7 @@ import { DIRECT_KINDS } from "@crm/db/agent-tasks";
 import {
 	claimDue,
 	completeTask,
+	failTask,
 	MAX_ATTEMPTS,
 	retireExhausted,
 	scheduleTask,
@@ -193,6 +194,30 @@ describe("completeTask", () => {
 		expect(await completeTask(task.id, "ran again")).toBeNull();
 		const row = await db.agentTask.findUnique({ where: { id: task.id } });
 		expect(row?.outcome).toBe("ran");
+	});
+});
+
+describe("failTask", () => {
+	it("requeues a failed session while attempts remain", async () => {
+		const contact = await someone();
+		const task = await queue({ contactId: contact.id });
+		await claimDue(10, RESEARCH);
+
+		const result = await failTask(task.id, "The provider was rate limited.");
+		expect(result?.retrying).toBe(true);
+
+		const waiting = await db.agentTask.findUnique({ where: { id: task.id } });
+		expect(waiting?.finishedAt).toBeNull();
+		expect(waiting?.leasedUntil).toBeNull();
+		expect(waiting?.outcome).toContain("retrying");
+
+		await db.agentTask.update({
+			where: { id: task.id },
+			data: { dueAt: new Date(Date.now() - 1000) },
+		});
+		expect((await claimDue(10, RESEARCH)).map((row) => row.id)).toContain(
+			task.id,
+		);
 	});
 });
 

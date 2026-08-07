@@ -3,7 +3,7 @@ import { defineChannel, POST } from "eve/channels";
 import { verifyKey } from "../lib/context-dev";
 import { brief, drainAll, taskAuth } from "../lib/dispatch";
 import { settle } from "../lib/enrichment";
-import { completeTask, taskSubject } from "../lib/tasks";
+import { completeTask, failTask } from "../lib/tasks";
 
 const TASK_MARKER = "task:";
 
@@ -71,6 +71,23 @@ export default defineChannel({
 	],
 
 	events: {
+		async "input.requested"(_data, channel) {
+			const taskId = taskFromToken(channel.continuationToken);
+			if (!taskId) return;
+
+			const subject = await completeTask(
+				taskId,
+				"Research paused because it needs a rep's answer.",
+			);
+			if (subject) {
+				await settle(
+					subject,
+					EnrichmentStatus.FAILED,
+					"Research needs a rep's answer before it can continue.",
+				);
+			}
+		},
+
 		async "session.waiting"(_data, channel) {
 			const taskId = taskFromToken(channel.continuationToken);
 			if (!taskId) return;
@@ -88,8 +105,14 @@ export default defineChannel({
 					? String((data as { error: unknown }).error)
 					: "The research turn failed.";
 
-			const subject = await taskSubject(taskId);
-			if (subject) await settle(subject, EnrichmentStatus.FAILED, reason);
+			const result = await failTask(taskId, reason);
+			if (!result) return;
+
+			await settle(
+				result.subject,
+				result.retrying ? EnrichmentStatus.PENDING : EnrichmentStatus.FAILED,
+				result.retrying ? "Research failed; retrying shortly." : reason,
+			);
 		},
 	},
 

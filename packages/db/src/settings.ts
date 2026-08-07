@@ -8,7 +8,7 @@ import {
 export const SETTINGS_ID = "app";
 
 export const DEFAULT_AGENT_MODEL = {
-	id: "google/gemini-2.5-flash-lite",
+	id: "google/gemini-2.5-flash",
 	contextWindowTokens: 1_048_576,
 } as const;
 

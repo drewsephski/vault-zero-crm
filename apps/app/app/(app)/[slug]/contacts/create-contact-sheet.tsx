@@ -101,8 +101,8 @@ function CreateContactForm({ companyId }: { companyId?: string }) {
 				<SheetHeader>
 					<SheetTitle>New contact</SheetTitle>
 					<SheetDescription>
-						Email addresses are unique, so importing the same person twice
-						updates them rather than duplicating them.
+						Email addresses are unique, so the same address cannot be added
+						twice.
 					</SheetDescription>
 				</SheetHeader>
 

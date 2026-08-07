@@ -173,7 +173,10 @@ export function ContactSheet({ contactId }: { contactId: string }) {
 			actions={
 				contact ? (
 					<>
-						<ContactEnrichmentAction contactId={contact.id} />
+						<ContactEnrichmentAction
+							contactId={contact.id}
+							busy={isEnriching(contact.enrichmentStatus, contact.queued)}
+						/>
 						{contact.email ? (
 							<Button asChild variant="outline" size="sm">
 								<a href={`mailto:${contact.email}`}>
@@ -329,7 +332,6 @@ function ContactOverview({ contact }: { contact: Contact }) {
 					<InlineField
 						label="Title"
 						value={contact.title}
-						placeholder="Head of Security"
 						saving={isSaving("title")}
 						onSave={(title) => save({ title })}
 						{...agentProps("title")}

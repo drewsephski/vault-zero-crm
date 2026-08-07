@@ -4,6 +4,7 @@ import { listInput } from "../trpc/list-input";
 export const contactListInput = listInput.extend({
 	owner: z.string().default("all"),
 	company: z.string().default("all"),
+	enrichment: z.string().default("all"),
 	source: z.string().default("all"),
 });
 

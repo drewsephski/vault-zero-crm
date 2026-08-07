@@ -38,7 +38,9 @@ export function EnrichmentActions({
 		trpc.companies.research.mutationOptions({
 			onSuccess: async () => {
 				await cache.activity();
-				toast.success("Brief added to the timeline.");
+				toast.success(
+					"Research queued — this page will update when it finishes.",
+				);
 			},
 			onError: (error) => toast.error(error.message),
 		}),
@@ -76,7 +78,13 @@ export function EnrichmentActions({
 	);
 }
 
-export function ContactEnrichmentAction({ contactId }: { contactId: string }) {
+export function ContactEnrichmentAction({
+	contactId,
+	busy = false,
+}: {
+	contactId: string;
+	busy?: boolean;
+}) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
 
@@ -96,7 +104,7 @@ export function ContactEnrichmentAction({ contactId }: { contactId: string }) {
 		<Button
 			variant="outline"
 			size="sm"
-			disabled={enrich.isPending}
+			disabled={enrich.isPending || busy}
 			onClick={() => enrich.mutate({ id: contactId })}
 		>
 			{enrich.isPending ? (
@@ -104,7 +112,9 @@ export function ContactEnrichmentAction({ contactId }: { contactId: string }) {
 			) : (
 				<Icon icon={Renew} data-icon="inline-start" />
 			)}
-			<span className="hidden sm:inline">Re-enrich</span>
+			<span className="hidden sm:inline">
+				{busy ? "Researching" : "Re-enrich"}
+			</span>
 		</Button>
 	);
 }

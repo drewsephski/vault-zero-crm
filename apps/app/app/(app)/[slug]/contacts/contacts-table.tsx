@@ -11,6 +11,12 @@ import { relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { CompanyCell } from "@/components/crm/company-cell";
 import { contactName } from "@/components/crm/contact-name";
+import {
+	ENRICHMENT_FACET_OPTIONS,
+	ENRICHMENT_POLL_MS,
+	EnrichmentIndicator,
+	isEnriching,
+} from "@/components/crm/enrichment-status";
 import { OwnerCell } from "@/components/crm/owner-cell";
 import { usePrefetchRecord } from "@/components/crm/record-sheet/record-prefetch";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
@@ -109,6 +115,16 @@ const COLUMNS: DataTableColumn<ContactRow>[] = [
 			</span>
 		),
 	},
+	{
+		id: "enrichment",
+		header: "Enrichment",
+		label: "Enrichment status",
+		defaultHidden: true,
+		width: "w-[14%]",
+		cell: (row) => (
+			<EnrichmentIndicator status={row.enrichmentStatus} queued={row.queued} />
+		),
+	},
 ];
 
 export function ContactsTable() {
@@ -120,6 +136,12 @@ export function ContactsTable() {
 	const contacts = useQuery({
 		...trpc.contacts.list.queryOptions(input),
 		placeholderData: (previous) => previous,
+		refetchInterval: (query) =>
+			query.state.data?.rows.some((row) =>
+				isEnriching(row.enrichmentStatus, row.queued),
+			)
+				? ENRICHMENT_POLL_MS
+				: false,
 	});
 	const users = useQuery(trpc.users.list.queryOptions());
 	const companies = useQuery(trpc.companies.options.queryOptions({ q: "" }));
@@ -148,6 +170,13 @@ export function ContactsTable() {
 					label: company.name,
 				})),
 			].filter((option) => (facetCounts?.company?.[option.value] ?? 0) > 0),
+		},
+		{
+			id: "enrichment",
+			label: "Enrichment",
+			options: ENRICHMENT_FACET_OPTIONS.filter(
+				(option) => (facetCounts?.enrichment?.[option.value] ?? 0) > 0,
+			),
 		},
 	];
 
