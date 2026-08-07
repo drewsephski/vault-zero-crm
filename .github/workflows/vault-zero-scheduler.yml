@@ -20,9 +20,16 @@ jobs:
       CRON_SECRET: ${{ secrets.VAULTZERO_CRON_SECRET }}
     steps:
       - name: Sync Google mail and calendar
-        run: >-
-          curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 120
-          -X POST "$API_URL/internal/sync/google"
+        run: |
+          set -euo pipefail
+          : "${API_URL:?VAULTZERO_API_URL secret is empty or unset}"
+          : "${CRON_SECRET:?VAULTZERO_CRON_SECRET secret is empty or unset}"
+          case "$API_URL" in
+            http://*|https://*) ;;
+            *) echo "VAULTZERO_API_URL must include an http:// or https:// scheme" >&2; exit 1 ;;
+          esac
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 120 \
+          -X POST "$API_URL/internal/sync/google" \
           -H "Authorization: Bearer $CRON_SECRET"
 
   agent-dispatch:
@@ -34,9 +41,16 @@ jobs:
       AGENT_BRIDGE_SECRET: ${{ secrets.VAULTZERO_AGENT_BRIDGE_SECRET }}
     steps:
       - name: Drain queued agent work
-        run: >-
-          curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 120
-          -X POST "$AGENT_URL/internal/crm/dispatch"
+        run: |
+          set -euo pipefail
+          : "${AGENT_URL:?VAULTZERO_AGENT_URL secret is empty or unset}"
+          : "${AGENT_BRIDGE_SECRET:?VAULTZERO_AGENT_BRIDGE_SECRET secret is empty or unset}"
+          case "$AGENT_URL" in
+            http://*|https://*) ;;
+            *) echo "VAULTZERO_AGENT_URL must include an http:// or https:// scheme" >&2; exit 1 ;;
+          esac
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 120 \
+          -X POST "$AGENT_URL/internal/crm/dispatch" \
           -H "Authorization: Bearer $AGENT_BRIDGE_SECRET"
 
   rates:
@@ -48,9 +62,16 @@ jobs:
       CRON_SECRET: ${{ secrets.VAULTZERO_CRON_SECRET }}
     steps:
       - name: Refresh exchange rates
-        run: >-
-          curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 120
-          -X POST "$API_URL/internal/sync/rates"
+        run: |
+          set -euo pipefail
+          : "${API_URL:?VAULTZERO_API_URL secret is empty or unset}"
+          : "${CRON_SECRET:?VAULTZERO_CRON_SECRET secret is empty or unset}"
+          case "$API_URL" in
+            http://*|https://*) ;;
+            *) echo "VAULTZERO_API_URL must include an http:// or https:// scheme" >&2; exit 1 ;;
+          esac
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 120 \
+          -X POST "$API_URL/internal/sync/rates" \
           -H "Authorization: Bearer $CRON_SECRET"
 
   telemetry:
@@ -62,7 +83,14 @@ jobs:
       CRON_SECRET: ${{ secrets.VAULTZERO_CRON_SECRET }}
     steps:
       - name: Roll up telemetry
-        run: >-
-          curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 120
-          -X POST "$API_URL/internal/telemetry/rollup"
+        run: |
+          set -euo pipefail
+          : "${API_URL:?VAULTZERO_API_URL secret is empty or unset}"
+          : "${CRON_SECRET:?VAULTZERO_CRON_SECRET secret is empty or unset}"
+          case "$API_URL" in
+            http://*|https://*) ;;
+            *) echo "VAULTZERO_API_URL must include an http:// or https:// scheme" >&2; exit 1 ;;
+          esac
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 --max-time 120 \
+          -X POST "$API_URL/internal/telemetry/rollup" \
           -H "Authorization: Bearer $CRON_SECRET"

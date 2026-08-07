@@ -1,3 +1,5 @@
 {
-	"$schema": "https://openapi.vercel.sh/vercel.json"
+	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"buildCommand": "cd ../.. && VERCEL_EXTERNAL_SCHEDULER=1 bun run --filter=api vercel:build",
+	"outputDirectory": ".vercel/output"
 }
