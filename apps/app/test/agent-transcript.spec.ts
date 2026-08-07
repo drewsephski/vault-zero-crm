@@ -5,6 +5,7 @@ import {
 	describe as describeStep,
 	NEW_THREAD,
 	outcomeTone,
+	pendingLinkedInFallback,
 	pendingQuestion,
 	resolveThread,
 	sourcesOf,
@@ -240,6 +241,47 @@ describe("pendingQuestion", () => {
 
 	it("finds nothing in an empty transcript", () => {
 		expect(pendingQuestion([])).toBeNull();
+	});
+});
+
+describe("pendingLinkedInFallback", () => {
+	it("offers a LinkedIn field after a zero-match person search", () => {
+		const result = pendingLinkedInFallback([
+			message([
+				{
+					type: "text",
+					text: "I found no contacts by that name in the CRM.",
+				},
+				tool("search_crm", {
+					output: {
+						query: "Drew Sepeczi",
+						contacts: [],
+						companies: [],
+						deals: [],
+						total: 0,
+						externalResearch: { found: false },
+					},
+				}),
+			]),
+		]);
+
+		expect(result?.query).toBe("Drew Sepeczi");
+	});
+
+	it("does not offer a second prompt when candidates were found", () => {
+		expect(
+			pendingLinkedInFallback([
+				message([
+					tool("search_crm", {
+						output: {
+							query: "Drew Sepeczi",
+							total: 0,
+							externalResearch: { found: true },
+						},
+					}),
+				]),
+			]),
+		).toBeNull();
 	});
 });
 

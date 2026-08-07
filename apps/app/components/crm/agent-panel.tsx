@@ -76,6 +76,7 @@ import {
 } from "@/lib/agent-session";
 import {
 	NEW_THREAD,
+	pendingLinkedInFallback,
 	pendingQuestion,
 	resolveThread,
 	type Source,
@@ -244,6 +245,7 @@ function Thread({
 	const working = busy || thread?.status === "working";
 	const messages = toTranscript(agent.data.messages);
 	const question = pendingQuestion(agent.data.messages);
+	const linkedinFallback = pendingLinkedInFallback(agent.data.messages);
 	const latestMessage = messages.at(-1);
 	const hasStreamingText =
 		working && latestMessage?.mine === false
@@ -302,6 +304,12 @@ function Thread({
 							{question ? (
 								<MessageScrollerItem messageId={question.requestId}>
 									<Question question={question} agent={agent} />
+								</MessageScrollerItem>
+							) : null}
+
+							{linkedinFallback && !question && !working ? (
+								<MessageScrollerItem messageId="linkedin-fallback">
+									<LinkedInFallback fallback={linkedinFallback} agent={agent} />
 								</MessageScrollerItem>
 							) : null}
 						</MessageScrollerContent>
@@ -637,6 +645,89 @@ function Question({
 						</Button>
 					))}
 				</div>
+			</MessageContent>
+		</Message>
+	);
+}
+
+function LinkedInFallback({
+	fallback,
+	agent,
+}: {
+	fallback: NonNullable<ReturnType<typeof pendingLinkedInFallback>>;
+	agent: ReturnType<typeof useEveAgent>;
+}) {
+	const [value, setValue] = useState("");
+	const [error, setError] = useState<string | null>(null);
+	const [submitted, setSubmitted] = useState(false);
+	const inputId = useId();
+
+	const submit = (event: FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		const trimmed = value.trim();
+		if (!trimmed) return;
+		if (!looksLikeLinkedinInput(trimmed)) {
+			setError("Enter a linkedin.com/in profile URL or username.");
+			return;
+		}
+
+		setError(null);
+		setSubmitted(true);
+		void agent.send({
+			message: `Use this LinkedIn profile to continue researching ${fallback.query}: ${trimmed}. Read it now, verify it against the name, and do not ask me for an email, company, or domain first.`,
+		});
+	};
+
+	return (
+		<Message>
+			<AgentAvatar />
+			<MessageContent>
+				<Bubble variant="tinted">
+					<BubbleContent>{fallback.prompt}</BubbleContent>
+				</Bubble>
+
+				<form className="space-y-2" onSubmit={submit}>
+					<Field>
+						<FieldLabel htmlFor={inputId}>LinkedIn profile</FieldLabel>
+					</Field>
+					<InputGroup aria-invalid={Boolean(error)}>
+						<InputGroupInput
+							aria-describedby={error ? `${inputId}-error` : undefined}
+							aria-invalid={Boolean(error)}
+							autoComplete="url"
+							autoFocus
+							disabled={submitted}
+							id={inputId}
+							inputMode="url"
+							onChange={(event) => {
+								setValue(event.target.value);
+								if (error) setError(null);
+							}}
+							placeholder="linkedin.com/in/username"
+							value={value}
+						/>
+						<InputGroupAddon align="inline-end">
+							<InputGroupButton
+								aria-label="Continue with LinkedIn profile"
+								disabled={submitted || !value.trim()}
+								size="icon-sm"
+								type="submit"
+								variant="default"
+							>
+								{submitted ? <Spinner /> : <Icon icon={Send} />}
+							</InputGroupButton>
+						</InputGroupAddon>
+					</InputGroup>
+					{error ? (
+						<p
+							className="text-destructive text-xs"
+							id={`${inputId}-error`}
+							role="alert"
+						>
+							{error}
+						</p>
+					) : null}
+				</form>
 			</MessageContent>
 		</Message>
 	);

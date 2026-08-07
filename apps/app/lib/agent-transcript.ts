@@ -19,6 +19,11 @@ export type Source = {
 	network: "linkedin" | "github" | "web";
 };
 
+export type LinkedInFallback = {
+	query: string;
+	prompt: string;
+};
+
 const VERBS: Record<string, string> = {
 	read_crm_history: "Read our emails and meetings with them",
 	read_company_history: "Read everything we have on the company",
@@ -186,6 +191,24 @@ export function sourcesOf(part: EveMessagePart): Source[] {
 		}
 	}
 
+	const externalResearch = result.externalResearch;
+	if (externalResearch && typeof externalResearch === "object") {
+		const nested = (externalResearch as Record<string, unknown>).candidates;
+		if (Array.isArray(nested)) {
+			for (const candidate of nested) {
+				if (!candidate || typeof candidate !== "object") continue;
+				const row = candidate as Record<string, unknown>;
+				const title =
+					typeof row.fullName === "string"
+						? row.fullName
+						: typeof row.title === "string"
+							? row.title
+							: undefined;
+				add(row.profileUrl, title);
+			}
+		}
+	}
+
 	return [...sources].map(([url, title]) => {
 		const host = hostOf(url);
 		return {
@@ -206,6 +229,56 @@ export function pendingQuestion(messages: readonly EveMessage[]) {
 
 		const request = part.toolMetadata?.eve?.inputRequest;
 		if (request) return request;
+	}
+
+	return null;
+}
+
+export function pendingLinkedInFallback(
+	messages: readonly EveMessage[],
+): LinkedInFallback | null {
+	const latest = messages.at(-1);
+	if (latest?.role !== "assistant") return null;
+
+	const said = latest.parts
+		.filter((part) => part.type === "text")
+		.map((part) => part.text.toLowerCase())
+		.join(" ");
+
+	for (const part of [...latest.parts].reverse()) {
+		if (toolName(part) !== "search_crm") continue;
+
+		const result = output(part);
+		if (result?.total !== 0 || typeof result.query !== "string") {
+			return null;
+		}
+
+		const external = result.externalResearch;
+		if (
+			external &&
+			typeof external === "object" &&
+			(external as Record<string, unknown>).found === true
+		) {
+			return null;
+		}
+
+		const query = result.query.trim();
+		const personLike =
+			query.split(/\s+/).length >= 2 &&
+			!query.includes("@") &&
+			!/[/.][a-z]{2,}(?:\/|$)/i.test(query);
+		const oldAgentNoMatch =
+			/\b(no contacts?|no one|couldn't find|no match)/i.test(said);
+
+		if (personLike && (external !== undefined || oldAgentNoMatch)) {
+			return {
+				query,
+				prompt:
+					"I couldn't find this person in the CRM, and no verified external candidate is available yet. Add their LinkedIn profile URL or username to continue.",
+			};
+		}
+
+		return null;
 	}
 
 	return null;
