@@ -183,10 +183,33 @@ if (!process.env.VERCEL) {
 	console.log("• no database URL at build time — skipping migrations");
 } else {
 	console.log("• applying migrations (prisma migrate deploy)...");
-	execSync(`${bun} x prisma migrate deploy`, {
+	await deployMigrations({
+		bun,
 		cwd: join(repoRoot, "packages/db"),
-		stdio: "inherit",
-		env: { ...process.env, DATABASE_URL: directDatabaseUrl },
+		directDatabaseUrl,
 	});
 	console.log("✓ migrations applied");
+}
+
+async function deployMigrations({ bun, cwd, directDatabaseUrl }) {
+	const attempts = 3;
+
+	for (let attempt = 1; attempt <= attempts; attempt += 1) {
+		try {
+			execSync(`${bun} x prisma migrate deploy`, {
+				cwd,
+				stdio: "inherit",
+				env: { ...process.env, DATABASE_URL: directDatabaseUrl },
+			});
+			return;
+		} catch (error) {
+			if (attempt === attempts) throw error;
+
+			const delayMs = attempt * 5_000;
+			console.warn(
+				`Migration deploy failed; retrying in ${delayMs / 1_000}s (${attempt}/${attempts - 1})`,
+			);
+			await new Promise((resolve) => setTimeout(resolve, delayMs));
+		}
+	}
 }
