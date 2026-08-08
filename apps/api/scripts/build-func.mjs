@@ -16,6 +16,7 @@ const apiDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = dirname(dirname(apiDir));
 const outDir = join(apiDir, ".vercel/output");
 const funcDir = join(outDir, "functions/api/index.func");
+const sourceEntry = join(apiDir, "api/index.mjs");
 const bun = process.env.BUN_BIN || "bun";
 
 const EXTERNALS = [
@@ -41,7 +42,7 @@ execSync(
 		`${bun} build api/index.ts`,
 		"--target=node",
 		"--format=esm",
-		`--outfile=${JSON.stringify(join(funcDir, "index.mjs"))}`,
+		`--outfile=${JSON.stringify(sourceEntry)}`,
 		...EXTERNALS.map((e) => `--external ${e}`),
 	].join(" "),
 	{
@@ -53,10 +54,12 @@ execSync(
 
 console.log("• pinning NODE_ENV in the bundle...");
 const entry = join(funcDir, "index.mjs");
+const bundledEntry = readFileSync(sourceEntry, "utf8");
 writeFileSync(
-	entry,
-	`process.env.NODE_ENV ??= "production";\n${readFileSync(entry, "utf8")}`,
+	sourceEntry,
+	`process.env.NODE_ENV ??= "production";\n${bundledEntry}`,
 );
+cpSync(sourceEntry, entry);
 
 console.log("• vendoring runtime-resolved dependencies...");
 const bunStore = join(repoRoot, "node_modules/.bun");

@@ -2,6 +2,7 @@
 /dist
 /node_modules
 /build
+/api/index.mjs
 
 # nestjs-trpc codegen. server.ts is committed so a checkout type-checks — and
 # a deploy builds — without first running the native codegen binary; everything
