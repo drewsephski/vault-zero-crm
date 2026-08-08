@@ -1,14 +1,5 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
-	"version": 2,
-	"builds": [
-		{
-			"src": "api/index.mjs",
-			"use": "@vercel/node",
-			"config": {
-				"buildCommand": "cd ../.. && VERCEL_EXTERNAL_SCHEDULER=1 bun run --filter=api vercel:build"
-			}
-		}
-	],
-	"routes": [{ "src": "/(.*)", "dest": "api/index.mjs" }]
+	"buildCommand": "cd ../.. && VERCEL_EXTERNAL_SCHEDULER=1 bun run --filter=api vercel:build",
+	"framework": null
 }

@@ -156,6 +156,11 @@ writeFileSync(
 		regions: ["iad1"],
 	}),
 );
+
+if (process.env.VERCEL === "1") {
+	rmSync(join(apiDir, "api/index.ts"), { force: true });
+}
+
 const outputConfig = {
 	version: 3,
 	routes: [{ src: "/(.*)", dest: "/api/index" }],
