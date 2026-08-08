@@ -53,7 +53,9 @@ const SORTABLE: Record<
 	email: (dir) => ({ email: dir }),
 	vertical: (dir) => ({ vertical: dir }),
 	status: (dir) => ({ status: dir }),
+	messages: (dir) => ({ messageCount: dir }),
 	lastContacted: (dir) => ({ lastContactedAt: { sort: dir, nulls: "last" } }),
+	response: (dir) => ({ lastRespondedAt: { sort: dir, nulls: "last" } }),
 	createdAt: (dir) => ({ createdAt: dir }),
 };
 
