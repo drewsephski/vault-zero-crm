@@ -1,6 +1,7 @@
 import { WorkspaceMode } from "@crm/db/enums";
 
 export type WorkspaceLabels = {
+	acquisition: boolean;
 	companies: string;
 	company: string;
 	companiesLower: string;
@@ -12,6 +13,7 @@ export type WorkspaceLabels = {
 };
 
 const SALES_LABELS: WorkspaceLabels = {
+	acquisition: false,
 	companies: "Companies",
 	company: "Company",
 	companiesLower: "companies",
@@ -23,6 +25,7 @@ const SALES_LABELS: WorkspaceLabels = {
 };
 
 const ACQUISITION_LABELS: WorkspaceLabels = {
+	acquisition: true,
 	companies: "Targets",
 	company: "Target",
 	companiesLower: "targets",

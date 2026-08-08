@@ -1,6 +1,12 @@
 "use client";
 
 import { WorkspaceMode } from "@crm/db/enums";
+import {
+	Alert,
+	AlertAction,
+	AlertDescription,
+	AlertTitle,
+} from "@crm/ui/components/alert";
 import { Button } from "@crm/ui/components/button";
 import {
 	Card,
@@ -51,7 +57,31 @@ export function WorkflowModeForm() {
 		}),
 	);
 
-	if (!workspace.data) return null;
+	if (workspace.isError && !workspace.data) {
+		return (
+			<Alert variant="destructive">
+				<AlertTitle>Could not load workflow settings</AlertTitle>
+				<AlertDescription>{workspace.error.message}</AlertDescription>
+				<AlertAction>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => void workspace.refetch()}
+					>
+						Try again
+					</Button>
+				</AlertAction>
+			</Alert>
+		);
+	}
+
+	if (!workspace.data) {
+		return (
+			<div aria-busy="true" className="flex justify-center py-12">
+				<Spinner />
+			</div>
+		);
+	}
 
 	const value = draft ?? workspace.data.mode;
 	const acquisition = value === WorkspaceMode.ACQUISITION;

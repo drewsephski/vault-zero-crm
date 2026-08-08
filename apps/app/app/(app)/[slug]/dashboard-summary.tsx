@@ -1,6 +1,12 @@
 "use client";
 
 import { WorkspaceMode } from "@crm/db/enums";
+import {
+	Alert,
+	AlertAction,
+	AlertDescription,
+	AlertTitle,
+} from "@crm/ui/components/alert";
 import { Button } from "@crm/ui/components/button";
 import {
 	Card,
@@ -86,9 +92,27 @@ function DashboardData() {
 
 	const summary = summaryQuery.data;
 
+	if (summaryQuery.isError && !summary) {
+		return (
+			<Alert variant="destructive">
+				<AlertTitle>Could not load the overview</AlertTitle>
+				<AlertDescription>{summaryQuery.error.message}</AlertDescription>
+				<AlertAction>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => void summaryQuery.refetch()}
+					>
+						Try again
+					</Button>
+				</AlertAction>
+			</Alert>
+		);
+	}
+
 	if (!summary) {
 		return (
-			<div className="flex flex-1 justify-center py-12">
+			<div aria-busy="true" className="flex flex-1 justify-center py-12">
 				<Spinner />
 			</div>
 		);

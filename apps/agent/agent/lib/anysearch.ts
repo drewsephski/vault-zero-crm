@@ -84,7 +84,8 @@ export async function search(
 			}),
 		});
 
-		if (!response.ok) return { ok: false, reason: await describeFailure(response) };
+		if (!response.ok)
+			return { ok: false, reason: await describeFailure(response) };
 
 		const body = (await response.json()) as {
 			code?: unknown;

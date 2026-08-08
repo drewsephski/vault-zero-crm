@@ -14,7 +14,6 @@ import { InjectDatabase } from "../database/database.constants";
 import { OPEN_DEAL_STAGES } from "../deals/deal-stage";
 import {
 	ACQUISITION_STALE_DAYS,
-	emptyAcquisitionSummary,
 	visibleCriteriaCount,
 	visibleFitWhere,
 } from "./acquisition-summary";
@@ -53,23 +52,33 @@ export class DashboardService {
 	async summary(actingUserId: string, input: DashboardSummaryInput) {
 		const mine = input.scope === "me";
 		const owned = mine ? { ownerId: actingUserId } : {};
-
 		const now = new Date();
+		const acquisitionProfile = await this.db.acquisitionProfile.findUnique({
+			where: { id: WORKSPACE_ID },
+		});
+
+		if (acquisitionProfile?.mode === WorkspaceMode.ACQUISITION) {
+			return {
+				scope: input.scope,
+				mode: "ACQUISITION" as const,
+				...emptySalesSummary(acquisitionProfile.currency, now),
+				acquisition: await this.acquisitionSummary(
+					actingUserId,
+					mine,
+					acquisitionProfile,
+					now,
+				),
+			};
+		}
+
 		const startOfMonth = monthStart(now, 0);
 		const startOfNextMonth = monthStart(now, 1);
 		const startOfPrevMonth = monthStart(now, -1);
 		const trendStart = monthStart(now, -(TREND_MONTHS - 1));
 		const rateStart = new Date(now.getTime() - RATE_WINDOW_DAYS * DAY_MS);
 
-		const [base, acquisitionProfile] = await Promise.all([
-			this.conversion.reportingCurrency(),
-			this.db.acquisitionProfile.findUnique({ where: { id: WORKSPACE_ID } }),
-		]);
+		const base = await this.conversion.reportingCurrency();
 		const counted = this.conversion.countedWhere(base);
-		const acquisitionPromise =
-			acquisitionProfile?.mode === WorkspaceMode.ACQUISITION
-				? this.acquisitionSummary(actingUserId, mine, acquisitionProfile, now)
-				: Promise.resolve(emptyAcquisitionSummary());
 
 		const [
 			openByStage,
@@ -292,12 +301,10 @@ export class DashboardService {
 
 		const decided = wins + losses;
 
-		const acquisition = await acquisitionPromise;
-
 		return {
 			scope: input.scope,
-			mode: acquisitionProfile?.mode ?? WorkspaceMode.SALES,
-			acquisition,
+			mode: "SALES" as const,
+			acquisition: null,
 			reportingCurrency: base,
 			unconverted,
 			pipeline: {
@@ -398,6 +405,8 @@ export class DashboardService {
 			needsResearch,
 			staleTargets,
 			activeAcquisitions,
+			missingNextActions,
+			activeOpportunities,
 			nextActionCount,
 			nextActions,
 		] = await Promise.all([
@@ -449,6 +458,36 @@ export class DashboardService {
 					stage: { in: [...OPEN_DEAL_STAGES] },
 				},
 			}),
+			this.db.deal.count({
+				where: {
+					...dealWhere,
+					stage: { in: [...OPEN_DEAL_STAGES] },
+					activities: {
+						none: { type: ActivityType.TASK, completedAt: null },
+					},
+				},
+			}),
+			this.db.deal.findMany({
+				where: {
+					...dealWhere,
+					stage: { in: [...OPEN_DEAL_STAGES] },
+				},
+				orderBy: [{ stageChangedAt: "asc" }, { createdAt: "desc" }],
+				take: 6,
+				select: {
+					id: true,
+					name: true,
+					stageChangedAt: true,
+					company: { select: { id: true, name: true } },
+					_count: {
+						select: {
+							activities: {
+								where: { type: ActivityType.TASK, completedAt: null },
+							},
+						},
+					},
+				},
+			}),
 			this.db.activity.count({
 				where: {
 					type: ActivityType.TASK,
@@ -488,6 +527,14 @@ export class DashboardService {
 			staleTargets,
 			staleAfterDays: ACQUISITION_STALE_DAYS,
 			activeAcquisitions,
+			missingNextActions,
+			activeOpportunities: activeOpportunities.map(
+				({ stageChangedAt, _count, ...opportunity }) => ({
+					...opportunity,
+					stageChangedAt: stageChangedAt.toISOString(),
+					hasNextAction: _count.activities > 0,
+				}),
+			),
 			nextActionCount,
 			nextActions: nextActions.map(({ dueAt, ...task }) => ({
 				...task,
@@ -524,4 +571,42 @@ function proposalValueCents(payload: unknown): number | null {
 	}
 
 	return setupFeeCents + monthlyFeeCents * 12;
+}
+
+function emptySalesSummary(reportingCurrency: string, now: Date) {
+	const trendStart = monthStart(now, -(TREND_MONTHS - 1));
+	const stages = OPEN_DEAL_STAGES.map((stage) => ({
+		stage,
+		count: 0,
+		valueCents: 0,
+	}));
+
+	return {
+		reportingCurrency,
+		unconverted: { count: 0, currencies: [] as string[] },
+		pipeline: { stages, totalCents: 0, totalDeals: 0 },
+		wonThisMonth: { count: 0, valueCents: 0 },
+		wonPrevMonth: { count: 0, valueCents: 0 },
+		performance: {
+			windowDays: RATE_WINDOW_DAYS,
+			wins: 0,
+			losses: 0,
+			winRate: null,
+			avgDealCents: null,
+			avgCycleDays: null,
+		},
+		trend: Array.from({ length: TREND_MONTHS }, (_, index) => ({
+			month: MONTH_LABEL.format(monthStart(trendStart, index)),
+			won: 0,
+			created: 0,
+		})),
+		closingThisMonthTotal: { count: 0, valueCents: 0 },
+		biggestOpen: [],
+		overdueTasks: [],
+		recentActivity: [],
+		vaultZero: {
+			leads: { count: 0, items: [] },
+			proposals: { count: 0, items: [] },
+		},
+	};
 }

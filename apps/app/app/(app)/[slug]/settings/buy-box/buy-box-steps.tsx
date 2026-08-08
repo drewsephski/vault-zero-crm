@@ -9,6 +9,7 @@ import {
 import {
 	Field,
 	FieldDescription,
+	FieldError,
 	FieldGroup,
 	FieldLabel,
 } from "@crm/ui/components/field";
@@ -21,25 +22,33 @@ import {
 	SelectValue,
 } from "@crm/ui/components/select";
 import { Textarea } from "@crm/ui/components/textarea";
-import { useId } from "react";
-import type { BuyBoxDraft } from "./buy-box-values";
+import {
+	BUY_BOX_FIELD_IDS,
+	type BuyBoxDraft,
+	type BuyBoxErrors,
+} from "./buy-box-values";
 
 type StepProps = {
 	values: BuyBoxDraft;
+	errors: BuyBoxErrors;
 	edit: (patch: Partial<BuyBoxDraft>) => void;
 };
 
-export function FocusStep({ values, edit }: StepProps) {
-	const industryId = useId();
-	const geographyId = useId();
-	const excludedId = useId();
-
+export function FocusStep({ values, errors, edit }: StepProps) {
 	return (
 		<FieldGroup>
-			<Field>
-				<FieldLabel htmlFor={industryId}>Preferred industries</FieldLabel>
+			<Field data-invalid={Boolean(errors.preferredIndustries)}>
+				<FieldLabel htmlFor={BUY_BOX_FIELD_IDS.preferredIndustries}>
+					Preferred industries
+				</FieldLabel>
 				<Input
-					id={industryId}
+					id={BUY_BOX_FIELD_IDS.preferredIndustries}
+					aria-invalid={Boolean(errors.preferredIndustries)}
+					aria-describedby={
+						errors.preferredIndustries
+							? `${BUY_BOX_FIELD_IDS.preferredIndustries}-error`
+							: undefined
+					}
 					value={values.preferredIndustries}
 					onChange={(event) =>
 						edit({ preferredIndustries: event.target.value })
@@ -47,11 +56,22 @@ export function FocusStep({ values, edit }: StepProps) {
 					placeholder="HVAC, commercial services, specialty manufacturing"
 				/>
 				<FieldDescription>Separate industries with commas.</FieldDescription>
+				<FieldError id={`${BUY_BOX_FIELD_IDS.preferredIndustries}-error`}>
+					{errors.preferredIndustries}
+				</FieldError>
 			</Field>
-			<Field>
-				<FieldLabel htmlFor={geographyId}>Geography</FieldLabel>
+			<Field data-invalid={Boolean(errors.geographies)}>
+				<FieldLabel htmlFor={BUY_BOX_FIELD_IDS.geographies}>
+					Geography
+				</FieldLabel>
 				<Input
-					id={geographyId}
+					id={BUY_BOX_FIELD_IDS.geographies}
+					aria-invalid={Boolean(errors.geographies)}
+					aria-describedby={
+						errors.geographies
+							? `${BUY_BOX_FIELD_IDS.geographies}-error`
+							: undefined
+					}
 					value={values.geographies}
 					onChange={(event) => edit({ geographies: event.target.value })}
 					placeholder="Texas, Midwest, remote"
@@ -60,11 +80,22 @@ export function FocusStep({ values, edit }: StepProps) {
 					Use cities, states, regions, or countries and separate them with
 					commas.
 				</FieldDescription>
+				<FieldError id={`${BUY_BOX_FIELD_IDS.geographies}-error`}>
+					{errors.geographies}
+				</FieldError>
 			</Field>
-			<Field>
-				<FieldLabel htmlFor={excludedId}>Excluded categories</FieldLabel>
+			<Field data-invalid={Boolean(errors.excludedCategories)}>
+				<FieldLabel htmlFor={BUY_BOX_FIELD_IDS.excludedCategories}>
+					Excluded categories
+				</FieldLabel>
 				<Input
-					id={excludedId}
+					id={BUY_BOX_FIELD_IDS.excludedCategories}
+					aria-invalid={Boolean(errors.excludedCategories)}
+					aria-describedby={
+						errors.excludedCategories
+							? `${BUY_BOX_FIELD_IDS.excludedCategories}-error`
+							: undefined
+					}
 					value={values.excludedCategories}
 					onChange={(event) => edit({ excludedCategories: event.target.value })}
 					placeholder="Restaurants, pre-revenue, franchises"
@@ -72,23 +103,24 @@ export function FocusStep({ values, edit }: StepProps) {
 				<FieldDescription>
 					Targets matching these categories should be screened out.
 				</FieldDescription>
+				<FieldError id={`${BUY_BOX_FIELD_IDS.excludedCategories}-error`}>
+					{errors.excludedCategories}
+				</FieldError>
 			</Field>
 		</FieldGroup>
 	);
 }
 
-export function FinancialStep({ values, edit }: StepProps) {
-	const currencyId = useId();
-
+export function FinancialStep({ values, errors, edit }: StepProps) {
 	return (
 		<FieldGroup>
 			<Field>
-				<FieldLabel htmlFor={currencyId}>Currency</FieldLabel>
+				<FieldLabel htmlFor={BUY_BOX_FIELD_IDS.currency}>Currency</FieldLabel>
 				<Select
 					value={values.currency}
 					onValueChange={(currency) => edit({ currency })}
 				>
-					<SelectTrigger id={currencyId}>
+					<SelectTrigger id={BUY_BOX_FIELD_IDS.currency}>
 						<SelectValue />
 					</SelectTrigger>
 					<SelectContent>
@@ -104,6 +136,10 @@ export function FinancialStep({ values, edit }: StepProps) {
 				label="Annual revenue"
 				minimum={values.revenueMin}
 				maximum={values.revenueMax}
+				minimumId={BUY_BOX_FIELD_IDS.revenueMin}
+				maximumId={BUY_BOX_FIELD_IDS.revenueMax}
+				minimumError={errors.revenueMin}
+				maximumError={errors.revenueMax}
 				onMinimum={(revenueMin) => edit({ revenueMin })}
 				onMaximum={(revenueMax) => edit({ revenueMax })}
 			/>
@@ -111,6 +147,10 @@ export function FinancialStep({ values, edit }: StepProps) {
 				label="EBITDA or SDE"
 				minimum={values.ebitdaMin}
 				maximum={values.ebitdaMax}
+				minimumId={BUY_BOX_FIELD_IDS.ebitdaMin}
+				maximumId={BUY_BOX_FIELD_IDS.ebitdaMax}
+				minimumError={errors.ebitdaMin}
+				maximumError={errors.ebitdaMax}
 				onMinimum={(ebitdaMin) => edit({ ebitdaMin })}
 				onMaximum={(ebitdaMax) => edit({ ebitdaMax })}
 			/>
@@ -118,6 +158,10 @@ export function FinancialStep({ values, edit }: StepProps) {
 				label="Purchase price"
 				minimum={values.purchasePriceMin}
 				maximum={values.purchasePriceMax}
+				minimumId={BUY_BOX_FIELD_IDS.purchasePriceMin}
+				maximumId={BUY_BOX_FIELD_IDS.purchasePriceMax}
+				minimumError={errors.purchasePriceMin}
+				maximumError={errors.purchasePriceMax}
 				onMinimum={(purchasePriceMin) => edit({ purchasePriceMin })}
 				onMaximum={(purchasePriceMax) => edit({ purchasePriceMax })}
 			/>
@@ -125,16 +169,11 @@ export function FinancialStep({ values, edit }: StepProps) {
 	);
 }
 
-export function OperationsStep({ values, edit }: StepProps) {
-	const ownerId = useId();
-	const recurringId = useId();
-	const concentrationId = useId();
-	const assetId = useId();
-
+export function OperationsStep({ values, errors, edit }: StepProps) {
 	return (
 		<FieldGroup>
 			<PreferenceSelect
-				id={ownerId}
+				id={BUY_BOX_FIELD_IDS.ownerInvolvement}
 				label="Owner involvement"
 				value={values.ownerInvolvement}
 				onChange={(ownerInvolvement) => edit({ ownerInvolvement })}
@@ -145,7 +184,7 @@ export function OperationsStep({ values, edit }: StepProps) {
 				]}
 			/>
 			<PreferenceSelect
-				id={recurringId}
+				id={BUY_BOX_FIELD_IDS.recurringRevenuePreference}
 				label="Recurring revenue"
 				value={values.recurringRevenuePreference}
 				onChange={(recurringRevenuePreference) =>
@@ -157,12 +196,18 @@ export function OperationsStep({ values, edit }: StepProps) {
 					[AcquisitionRevenuePreference.OPTIONAL, "Not required"],
 				]}
 			/>
-			<Field>
-				<FieldLabel htmlFor={concentrationId}>
+			<Field data-invalid={Boolean(errors.customerConcentrationMax)}>
+				<FieldLabel htmlFor={BUY_BOX_FIELD_IDS.customerConcentrationMax}>
 					Maximum customer concentration
 				</FieldLabel>
 				<Input
-					id={concentrationId}
+					id={BUY_BOX_FIELD_IDS.customerConcentrationMax}
+					aria-invalid={Boolean(errors.customerConcentrationMax)}
+					aria-describedby={
+						errors.customerConcentrationMax
+							? `${BUY_BOX_FIELD_IDS.customerConcentrationMax}-error`
+							: undefined
+					}
 					type="number"
 					min={0}
 					max={100}
@@ -175,9 +220,12 @@ export function OperationsStep({ values, edit }: StepProps) {
 				<FieldDescription>
 					Highest acceptable share of revenue from one customer, as a percent.
 				</FieldDescription>
+				<FieldError id={`${BUY_BOX_FIELD_IDS.customerConcentrationMax}-error`}>
+					{errors.customerConcentrationMax}
+				</FieldError>
 			</Field>
 			<PreferenceSelect
-				id={assetId}
+				id={BUY_BOX_FIELD_IDS.assetPreference}
 				label="Asset profile"
 				value={values.assetPreference}
 				onChange={(assetPreference) => edit({ assetPreference })}
@@ -191,15 +239,22 @@ export function OperationsStep({ values, edit }: StepProps) {
 	);
 }
 
-export function FinancingStep({ values, edit }: StepProps) {
-	const financingId = useId();
-
+export function FinancingStep({ values, errors, edit }: StepProps) {
 	return (
 		<FieldGroup>
-			<Field>
-				<FieldLabel htmlFor={financingId}>Financing assumptions</FieldLabel>
+			<Field data-invalid={Boolean(errors.financingAssumptions)}>
+				<FieldLabel htmlFor={BUY_BOX_FIELD_IDS.financingAssumptions}>
+					Financing assumptions
+				</FieldLabel>
 				<Textarea
-					id={financingId}
+					id={BUY_BOX_FIELD_IDS.financingAssumptions}
+					aria-invalid={Boolean(errors.financingAssumptions)}
+					aria-describedby={
+						errors.financingAssumptions
+							? `${BUY_BOX_FIELD_IDS.financingAssumptions}-error`
+							: undefined
+					}
+					maxLength={500}
 					value={values.financingAssumptions}
 					onChange={(event) =>
 						edit({ financingAssumptions: event.target.value })
@@ -209,6 +264,9 @@ export function FinancingStep({ values, edit }: StepProps) {
 				<FieldDescription>
 					State assumptions the screening process should not silently invent.
 				</FieldDescription>
+				<FieldError id={`${BUY_BOX_FIELD_IDS.financingAssumptions}-error`}>
+					{errors.financingAssumptions}
+				</FieldError>
 			</Field>
 		</FieldGroup>
 	);
@@ -218,43 +276,50 @@ function MoneyRange({
 	label,
 	minimum,
 	maximum,
+	minimumId,
+	maximumId,
+	minimumError,
+	maximumError,
 	onMinimum,
 	onMaximum,
 }: {
 	label: string;
 	minimum: string;
 	maximum: string;
+	minimumId: string;
+	maximumId: string;
+	minimumError?: string;
+	maximumError?: string;
 	onMinimum: (value: string) => void;
 	onMaximum: (value: string) => void;
 }) {
-	const minimumId = useId();
-	const maximumId = useId();
-
 	return (
 		<div className="grid gap-3 sm:grid-cols-2">
-			<Field>
+			<Field data-invalid={Boolean(minimumError)}>
 				<FieldLabel htmlFor={minimumId}>{label} minimum</FieldLabel>
 				<Input
 					id={minimumId}
-					type="number"
-					min={0}
-					step={1000}
+					aria-invalid={Boolean(minimumError)}
+					aria-describedby={minimumError ? `${minimumId}-error` : undefined}
+					inputMode="decimal"
 					value={minimum}
 					onChange={(event) => onMinimum(event.target.value)}
 					placeholder="No minimum"
 				/>
+				<FieldError id={`${minimumId}-error`}>{minimumError}</FieldError>
 			</Field>
-			<Field>
+			<Field data-invalid={Boolean(maximumError)}>
 				<FieldLabel htmlFor={maximumId}>{label} maximum</FieldLabel>
 				<Input
 					id={maximumId}
-					type="number"
-					min={0}
-					step={1000}
+					aria-invalid={Boolean(maximumError)}
+					aria-describedby={maximumError ? `${maximumId}-error` : undefined}
+					inputMode="decimal"
 					value={maximum}
 					onChange={(event) => onMaximum(event.target.value)}
 					placeholder="No maximum"
 				/>
+				<FieldError id={`${maximumId}-error`}>{maximumError}</FieldError>
 			</Field>
 		</div>
 	);

@@ -22,7 +22,10 @@ import { AreaTrend, DonutStat } from "@/components/dashboard-charts";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 
-type Summary = RouterOutputs["dashboard"]["summary"];
+type Summary = Extract<
+	RouterOutputs["dashboard"]["summary"],
+	{ mode: "SALES" }
+>;
 
 const TREND_CONFIG: ChartConfig = {
 	won: { label: "Closed won", color: "var(--success)" },

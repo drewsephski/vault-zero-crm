@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { ActivityType, DealStage, db, EmailDirection } from "@crm/db";
 import { readCompanyHistory, readDealHistory } from "../agent/lib/accounts";
 
-const suffix = process.env.TEST_RUN_ID ?? "accounts-spec";
+const suffix = process.env.TEST_RUN_ID ?? `accounts-${randomUUID()}`;
 const domain = `fernhill-${suffix}.test`;
 
 let companyId: string;

@@ -88,6 +88,7 @@ import {
 	toTranscript,
 } from "@/lib/agent-transcript";
 import { useTRPC } from "@/lib/trpc/client";
+import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
 import { useRecordSheetView } from "./record-sheet/record-stack";
 
 type AgentChatDensity = "default" | "compact";
@@ -241,7 +242,8 @@ function Thread({
 	onBusyChange: (busy: boolean) => void;
 	density: AgentChatDensity;
 }) {
-	const copy = recordCopy(scope.kind);
+	const labels = useWorkspaceLabels();
+	const copy = recordCopy(scope.kind, labels.acquisition);
 	const agent = useEveAgent({
 		headers: recordHeader(scope),
 		...(thread && "session" in thread
@@ -335,7 +337,7 @@ function Thread({
 							)}
 						>
 							{messages.length === 0 && !busy ? (
-								<Idle kind={scope.kind} onAsk={ask} />
+								<Idle copy={copy} onAsk={ask} />
 							) : null}
 
 							{messages.map((message) => (
@@ -492,14 +494,12 @@ function FollowUpPrompts({
 }
 
 function Idle({
-	kind,
+	copy,
 	onAsk,
 }: {
-	kind: AgentScope["kind"];
+	copy: ReturnType<typeof recordCopy>;
 	onAsk: (question: string) => void;
 }) {
-	const copy = recordCopy(kind);
-
 	return (
 		<Empty className="min-h-full border-0 py-16" width="wide">
 			<EmptyHeader>

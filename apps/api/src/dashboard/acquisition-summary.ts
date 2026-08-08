@@ -54,17 +54,3 @@ export function visibleCriteriaCount(profile: Profile | null): number {
 		profile.excludedCategories.length
 	);
 }
-
-export function emptyAcquisitionSummary() {
-	return {
-		totalTargets: 0,
-		visibleMatches: null,
-		visibleCriteria: 0,
-		needsResearch: 0,
-		staleTargets: 0,
-		staleAfterDays: ACQUISITION_STALE_DAYS,
-		activeAcquisitions: 0,
-		nextActionCount: 0,
-		nextActions: [],
-	};
-}

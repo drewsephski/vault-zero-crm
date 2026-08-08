@@ -33,6 +33,19 @@ const WORKSPACE_COPY: ScopeCopy = {
 	],
 };
 
+const ACQUISITION_WORKSPACE_COPY: ScopeCopy = {
+	title: "Ask across your acquisitions",
+	blurb:
+		"Screen targets against the buy box, find research gaps, and decide what needs attention next.",
+	placeholder: "What should I work on next?",
+	suggestions: [
+		"Which targets best fit the buy box?",
+		"Which active opportunities need attention?",
+		"What research is still missing?",
+		"Compare my active opportunities",
+	],
+};
+
 const RECORD_COPY: Record<AgentRecordKind, RecordCopy> = {
 	contact: {
 		header: "x-crm-contact",
@@ -75,8 +88,42 @@ const RECORD_COPY: Record<AgentRecordKind, RecordCopy> = {
 	},
 };
 
-export function recordCopy(kind: AgentScopeKind) {
-	return kind === "workspace" ? WORKSPACE_COPY : RECORD_COPY[kind];
+const ACQUISITION_RECORD_COPY: Partial<Record<AgentRecordKind, RecordCopy>> = {
+	company: {
+		...RECORD_COPY.company,
+		title: "Ask about this target",
+		blurb:
+			"It compares public evidence and CRM history with the saved buy box without filling unknowns with guesses.",
+		placeholder: "Does this fit the buy box?",
+		suggestions: [
+			"Does this target fit the buy box?",
+			"What is verified and still unknown?",
+			"What are the biggest risks?",
+			"Prepare me for an owner call",
+		],
+	},
+	deal: {
+		...RECORD_COPY.deal,
+		title: "Ask about this opportunity",
+		blurb:
+			"It reads the history, people, and evidence behind this acquisition opportunity.",
+		placeholder: "What could stop this acquisition?",
+		suggestions: [
+			"What are the biggest risks?",
+			"What diligence is still missing?",
+			"What should we ask for before an NDA?",
+			"What is the next decision?",
+		],
+	},
+};
+
+export function recordCopy(kind: AgentScopeKind, acquisition = false) {
+	if (kind === "workspace") {
+		return acquisition ? ACQUISITION_WORKSPACE_COPY : WORKSPACE_COPY;
+	}
+	return acquisition
+		? (ACQUISITION_RECORD_COPY[kind] ?? RECORD_COPY[kind])
+		: RECORD_COPY[kind];
 }
 
 export function recordHeader(scope: AgentScope): Record<string, string> {

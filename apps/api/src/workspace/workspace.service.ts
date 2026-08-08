@@ -465,7 +465,7 @@ function normalizeList(values: string[]): string[] {
 
 	for (const value of values) {
 		const trimmed = value.trim();
-		const key = trimmed.toLocaleLowerCase();
+		const key = trimmed.toLowerCase();
 		if (!trimmed || seen.has(key)) continue;
 		seen.add(key);
 		normalized.push(trimmed);

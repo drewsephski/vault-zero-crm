@@ -1,12 +1,18 @@
 "use client";
 
 import { WorkspaceMode } from "@crm/db/enums";
+import {
+	Alert,
+	AlertAction,
+	AlertDescription,
+	AlertTitle,
+} from "@crm/ui/components/alert";
 import { Button } from "@crm/ui/components/button";
 import {
 	Card,
-	CardAction,
 	CardContent,
 	CardDescription,
+	CardFooter,
 	CardHeader,
 	CardTitle,
 } from "@crm/ui/components/card";
@@ -26,13 +32,18 @@ import {
 	OperationsStep,
 } from "./buy-box-steps";
 import {
+	BUY_BOX_FIELD_IDS,
 	BUY_BOX_STEPS,
 	type BuyBoxDraft,
+	type BuyBoxErrors,
+	type BuyBoxField,
+	errorsForStep,
 	listValues,
 	moneyCents,
 	percentage,
 	profileDraft,
 	stepDescription,
+	validateBuyBoxDraft,
 } from "./buy-box-values";
 
 export function BuyBoxForm() {
@@ -41,6 +52,7 @@ export function BuyBoxForm() {
 	const workspaceUrl = useWorkspaceUrl();
 	const profile = useQuery(trpc.workspace.acquisitionProfile.queryOptions());
 	const [draft, setDraft] = useState<BuyBoxDraft | null>(null);
+	const [errors, setErrors] = useState<BuyBoxErrors>({});
 	const [step, setStep] = useState(0);
 
 	const save = useMutation(
@@ -48,6 +60,7 @@ export function BuyBoxForm() {
 			onSuccess: async () => {
 				await cache.workspace();
 				setDraft(null);
+				setErrors({});
 				setStep(0);
 				toast.success("Buy box saved.");
 			},
@@ -55,37 +68,70 @@ export function BuyBoxForm() {
 		}),
 	);
 
-	if (!profile.data) return null;
+	if (profile.isError && !profile.data) {
+		return (
+			<Alert variant="destructive">
+				<AlertTitle>Could not load the buy box</AlertTitle>
+				<AlertDescription>{profile.error.message}</AlertDescription>
+				<AlertAction>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => void profile.refetch()}
+					>
+						Try again
+					</Button>
+				</AlertAction>
+			</Alert>
+		);
+	}
+
+	if (!profile.data) {
+		return (
+			<div aria-busy="true" className="flex justify-center py-12">
+				<Spinner />
+			</div>
+		);
+	}
 
 	const values = draft ?? profileDraft(profile.data);
-	const edit = (patch: Partial<BuyBoxDraft>) =>
+	const edit = (patch: Partial<BuyBoxDraft>) => {
 		setDraft({ ...values, ...patch });
+		setErrors((current) => {
+			const next = { ...current };
+			for (const field of Object.keys(patch) as BuyBoxField[])
+				delete next[field];
+			return next;
+		});
+	};
 	const canManage = profile.data.canManage && !save.isPending;
 
+	const focusFirstError = (nextErrors: BuyBoxErrors) => {
+		const field = Object.keys(nextErrors)[0] as BuyBoxField | undefined;
+		if (!field) return;
+		requestAnimationFrame(() =>
+			document.getElementById(BUY_BOX_FIELD_IDS[field])?.focus(),
+		);
+	};
+
+	const validateStep = (targetStep: number): boolean => {
+		const nextErrors = errorsForStep(validateBuyBoxDraft(values), targetStep);
+		if (Object.keys(nextErrors).length === 0) return true;
+		setErrors((current) => ({ ...current, ...nextErrors }));
+		focusFirstError(nextErrors);
+		return false;
+	};
+
 	const submit = () => {
-		const concentration = percentage(values.customerConcentrationMax);
-
-		if (values.customerConcentrationMax.trim() && concentration === null) {
-			toast.error(
-				"Customer concentration must be a whole percent from 0 to 100.",
+		const nextErrors = validateBuyBoxDraft(values);
+		if (Object.keys(nextErrors).length > 0) {
+			setErrors(nextErrors);
+			const firstField = Object.keys(nextErrors)[0] as BuyBoxField;
+			const errorStep = BUY_BOX_STEPS.findIndex((_, index) =>
+				Object.hasOwn(errorsForStep(nextErrors, index), firstField),
 			);
-			return;
-		}
-
-		const ranges: Array<readonly [string, string]> = [
-			[values.revenueMin, values.revenueMax],
-			[values.ebitdaMin, values.ebitdaMax],
-			[values.purchasePriceMin, values.purchasePriceMax],
-		];
-
-		if (
-			ranges.some(([minimum, maximum]) => {
-				const min = moneyCents(minimum);
-				const max = moneyCents(maximum);
-				return min !== null && max !== null && min > max;
-			})
-		) {
-			toast.error("Each maximum must be at least its minimum.");
+			if (errorStep >= 0) setStep(errorStep);
+			focusFirstError(nextErrors);
 			return;
 		}
 
@@ -102,7 +148,7 @@ export function BuyBoxForm() {
 			purchasePriceMaxCents: moneyCents(values.purchasePriceMax),
 			ownerInvolvement: values.ownerInvolvement,
 			recurringRevenuePreference: values.recurringRevenuePreference,
-			customerConcentrationMax: concentration,
+			customerConcentrationMax: percentage(values.customerConcentrationMax),
 			assetPreference: values.assetPreference,
 			financingAssumptions: values.financingAssumptions.trim() || null,
 		});
@@ -110,67 +156,107 @@ export function BuyBoxForm() {
 
 	return (
 		<Card>
-			<CardHeader>
-				<CardTitle>
-					{BUY_BOX_STEPS[step]} · {step + 1} of {BUY_BOX_STEPS.length}
-				</CardTitle>
-				<CardDescription>{stepDescription(step)}</CardDescription>
-				<CardAction>
-					{step === BUY_BOX_STEPS.length - 1 ? (
-						<Button disabled={!canManage} onClick={submit}>
-							{save.isPending ? <Spinner data-icon="inline-start" /> : null}
-							Save buy box
-						</Button>
+			<form
+				onSubmit={(event) => {
+					event.preventDefault();
+					if (step < BUY_BOX_STEPS.length - 1) {
+						if (validateStep(step)) setStep((current) => current + 1);
+						return;
+					}
+					submit();
+				}}
+			>
+				<CardHeader>
+					<CardTitle>
+						{BUY_BOX_STEPS[step]} · {step + 1} of {BUY_BOX_STEPS.length}
+					</CardTitle>
+					<CardDescription>{stepDescription(step)}</CardDescription>
+				</CardHeader>
+
+				<CardContent>
+					<ol aria-label="Buy box progress" className="grid grid-cols-4 gap-2">
+						{BUY_BOX_STEPS.map((label, index) => (
+							<li
+								key={label}
+								aria-current={index === step ? "step" : undefined}
+								className={
+									index === step
+										? "border-primary border-t-2 pt-2 font-medium text-xs"
+										: "border-t pt-2 text-muted-foreground text-xs"
+								}
+							>
+								<span className="hidden sm:inline">{label}</span>
+								<span className="sm:hidden">{index + 1}</span>
+							</li>
+						))}
+					</ol>
+
+					{profile.data.mode === WorkspaceMode.SALES ? (
+						<p className="text-muted-foreground text-xs">
+							This buy box is saved, but acquisition terminology and dashboard
+							metrics stay off until you enable Acquisition CRM in{" "}
+							<Link href={workspaceUrl("/settings")} className="underline">
+								General settings
+							</Link>
+							.
+						</p>
 					) : null}
-				</CardAction>
-			</CardHeader>
 
-			<CardContent>
-				{profile.data.mode === WorkspaceMode.SALES ? (
-					<p className="text-muted-foreground text-xs">
-						This buy box is saved, but acquisition terminology and dashboard
-						metrics stay off until you enable Acquisition CRM in{" "}
-						<Link href={workspaceUrl("/settings")} className="underline">
-							General settings
-						</Link>
-						.
-					</p>
-				) : null}
-
-				<FieldSet disabled={!canManage}>
-					{step === 0 ? <FocusStep values={values} edit={edit} /> : null}
-					{step === 1 ? <FinancialStep values={values} edit={edit} /> : null}
-					{step === 2 ? <OperationsStep values={values} edit={edit} /> : null}
-					{step === 3 ? <FinancingStep values={values} edit={edit} /> : null}
-				</FieldSet>
-
-				<div className="flex items-center justify-between gap-3 border-t pt-4">
-					<Button
-						variant="outline"
-						disabled={step === 0 || save.isPending}
-						onClick={() => setStep((current) => Math.max(0, current - 1))}
-					>
-						Back
-					</Button>
-					<span className="text-muted-foreground text-xs" aria-live="polite">
-						{BUY_BOX_STEPS[step]}
-					</span>
-					{step < BUY_BOX_STEPS.length - 1 ? (
-						<Button
-							disabled={save.isPending}
-							onClick={() =>
-								setStep((current) =>
-									Math.min(BUY_BOX_STEPS.length - 1, current + 1),
-								)
-							}
-						>
-							Continue
-						</Button>
-					) : (
-						<span />
+					{profile.data.canManage ? null : (
+						<p className="text-muted-foreground text-xs">
+							Only a workspace owner or admin can change the buy box.
+						</p>
 					)}
-				</div>
-			</CardContent>
+
+					<FieldSet disabled={!canManage}>
+						{step === 0 ? (
+							<FocusStep values={values} errors={errors} edit={edit} />
+						) : null}
+						{step === 1 ? (
+							<FinancialStep values={values} errors={errors} edit={edit} />
+						) : null}
+						{step === 2 ? (
+							<OperationsStep values={values} errors={errors} edit={edit} />
+						) : null}
+						{step === 3 ? (
+							<FinancingStep values={values} errors={errors} edit={edit} />
+						) : null}
+					</FieldSet>
+				</CardContent>
+				<CardFooter>
+					<div className="flex w-full items-center justify-between gap-3">
+						<Button
+							type="button"
+							variant="outline"
+							disabled={step === 0 || save.isPending}
+							onClick={() => setStep((current) => Math.max(0, current - 1))}
+						>
+							Back
+						</Button>
+						<span className="text-muted-foreground text-xs" aria-live="polite">
+							{BUY_BOX_STEPS[step]}
+						</span>
+						{step < BUY_BOX_STEPS.length - 1 ? (
+							<Button
+								type="button"
+								disabled={!canManage}
+								onClick={() => {
+									if (validateStep(step)) {
+										setStep((current) => current + 1);
+									}
+								}}
+							>
+								Continue
+							</Button>
+						) : (
+							<Button type="submit" disabled={!canManage}>
+								{save.isPending ? <Spinner data-icon="inline-start" /> : null}
+								Save buy box
+							</Button>
+						)}
+					</div>
+				</CardFooter>
+			</form>
 		</Card>
 	);
 }

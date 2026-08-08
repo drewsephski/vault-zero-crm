@@ -2,7 +2,14 @@ import { db } from "@crm/db";
 import { websiteUrl } from "@crm/db/workspace";
 import { capabilitiesMarkdown } from "./capabilities";
 import { PRODUCT_CONTEXT } from "./product-context";
-import { identity, usMarkdown, type WorkspaceIdentity } from "./workspace";
+import {
+	type AcquisitionContext,
+	acquisitionContext,
+	acquisitionMarkdown,
+	identity,
+	usMarkdown,
+	type WorkspaceIdentity,
+} from "./workspace";
 
 export type Opened = {
 	dispatched: boolean;
@@ -32,14 +39,24 @@ export async function sessionPreamble(
 
 export async function composeClosing(
 	us: WorkspaceIdentity | null,
+	acquisition: AcquisitionContext | null = null,
 ): Promise<string> {
-	return [PRODUCT_CONTEXT, usMarkdown(us), await capabilitiesMarkdown()]
+	return [
+		PRODUCT_CONTEXT,
+		usMarkdown(us),
+		acquisitionMarkdown(acquisition),
+		await capabilitiesMarkdown(),
+	]
 		.filter(Boolean)
 		.join("\n\n");
 }
 
 async function closing(): Promise<string> {
-	return composeClosing(await identity());
+	const [us, acquisition] = await Promise.all([
+		identity(),
+		acquisitionContext(),
+	]);
+	return composeClosing(us, acquisition);
 }
 
 function opening(opened: Opened, questions: string): string {

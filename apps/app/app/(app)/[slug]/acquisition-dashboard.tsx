@@ -1,5 +1,11 @@
 "use client";
 
+import {
+	Alert,
+	AlertAction,
+	AlertDescription,
+	AlertTitle,
+} from "@crm/ui/components/alert";
 import { Button } from "@crm/ui/components/button";
 import {
 	Card,
@@ -26,13 +32,15 @@ import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
 import { RecordLink } from "@/components/crm/record-sheet/record-link";
-import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 
-type Summary = RouterOutputs["dashboard"]["summary"];
+type Summary = Extract<
+	RouterOutputs["dashboard"]["summary"],
+	{ mode: "ACQUISITION" }
+>;
 
 const CELL = "px-3 py-2.5 align-middle";
 
@@ -44,20 +52,21 @@ const ACTION_COLUMNS: SimpleTableColumn[] = [
 
 const OPPORTUNITY_COLUMNS: SimpleTableColumn[] = [
 	{ header: "Opportunity" },
-	{ header: "Target", width: "w-44", className: "hidden sm:table-cell" },
-	{ header: "Last moved", width: "w-24", align: "right" },
+	{ header: "Next action", width: "w-28", align: "right" },
 ];
 
 export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
 	const workspaceUrl = useWorkspaceUrl();
-	const openRecord = useOpenRecord();
-	const { acquisition, biggestOpen } = summary;
+	const { acquisition } = summary;
 
 	const complete = useMutation(
 		trpc.activities.complete.mutationOptions({
-			onSuccess: () => cache.activity(),
+			onSuccess: async () => {
+				await cache.activity();
+				toast.success("Next action completed.");
+			},
 			onError: (error) => toast.error(error.message),
 		}),
 	);
@@ -83,7 +92,11 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 				<StatCard
 					label="Next actions"
 					value={acquisition.nextActionCount}
-					description="Open tasks assigned to you"
+					description={
+						acquisition.missingNextActions > 0
+							? `${formatCount(acquisition.missingNextActions, "active opportunity")} still need one`
+							: "Every active opportunity has one"
+					}
 				/>
 				<StatCard
 					label="Stale targets"
@@ -91,6 +104,21 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 					description={`No activity for ${acquisition.staleAfterDays} days`}
 				/>
 			</StatGroup>
+
+			{acquisition.visibleMatches === null ? (
+				<Alert>
+					<AlertTitle>Finish the buy box</AlertTitle>
+					<AlertDescription>
+						Add an industry, geography, or exclusion before the dashboard
+						screens targets against your criteria.
+					</AlertDescription>
+					<AlertAction>
+						<Button asChild variant="outline" size="sm">
+							<Link href={workspaceUrl("/settings/buy-box")}>Set criteria</Link>
+						</Button>
+					</AlertAction>
+				</Alert>
+			) : null}
 
 			<div className="grid gap-6 @3xl/page-content:grid-cols-2">
 				<Card className="min-w-0">
@@ -121,7 +149,10 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 										<TableCell className={CELL}>
 											<Checkbox
 												checked={false}
-												disabled={complete.isPending}
+												disabled={
+													complete.isPending &&
+													complete.variables?.id === task.id
+												}
 												aria-label={`Complete ${task.subject ?? "task"}`}
 												onCheckedChange={() =>
 													complete.mutate({ id: task.id, completed: true })
@@ -173,7 +204,7 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 						</CardAction>
 					</CardHeader>
 					<CardPanel>
-						{biggestOpen.length === 0 ? (
+						{acquisition.activeOpportunities.length === 0 ? (
 							<CardPanelEmpty>No active acquisitions yet.</CardPanelEmpty>
 						) : (
 							<SimpleTable
@@ -181,28 +212,35 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 								surface="page"
 								columns={OPPORTUNITY_COLUMNS}
 							>
-								{biggestOpen.map((opportunity) => (
-									<SimpleTableRow
-										key={opportunity.id}
-										clickable
-										onClick={() =>
-											openRecord({ kind: "deal", id: opportunity.id })
-										}
-									>
+								{acquisition.activeOpportunities.map((opportunity) => (
+									<SimpleTableRow key={opportunity.id}>
 										<TableCell className={CELL}>
-											<span className="truncate font-medium">
-												{opportunity.name}
+											<span className="flex min-w-0 flex-col">
+												<RecordLink kind="deal" id={opportunity.id}>
+													{opportunity.name}
+												</RecordLink>
+												<span className="flex min-w-0 gap-1 text-muted-foreground">
+													<RecordLink
+														kind="company"
+														id={opportunity.company.id}
+													>
+														{opportunity.company.name}
+													</RecordLink>
+													<span aria-hidden>·</span>
+													<span className="truncate">
+														Moved{" "}
+														{relativeTimeFromIso(opportunity.stageChangedAt)}
+													</span>
+												</span>
 											</span>
 										</TableCell>
-										<TableCell className={`${CELL} hidden sm:table-cell`}>
-											<RecordLink kind="company" id={opportunity.company.id}>
-												{opportunity.company.name}
-											</RecordLink>
-										</TableCell>
-										<TableCell
-											className={`${CELL} text-right text-muted-foreground`}
-										>
-											{relativeTimeFromIso(opportunity.stageChangedAt)}
+										<TableCell className={`${CELL} text-right`}>
+											<StatusIndicator
+												tone={opportunity.hasNextAction ? "neutral" : "warning"}
+												label={
+													opportunity.hasNextAction ? "Planned" : "Missing"
+												}
+											/>
 										</TableCell>
 									</SimpleTableRow>
 								))}

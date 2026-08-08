@@ -183,9 +183,8 @@ function selectProviders(
 			provider === "anysearch" || provider === "tavily",
 	);
 	const configured = supported.filter((provider) => available[provider]);
-	const limited = explicit || options.deep
-		? configured
-		: configured.slice(0, 1);
+	const limited =
+		explicit || options.deep ? configured : configured.slice(0, 1);
 
 	for (const provider of candidates) {
 		if (provider === "context") {

@@ -1,6 +1,13 @@
 "use client";
 
 import {
+	Alert,
+	AlertAction,
+	AlertDescription,
+	AlertTitle,
+} from "@crm/ui/components/alert";
+import { Button } from "@crm/ui/components/button";
+import {
 	Card,
 	CardDescription,
 	CardHeader,
@@ -70,14 +77,39 @@ export function TasksTable() {
 
 	const complete = useMutation(
 		trpc.activities.complete.mutationOptions({
-			onSuccess: () => cache.activity(),
+			onSuccess: async () => {
+				await cache.activity();
+				toast.success("Task completed.");
+			},
 			onError: (error) => toast.error(error.message),
 		}),
 	);
 
+	if ((tasks.isError && !tasks.data) || (counts.isError && !counts.data)) {
+		const message = tasks.error?.message ?? counts.error?.message;
+		return (
+			<Alert variant="destructive">
+				<AlertTitle>Could not load your tasks</AlertTitle>
+				<AlertDescription>{message}</AlertDescription>
+				<AlertAction>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => {
+							void tasks.refetch();
+							void counts.refetch();
+						}}
+					>
+						Try again
+					</Button>
+				</AlertAction>
+			</Alert>
+		);
+	}
+
 	if (!tasks.data || !counts.data) {
 		return (
-			<div className="flex justify-center py-12">
+			<div aria-busy="true" className="flex justify-center py-12">
 				<Spinner />
 			</div>
 		);
@@ -88,8 +120,9 @@ export function TasksTable() {
 			<CardHeader>
 				<CardTitle>Your next actions</CardTitle>
 				<CardDescription>
-					Tasks without a due date remain in All until you schedule or complete
-					them.
+					{counts.data.unscheduled === 0
+						? "Every open task has a due date."
+						: `${counts.data.unscheduled} unscheduled ${counts.data.unscheduled === 1 ? "task remains" : "tasks remain"} in All.`}
 				</CardDescription>
 			</CardHeader>
 
@@ -119,7 +152,9 @@ export function TasksTable() {
 								<TableCell className={CELL}>
 									<Checkbox
 										checked={false}
-										disabled={complete.isPending}
+										disabled={
+											complete.isPending && complete.variables?.id === task.id
+										}
 										aria-label={`Complete ${task.subject ?? "task"}`}
 										onCheckedChange={() =>
 											complete.mutate({ id: task.id, completed: true })
@@ -136,6 +171,9 @@ export function TasksTable() {
 												{task.body}
 											</span>
 										) : null}
+										<span className="truncate text-muted-foreground md:hidden">
+											<TaskContext task={task} />
+										</span>
 									</span>
 								</TableCell>
 								<TableCell className={`${CELL} hidden md:table-cell`}>
@@ -144,7 +182,9 @@ export function TasksTable() {
 								<TableCell className={`${CELL} text-right`}>
 									{task.dueAt ? (
 										<StatusIndicator
-											tone={window === "overdue" ? "error" : "neutral"}
+											tone={
+												new Date(task.dueAt) < new Date() ? "error" : "neutral"
+											}
 											label={formatDay(task.dueAt)}
 										/>
 									) : (

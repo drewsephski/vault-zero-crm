@@ -97,7 +97,9 @@ describe("Tavily search", () => {
 	});
 
 	it("supports current-news and exact-match controls", async () => {
-		stub({ results: [{ title: "Acme news", url: "https://example.com/news" }] });
+		stub({
+			results: [{ title: "Acme news", url: "https://example.com/news" }],
+		});
 
 		await ask('"Acme" funding', {
 			depth: "fast",

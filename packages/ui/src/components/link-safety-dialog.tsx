@@ -19,7 +19,7 @@ import {
 import { Button } from "@crm/ui/components/button";
 import { type CarbonIcon, Icon } from "@crm/ui/components/icon";
 import { describeLinkDestination } from "@crm/ui/lib/link-destination";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 type CopyState = "idle" | "copied" | "failed";
 
@@ -45,21 +45,21 @@ export function LinkSafetyDialog({
 	url: string;
 }) {
 	const destination = describeLinkDestination(url);
-	const [copyState, setCopyState] = useState<CopyState>("idle");
+	const [copyResult, setCopyResult] = useState<{
+		url: string;
+		state: CopyState;
+	} | null>(null);
+	const copyState = copyResult?.url === url ? copyResult.state : "idle";
 	const returnFocusRef = useRef<HTMLElement | null>(null);
 	const DestinationIcon = ICONS[destination.type];
 	const ActionIcon = destination.type === "other" ? Link : DestinationIcon;
 
-	useEffect(() => {
-		setCopyState("idle");
-	}, [url, isOpen]);
-
 	const copy = async () => {
 		try {
 			await navigator.clipboard.writeText(destination.display);
-			setCopyState("copied");
+			setCopyResult({ url, state: "copied" });
 		} catch {
-			setCopyState("failed");
+			setCopyResult({ url, state: "failed" });
 		}
 	};
 

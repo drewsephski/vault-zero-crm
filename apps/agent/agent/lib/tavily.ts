@@ -118,7 +118,12 @@ export async function ask(
 				...(options.exactMatch ? { exact_match: true } : {}),
 				...(options.autoParameters ? { auto_parameters: true } : {}),
 				...(options.chunksPerSource
-					? { chunks_per_source: Math.min(Math.max(options.chunksPerSource, 1), 3) }
+					? {
+							chunks_per_source: Math.min(
+								Math.max(options.chunksPerSource, 1),
+								3,
+							),
+						}
 					: {}),
 			}),
 		});

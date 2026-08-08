@@ -119,6 +119,19 @@ describe("record context", () => {
 		expect(recordCopy("contact").suggestions[0]).toBe("Who is this person?");
 	});
 
+	it("uses acquisition questions when the workspace is screening targets", () => {
+		expect(recordCopy("workspace", true).title).toBe(
+			"Ask across your acquisitions",
+		);
+		expect(recordCopy("company", true).suggestions).toContain(
+			"Does this target fit the buy box?",
+		);
+		expect(recordCopy("deal", true).suggestions).toContain(
+			"What diligence is still missing?",
+		);
+		expect(recordCopy("contact", true)).toBe(recordCopy("contact"));
+	});
+
 	it("tells the agent which record it is on", () => {
 		expect(recordHeader({ kind: "contact", id: "c1" })).toEqual({
 			"x-crm-contact": "c1",
