@@ -4,6 +4,7 @@ import { db } from "@crm/db";
 import { readContextDevKey } from "@crm/db/settings";
 
 export const CONTEXT_DEV = "CONTEXT_DEV";
+export const ANYSEARCH = "ANYSEARCH_API_KEY";
 export const CRM = "CRM";
 
 export type Capability = {
@@ -63,6 +64,12 @@ export function capabilitiesFrom(
 			label: "Web research",
 			gives:
 				"open-web context with citations, and the search that finds a LinkedIn slug in the first place",
+		},
+		{
+			...fromEnv(ANYSEARCH),
+			label: "AnySearch",
+			gives:
+				"general and vertical search results with compact source content for research and candidate discovery",
 		},
 		{
 			id: CONTEXT_DEV,

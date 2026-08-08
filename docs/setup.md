@@ -43,16 +43,19 @@ inventory, including a `diagnostics` count that finds files eve silently ignored
 
 ## Agent providers
 
-Model-backed sessions use OpenRouter directly through the AI SDK, while open-web
-research uses Tavily:
+Model-backed sessions use OpenRouter directly through the AI SDK. Search can use
+AnySearch first, Tavily next, and Context.dev as a fallback; company-site briefs
+use Context.dev's structured extraction:
 
 ```sh
 OPENROUTER_API_KEY="sk-or-v1-..."
 TAVILY_API_KEY="tvly-..."
+ANYSEARCH_API_KEY="any-..."
 ```
 
 Create the keys at [OpenRouter](https://openrouter.ai/keys) and
-[Tavily](https://app.tavily.com). The default OpenRouter model is Gemini 2.5
+[Tavily](https://app.tavily.com) or [AnySearch](https://www.anysearch.com/console/api-keys).
+The default OpenRouter model is Gemini 2.5
 Flash-Lite, currently priced at $0.10 per million input tokens and $0.40 per million
 output tokens, so add a small OpenRouter credit balance. Tavily's free plan includes
 1,000 search credits per month. Model pricing and provider data policies can change,
@@ -60,8 +63,8 @@ so review the OpenRouter provider and privacy settings before sending production
 data.
 
 `OPENROUTER_API_KEY` is required for a conversation or research task that invokes the
-model. `TAVILY_API_KEY` is optional: without it, the agent uses CRM history and other
-configured sources and explicitly reports that open-web research was unavailable.
+model. Search keys are optional: without them, the agent uses CRM history and Context.dev
+when configured, and explicitly reports that the unavailable search source could not be checked.
 
 ## Running the agent
 

@@ -32,7 +32,6 @@ export function SetupPromptButton({ location }: { location: CtaLocation }) {
 				copied ? "Setup prompt copied to clipboard" : "Copy setup prompt"
 			}
 		>
-			<Copy data-icon="inline-start" className="size-4" />
 			{copied ? "Copied to clipboard" : "Copy setup prompt"}
 			{copied ? (
 				<Checkmark

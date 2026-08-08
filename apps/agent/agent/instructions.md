@@ -102,7 +102,11 @@ Tavily result or a name search as identity proof.
    identity: name, current title, employer, tenure. Self-reported, and
    authoritative for who someone is.
 3. **The open web** (`web_search`, `web_fetch`, `research_person`,
-   `research_company`) for context: news, funding, what they have said publicly.
+	`research_company`) for context: news, funding, what they have said publicly.
+	`web_search` automatically prefers AnySearch when configured, then Tavily, then
+	Context.dev. Use an AnySearch vertical tag only when the question clearly needs
+	that structured dataset. Context.dev is the first-party website source: prefer
+	`research_company` for a company's own positioning, pricing and customer claims.
    Sometimes wrong about job titles — where it disagrees with LinkedIn about
    identity, LinkedIn wins.
 

@@ -155,7 +155,8 @@ export async function extract(
 	schema: Record<string, unknown>,
 	instructions: string,
 ): Promise<
-	{ outcome: "found"; data: unknown } | { outcome: "failed"; reason: string }
+	| { outcome: "found"; data: unknown; sourceUrls: string[] }
+	| { outcome: "failed"; reason: string }
 > {
 	const api = await contextDev();
 	if (!api) {
@@ -167,10 +168,20 @@ export async function extract(
 			url,
 			schema,
 			instructions,
-			maxPages: 8,
+			factCheck: true,
+			maxAgeMs: 604_800_000,
+			maxDepth: 2,
+			maxPages: 6,
+			stopAfterMs: 80_000,
 			timeoutMS: TIMEOUT_MS,
 		});
-		return { outcome: "found", data: response.data };
+		return {
+			outcome: "found",
+			data: response.data,
+			sourceUrls: response.urls_analyzed.filter(
+				(item) => httpUrl(item) !== null,
+			),
+		};
 	} catch (error) {
 		return { outcome: "failed", reason: describe(error) };
 	}
@@ -178,7 +189,14 @@ export async function extract(
 
 export async function search(
 	query: string,
-	options: { limit?: number; excludeDomains?: string[] } = {},
+	options: {
+		limit?: number;
+		excludeDomains?: string[];
+		includeDomains?: string[];
+		freshness?: "last_24_hours" | "last_week" | "last_month" | "last_year";
+		queryFanout?: boolean;
+		includeMarkdown?: boolean;
+	} = {},
 ): Promise<
 	| { outcome: "found"; results: SearchResult[] }
 	| { outcome: "failed"; reason: string }
@@ -191,10 +209,23 @@ export async function search(
 	try {
 		const response = await api.web.search({
 			query,
-			numResults: Math.max(options.limit ?? 10, 10),
-			markdownOptions: { enabled: true },
+			numResults: Math.min(Math.max(options.limit ?? 10, 10), 100),
+			...(options.freshness ? { freshness: options.freshness } : {}),
+			...(options.queryFanout ? { queryFanout: true } : {}),
+			...(options.includeMarkdown
+				? {
+						markdownOptions: {
+							enabled: true,
+							maxAgeMs: 604_800_000,
+							useMainContentOnly: true,
+						},
+					}
+				: {}),
 			...(options.excludeDomains
 				? { excludeDomains: options.excludeDomains }
+				: {}),
+			...(options.includeDomains
+				? { includeDomains: options.includeDomains }
 				: {}),
 		});
 
@@ -202,10 +233,7 @@ export async function search(
 			url: result.url ?? null,
 			title: result.title ?? null,
 			description: result.description ?? null,
-			markdown:
-				result.markdown?.code === "SUCCESS"
-					? (result.markdown.markdown ?? null)
-					: null,
+			markdown: result.markdown?.markdown ?? null,
 		}));
 
 		return { outcome: "found", results };
@@ -286,4 +314,17 @@ function describe(error: unknown): string {
 		return `${error.status ?? "?"} ${errorCode(error) ?? error.message}`;
 	}
 	return error instanceof Error ? error.message : String(error);
+}
+
+function httpUrl(value: unknown): string | null {
+	if (typeof value !== "string" || !value.trim()) return null;
+
+	try {
+		const url = new URL(value);
+		return url.protocol === "https:" || url.protocol === "http:"
+			? url.toString()
+			: null;
+	} catch {
+		return null;
+	}
 }

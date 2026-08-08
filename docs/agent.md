@@ -23,7 +23,9 @@ the same ID and context window.
 - **The chooser offers only OpenRouter models that advertise tool support**
   (`ModelCatalogService`).
 - **`OPENROUTER_API_KEY` is required for model-backed sessions.** Search and CRM
-  sources remain independently optional.
+  sources remain independently optional. `ANYSEARCH_API_KEY` adds unified general
+  and vertical search; `TAVILY_API_KEY` remains available as a separate web-search
+  source.
 
 ## Pictures are copied, never linked
 

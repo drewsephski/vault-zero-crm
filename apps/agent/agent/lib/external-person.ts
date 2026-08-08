@@ -1,3 +1,4 @@
+import { findPersonProfileCandidates as findAnySearchCandidates } from "./anysearch";
 import { enabled, unavailable } from "./capabilities";
 import { spend } from "./focus";
 import { lookupCompany, searchPeople } from "./linkdapi";
@@ -65,8 +66,41 @@ export async function researchExternalPerson(input: {
 	}
 
 	const limit = Math.min(Math.max(input.limit ?? 5, 1), 5);
+	const anySearchEnabled = await enabled("ANYSEARCH_API_KEY");
 	const rapidEnabled = await enabled("RAPIDAPI_KEY");
 	const tavilyEnabled = await enabled("TAVILY_API_KEY");
+
+	if (anySearchEnabled) {
+		const charge = spend();
+		if (!charge.ok) return { found: false, reason: charge.reason };
+
+		const candidates = await findAnySearchCandidates(
+			input.name,
+			input.companyName,
+			input.title,
+		);
+		if (candidates.length > 0) {
+			return {
+				found: true,
+				candidates: candidates.slice(0, limit).map((candidate) => ({
+					profileUrl: candidate.url,
+					fullName: null,
+					title: candidate.title,
+					headline: null,
+					location: null,
+					content: candidate.content,
+					score: candidate.score,
+				})),
+				discovery: "web",
+				searchedFor: {
+					name: input.name,
+					companyName: input.companyName ?? null,
+					title: input.title ?? null,
+				},
+				note: "AnySearch found these profile candidates. Search results are not identity evidence; read a profile before asking the rep to confirm it.",
+			};
+		}
+	}
 
 	if (tavilyEnabled) {
 		const charge = spend();
@@ -152,10 +186,10 @@ export async function researchExternalPerson(input: {
 		}
 	}
 
-	if (!rapidEnabled && !tavilyEnabled) {
+	if (!anySearchEnabled && !rapidEnabled && !tavilyEnabled) {
 		return {
 			found: false,
-			...unavailable("RAPIDAPI_KEY or TAVILY_API_KEY"),
+			...unavailable("ANYSEARCH_API_KEY, RAPIDAPI_KEY or TAVILY_API_KEY"),
 		};
 	}
 

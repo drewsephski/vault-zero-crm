@@ -94,7 +94,7 @@ export default defineTool({
 			data: {
 				type: ActivityType.ENRICHMENT,
 				subject: `Research brief — ${company.name}`,
-				body: formatBrief(result.data),
+				body: formatBrief(result.data, result.sourceUrls),
 				occurredAt: new Date(),
 				companyId: company.id,
 				createdById: author,
@@ -103,6 +103,7 @@ export default defineTool({
 					endpoint: "web/extract",
 					creditCost: 10,
 					agent: "people-research",
+					sourceUrls: result.sourceUrls,
 				},
 			},
 			select: { id: true },
@@ -117,7 +118,7 @@ export default defineTool({
 	},
 });
 
-function formatBrief(data: unknown): string {
+function formatBrief(data: unknown, sourceUrls: string[]): string {
 	if (typeof data !== "object" || data === null) return String(data ?? "");
 
 	const brief = data as {
@@ -151,6 +152,10 @@ function formatBrief(data: unknown): string {
 	const news = list(brief.recentNews);
 	if (news.length > 0) {
 		lines.push(`Recently:\n${news.map((item) => `• ${item}`).join("\n")}`);
+	}
+
+	if (sourceUrls.length > 0) {
+		lines.push(`Sources:\n${sourceUrls.map((item) => `- ${item}`).join("\n")}`);
 	}
 
 	return lines.join("\n\n");

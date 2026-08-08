@@ -11,6 +11,7 @@ import {
 const KEYS = [
 	"RAPIDAPI_KEY",
 	"TAVILY_API_KEY",
+	"ANYSEARCH_API_KEY",
 	"BLOB_READ_WRITE_TOKEN",
 ] as const;
 
@@ -49,6 +50,17 @@ describe("capabilities", () => {
 
 		expect(await enabled("TAVILY_API_KEY")).toBe(true);
 		expect(await enabled("RAPIDAPI_KEY")).toBe(false);
+	});
+
+	it("exposes AnySearch as an independent source", async () => {
+		process.env.ANYSEARCH_API_KEY = "any-test";
+
+		expect(await enabled("ANYSEARCH_API_KEY")).toBe(true);
+		expect(
+			capabilitiesFrom(null).find(
+				(capability) => capability.id === "ANYSEARCH_API_KEY",
+			)?.label,
+		).toBe("AnySearch");
 	});
 
 	it("treats blank and whitespace as unset", async () => {
