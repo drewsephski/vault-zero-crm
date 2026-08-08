@@ -13,6 +13,10 @@ export function ClosingCta() {
 					<SetupPromptButton location="closing" />
 					<GitHubStarButton location="closing" />
 				</div>
+
+				<p className="text-center text-muted-foreground text-xs/5">
+					Works with Codex, Claude Code, Cursor, and other coding agents.
+				</p>
 			</div>
 		</section>
 	);

@@ -19,6 +19,10 @@ export function Hero() {
 					<SetupPromptButton location="hero" />
 					<GitHubStarButton location="hero" />
 				</div>
+
+				<p className="text-center text-muted-foreground text-xs/5">
+					Works with Codex, Claude Code, Cursor, and other coding agents.
+				</p>
 			</div>
 		</section>
 	);
