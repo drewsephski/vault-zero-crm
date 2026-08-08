@@ -16,6 +16,7 @@ export type CrmCache = {
 	contact(id?: string, options?: Options): Promise<void>;
 	deal(id?: string, options?: Options): Promise<void>;
 	removed(record: RemovedRecord): Promise<void>;
+	removedMany(records: RemovedRecord[]): Promise<void>;
 	activity(options?: Options): Promise<void>;
 	outreach(options?: Options): Promise<void>;
 	google(options?: Options): Promise<void>;
@@ -105,36 +106,9 @@ export function useCrmCache(): CrmCache {
 				options,
 			),
 
-		removed: ({ kind, id }) => {
-			const goneKey = {
-				company: trpc.companies.byId,
-				contact: trpc.contacts.byId,
-				deal: trpc.deals.byId,
-			}[kind].queryKey({ id });
-			const gone = JSON.stringify(goneKey);
+		removed: (record) => runRemoved([record]),
 
-			for (const record of [
-				trpc.companies.byId,
-				trpc.contacts.byId,
-				trpc.deals.byId,
-			]) {
-				void queryClient.invalidateQueries({
-					queryKey: record.queryKey(),
-					predicate: (query) => JSON.stringify(query.queryKey) !== gone,
-				});
-			}
-
-			void queryClient.invalidateQueries({
-				queryKey: goneKey,
-				exact: true,
-				refetchType: "none",
-			});
-
-			return run(
-				[...listKeys(), ...activityKeys(), trpc.dashboard.summary.queryKey()],
-				[],
-			);
-		},
+		removedMany: (records) => runRemoved(records),
 
 		activity: (options) =>
 			run(
@@ -202,4 +176,42 @@ export function useCrmCache(): CrmCache {
 
 		everything: () => queryClient.invalidateQueries(),
 	};
+
+	function runRemoved(records: RemovedRecord[]): Promise<void> {
+		const goneKeys = new Set(
+			records.map(({ kind, id }) =>
+				JSON.stringify(
+					{
+						company: trpc.companies.byId,
+						contact: trpc.contacts.byId,
+						deal: trpc.deals.byId,
+					}[kind].queryKey({ id }),
+				),
+			),
+		);
+
+		for (const record of [
+			trpc.companies.byId,
+			trpc.contacts.byId,
+			trpc.deals.byId,
+		]) {
+			void queryClient.invalidateQueries({
+				queryKey: record.queryKey(),
+				predicate: (query) => !goneKeys.has(JSON.stringify(query.queryKey)),
+			});
+		}
+
+		for (const goneKey of goneKeys) {
+			void queryClient.invalidateQueries({
+				queryKey: JSON.parse(goneKey),
+				exact: true,
+				refetchType: "none",
+			});
+		}
+
+		return run(
+			[...listKeys(), ...activityKeys(), trpc.dashboard.summary.queryKey()],
+			[],
+		);
+	}
 }

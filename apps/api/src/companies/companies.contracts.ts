@@ -40,6 +40,26 @@ export const companyUpdateArgs = z.object({
 	data: companyUpdateInput,
 });
 
+const companyBulkUpdateInput = z
+	.object({
+		ownerId: z.string().nullable().optional(),
+	})
+	.refine(
+		(input) => Object.keys(input).length > 0,
+		"Choose a field to update.",
+	);
+
+export const companyBulkUpdateArgs = z.object({
+	ids: z.array(z.string()).min(1).max(100),
+	data: companyBulkUpdateInput,
+});
+
+export type CompanyBulkUpdateInput = z.infer<typeof companyBulkUpdateInput>;
+
+export const companyBulkDeleteInput = z.object({
+	ids: z.array(z.string()).min(1).max(100),
+});
+
 export const companyIdInput = z.object({ id: z.string() });
 
 export const setPrimaryContactInput = z.object({

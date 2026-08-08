@@ -133,6 +133,27 @@ export class ActivityStampService {
 		}
 	}
 
+	async recomputeAfterBulkDelete(
+		targets: StampTargets,
+		deleted: {
+			companyIds?: string[];
+			contactIds?: string[];
+		},
+	): Promise<void> {
+		try {
+			await this.recomputeMany(targets);
+		} catch (error) {
+			this.logger.error(
+				{
+					message:
+						"Records were deleted but their activity stamps were not recomputed",
+					...deleted,
+				},
+				error instanceof Error ? error.stack : String(error),
+			);
+		}
+	}
+
 	private restamp(table: string, column: string, ids: string[]) {
 		if (ids.length === 0) return null;
 

@@ -12,6 +12,8 @@ import {
 } from "@crm/ui/components/entity-logo";
 import { relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { BulkRecordActions } from "@/components/crm/bulk-record-actions";
 import {
 	ENRICHMENT_FACET_OPTIONS,
 	ENRICHMENT_POLL_MS,
@@ -144,6 +146,8 @@ export function CompaniesTable() {
 	const trpc = useTRPC();
 	const prefetchRecord = usePrefetchRecord();
 	const { query, input } = useTableQuery(companiesSearchParams);
+	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+	const selected = useMemo(() => [...selectedIds], [selectedIds]);
 
 	const companies = useQuery({
 		...trpc.companies.list.queryOptions(input),
@@ -196,6 +200,19 @@ export function CompaniesTable() {
 			total={companies.data?.total ?? 0}
 			facetCounts={facetCounts}
 			facets={facets}
+			selection={{
+				selectedIds,
+				onSelectedIdsChange: setSelectedIds,
+				getRowLabel: (row) => row.name,
+			}}
+			leadingActions={
+				<BulkRecordActions
+					kind="company"
+					ids={selected}
+					users={users.data ?? []}
+					onClear={() => setSelectedIds(new Set())}
+				/>
+			}
 			getRowId={(row) => row.id}
 			loading={companies.isFetching}
 			onRowHover={(row) => prefetchRecord({ kind: "company", id: row.id })}

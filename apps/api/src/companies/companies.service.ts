@@ -32,6 +32,7 @@ import {
 	resolveOrderBy,
 } from "../trpc/list-input";
 import type {
+	CompanyBulkUpdateInput,
 	CompanyCreateInput,
 	CompanyListInput,
 	CompanyUpdateInput,
@@ -408,6 +409,79 @@ export class CompaniesService {
 		});
 
 		return { id, name: deleted.name };
+	}
+
+	async bulkDelete(ids: string[]): Promise<{ ids: string[]; count: number }> {
+		const uniqueIds = [...new Set(ids)];
+		let deleted: { targets: StampTargets; count: number };
+
+		try {
+			deleted = await this.db.$transaction(async (tx) => {
+				const existing = await tx.company.count({
+					where: { id: { in: uniqueIds } },
+				});
+				if (existing !== uniqueIds.length) {
+					throw new NotFoundException("One or more companies no longer exist.");
+				}
+
+				const targets = await this.stamp.targetsOf(
+					{
+						OR: [
+							{ companyId: { in: uniqueIds } },
+							{ deal: { companyId: { in: uniqueIds } } },
+						],
+					},
+					tx,
+				);
+
+				await tx.agentTask.deleteMany({
+					where: { companyId: { in: uniqueIds } },
+				});
+				const result = await tx.company.deleteMany({
+					where: { id: { in: uniqueIds } },
+				});
+
+				return { targets, count: result.count };
+			});
+		} catch (error) {
+			if (error instanceof NotFoundException) throw error;
+			throw this.translate(error, uniqueIds[0] ?? "bulk");
+		}
+
+		await this.stamp.recomputeAfterBulkDelete(deleted.targets, {
+			companyIds: uniqueIds,
+		});
+
+		this.logger.log({ message: "Companies deleted", count: deleted.count });
+		return { ids: uniqueIds, count: deleted.count };
+	}
+
+	async bulkUpdate(
+		ids: string[],
+		input: CompanyBulkUpdateInput,
+	): Promise<{ ids: string[]; count: number }> {
+		const uniqueIds = [...new Set(ids)];
+		let result: { count: number };
+		try {
+			result = await this.db.$transaction(async (tx) => {
+				const existing = await tx.company.count({
+					where: { id: { in: uniqueIds } },
+				});
+				if (existing !== uniqueIds.length) {
+					throw new NotFoundException("One or more companies no longer exist.");
+				}
+				return tx.company.updateMany({
+					where: { id: { in: uniqueIds } },
+					data: { ownerId: input.ownerId },
+				});
+			});
+		} catch (error) {
+			if (error instanceof NotFoundException) throw error;
+			throw this.translate(error, uniqueIds[0] ?? "bulk");
+		}
+
+		this.logger.log({ message: "Companies updated", count: result.count });
+		return { ids: uniqueIds, count: result.count };
 	}
 
 	async enrich(id: string): Promise<{ id: string; queued: boolean }> {

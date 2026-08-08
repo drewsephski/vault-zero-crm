@@ -42,6 +42,27 @@ export const contactUpdateArgs = z.object({
 	data: contactUpdateInput,
 });
 
+const contactBulkUpdateInput = z
+	.object({
+		companyId: z.string().nullable().optional(),
+		ownerId: z.string().nullable().optional(),
+	})
+	.refine(
+		(input) => Object.keys(input).length > 0,
+		"Choose a field to update.",
+	);
+
+export const contactBulkUpdateArgs = z.object({
+	ids: z.array(z.string()).min(1).max(100),
+	data: contactBulkUpdateInput,
+});
+
+export type ContactBulkUpdateInput = z.infer<typeof contactBulkUpdateInput>;
+
+export const contactBulkDeleteInput = z.object({
+	ids: z.array(z.string()).min(1).max(100),
+});
+
 export const contactIdInput = z.object({ id: z.string() });
 
 export const factDecisionInput = z.object({

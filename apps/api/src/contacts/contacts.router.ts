@@ -11,6 +11,8 @@ import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import {
+	contactBulkDeleteInput,
+	contactBulkUpdateArgs,
 	contactCreateInput,
 	contactIdInput,
 	contactListInput,
@@ -49,6 +51,16 @@ export class ContactsRouter {
 	@Mutation({ input: contactIdInput })
 	async delete(@Input("id") id: string) {
 		return this.contacts.delete(id);
+	}
+
+	@Mutation({ input: contactBulkDeleteInput })
+	async bulkDelete(@Input("ids") ids: string[]) {
+		return this.contacts.bulkDelete(ids);
+	}
+
+	@Mutation({ input: contactBulkUpdateArgs })
+	async bulkUpdate(@Input() input: z.infer<typeof contactBulkUpdateArgs>) {
+		return this.contacts.bulkUpdate(input.ids, input.data);
 	}
 
 	@Mutation({ input: contactIdInput })

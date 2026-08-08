@@ -8,6 +8,7 @@ import ChevronRight from "@carbon/icons-react/es/ChevronRight";
 import Column from "@carbon/icons-react/es/Column";
 import Filter from "@carbon/icons-react/es/Filter";
 import { Button } from "@crm/ui/components/button";
+import { Checkbox } from "@crm/ui/components/checkbox";
 import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
@@ -76,6 +77,12 @@ export type DataTableExpandable<TRow, TSub> = {
 	onSubRowClick?: (sub: TSub, row: TRow) => void;
 };
 
+export type DataTableSelection<TRow> = {
+	selectedIds: ReadonlySet<string>;
+	onSelectedIdsChange: (ids: Set<string>) => void;
+	getRowLabel?: (row: TRow) => string;
+};
+
 export type DataTableProps<TRow, TSub> = {
 	query: TableQueryState;
 	columns: DataTableColumn<TRow>[];
@@ -89,6 +96,7 @@ export type DataTableProps<TRow, TSub> = {
 	onRowClick?: (row: TRow) => void;
 	onRowHover?: (row: TRow) => void;
 	expandable?: DataTableExpandable<TRow, TSub>;
+	selection?: DataTableSelection<TRow>;
 	actions?: ReactNode;
 	leadingActions?: ReactNode;
 	search?: ReactNode;
@@ -150,6 +158,7 @@ export function DataTable<TRow, TSub = unknown>({
 	onRowClick,
 	onRowHover,
 	expandable,
+	selection,
 	actions,
 	leadingActions,
 	search,
@@ -193,7 +202,17 @@ export function DataTable<TRow, TSub = unknown>({
 	const anyExpandable =
 		expandable != null &&
 		deferredRows.some((row) => expandable.isExpandable(row));
-	const colCount = visibleColumns.length + (anyExpandable ? 1 : 0);
+	const visibleIds = deferredRows.map((row) => getRowId(row));
+	const selectedVisibleCount = visibleIds.filter((id) =>
+		selection?.selectedIds.has(id),
+	).length;
+	const allVisibleSelected =
+		visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
+	const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected;
+	const colCount =
+		visibleColumns.length +
+		(anyExpandable ? 1 : 0) +
+		(selection ? 1 : 0);
 
 	const pageSize = query.pageSize;
 	const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -429,6 +448,29 @@ export function DataTable<TRow, TSub = unknown>({
 			>
 				<TableHeader className="sticky top-0 z-10 bg-muted [&_th]:bg-muted [&_tr]:border-0 [&_tr]:shadow-[inset_0_-1px_0_var(--border)]">
 					<TableRow>
+						{selection && (
+							<TableHead className="h-11 w-10 px-3">
+								<Checkbox
+									aria-label="Select all visible rows"
+									checked={
+										allVisibleSelected
+											? true
+											: someVisibleSelected
+												? "indeterminate"
+												: false
+									}
+									disabled={visibleIds.length === 0}
+									onCheckedChange={(checked) => {
+										const next = new Set(selection.selectedIds);
+										for (const id of visibleIds) {
+											if (checked === true) next.add(id);
+											else next.delete(id);
+										}
+										selection.onSelectedIdsChange(next);
+									}}
+								/>
+							</TableHead>
+						)}
 						{anyExpandable && (
 							<TableHead className="h-11 w-10 px-3">
 								<span className="sr-only">Detail</span>
@@ -521,6 +563,21 @@ export function DataTable<TRow, TSub = unknown>({
 												: undefined
 										}
 									>
+										{selection && (
+											<TableCell className="w-10 px-3 py-3">
+												<Checkbox
+													aria-label={`Select ${selection.getRowLabel?.(row) ?? id}`}
+													checked={selection.selectedIds.has(id)}
+													onClick={(event) => event.stopPropagation()}
+													onCheckedChange={(checked) => {
+														const next = new Set(selection.selectedIds);
+														if (checked === true) next.add(id);
+														else next.delete(id);
+														selection.onSelectedIdsChange(next);
+													}}
+												/>
+											</TableCell>
+										)}
 										{anyExpandable && (
 											<TableCell className="w-10 px-3 py-3 text-center text-muted-foreground">
 												{canExpand && (

@@ -33,6 +33,7 @@ import {
 	resolveOrderBy,
 } from "../trpc/list-input";
 import type {
+	ContactBulkUpdateInput,
 	ContactCreateInput,
 	ContactListInput,
 	ContactUpdateInput,
@@ -366,6 +367,103 @@ export class ContactsService {
 		});
 
 		return { id, name: deleted.name };
+	}
+
+	async bulkDelete(ids: string[]): Promise<{ ids: string[]; count: number }> {
+		const uniqueIds = [...new Set(ids)];
+		let deleted: { targets: StampTargets; count: number };
+
+		try {
+			deleted = await this.db.$transaction(async (tx) => {
+				const contacts = await tx.contact.findMany({
+					where: { id: { in: uniqueIds } },
+					select: { id: true, firstName: true, lastName: true, email: true },
+				});
+
+				if (contacts.length !== uniqueIds.length) {
+					throw new NotFoundException("One or more contacts no longer exist.");
+				}
+
+				const targets = await this.stamp.targetsOf(
+					{ contactId: { in: uniqueIds } },
+					tx,
+				);
+
+				await tx.agentTask.deleteMany({
+					where: { contactId: { in: uniqueIds } },
+				});
+				await tx.agentEvent.deleteMany({
+					where: { contactId: { in: uniqueIds } },
+				});
+
+				const suppressed = contacts.flatMap((contact) => {
+					const email = normalizeEmail(contact.email ?? "");
+					return email
+						? [
+								{
+									email,
+									reason: `Deleted from the CRM (${[contact.firstName, contact.lastName].filter(Boolean).join(" ")})`,
+								},
+							]
+						: [];
+				});
+
+				if (suppressed.length > 0) {
+					await tx.suppressedContact.createMany({
+						data: suppressed,
+						skipDuplicates: true,
+					});
+				}
+
+				const result = await tx.contact.deleteMany({
+					where: { id: { in: uniqueIds } },
+				});
+
+				return { targets, count: result.count };
+			});
+		} catch (error) {
+			if (error instanceof NotFoundException) throw error;
+			throw this.translate(error, uniqueIds[0] ?? "bulk");
+		}
+
+		await this.stamp.recomputeAfterBulkDelete(deleted.targets, {
+			contactIds: uniqueIds,
+		});
+
+		this.logger.log({ message: "Contacts deleted", count: deleted.count });
+		return { ids: uniqueIds, count: deleted.count };
+	}
+
+	async bulkUpdate(
+		ids: string[],
+		input: ContactBulkUpdateInput,
+	): Promise<{ ids: string[]; count: number }> {
+		const uniqueIds = [...new Set(ids)];
+		const data: Prisma.ContactUncheckedUpdateManyInput = {};
+		if (Object.hasOwn(input, "companyId")) data.companyId = input.companyId;
+		if (Object.hasOwn(input, "ownerId")) data.ownerId = input.ownerId;
+
+		let result: { count: number };
+		try {
+			result = await this.db.$transaction(async (tx) => {
+				const existing = await tx.contact.count({
+					where: { id: { in: uniqueIds } },
+				});
+				if (existing !== uniqueIds.length) {
+					throw new NotFoundException("One or more contacts no longer exist.");
+				}
+				return tx.contact.updateMany({
+					where: { id: { in: uniqueIds } },
+					data,
+				});
+			});
+		} catch (error) {
+			if (error instanceof NotFoundException) throw error;
+			throw this.translate(error, uniqueIds[0] ?? "bulk");
+		}
+
+		this.logger.log({ message: "Contacts updated", count: result.count });
+		return { ids: uniqueIds, count: result.count };
 	}
 
 	async update(id: string, input: ContactUpdateInput) {

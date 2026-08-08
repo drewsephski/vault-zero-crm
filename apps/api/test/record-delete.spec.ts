@@ -16,6 +16,9 @@ const domain = `delete-${suffix}.test`;
 const doomedDomain = `doomed-${suffix}.test`;
 const stampDomain = `stamped-${suffix}.test`;
 const orphanDomain = `orphaned-${suffix}.test`;
+const bulkContactDomain = `bulk-contact-${suffix}.test`;
+const bulkCompanyADomain = `bulk-company-a-${suffix}.test`;
+const bulkCompanyBDomain = `bulk-company-b-${suffix}.test`;
 const email = `gone@${domain}`;
 const colleague = `stays@${domain}`;
 const userId = `user-${suffix}`;
@@ -54,7 +57,15 @@ async function matchContext() {
 	};
 }
 
-const domains = [domain, doomedDomain, stampDomain, orphanDomain];
+const domains = [
+	domain,
+	doomedDomain,
+	stampDomain,
+	orphanDomain,
+	bulkContactDomain,
+	bulkCompanyADomain,
+	bulkCompanyBDomain,
+];
 const ours = {
 	OR: domains.map((host) => ({ email: { endsWith: `@${host}` } })),
 };
@@ -269,6 +280,78 @@ describe("deleting a company", () => {
 		expect(survivor?.companyId).toBeNull();
 
 		await db.contact.delete({ where: { id: contact.id } });
+	});
+});
+
+describe("bulk record actions", () => {
+	it("updates and deletes selected contacts and companies", async () => {
+		const companyA = await companies.create({
+			name: "Bulk A",
+			domain: bulkCompanyADomain,
+		});
+		const companyB = await companies.create({
+			name: "Bulk B",
+			domain: bulkCompanyBDomain,
+		});
+		const contactA = await contacts.create({
+			firstName: "Bulk A",
+			email: `a@${bulkContactDomain}`,
+			companyId: companyA.id,
+		});
+		const contactB = await contacts.create({
+			firstName: "Bulk B",
+			email: `b@${bulkContactDomain}`,
+			companyId: companyA.id,
+		});
+
+		expect(
+			await contacts.bulkUpdate([contactA.id, contactB.id], {
+				companyId: companyB.id,
+				ownerId: userId,
+			}),
+		).toEqual({
+			ids: [contactA.id, contactB.id],
+			count: 2,
+		});
+		expect(
+			await db.contact.findMany({
+				where: { id: { in: [contactA.id, contactB.id] } },
+				select: { companyId: true, ownerId: true },
+				orderBy: { email: "asc" },
+			}),
+		).toEqual([
+			{ companyId: companyB.id, ownerId: userId },
+			{ companyId: companyB.id, ownerId: userId },
+		]);
+
+		expect(
+			await companies.bulkUpdate([companyA.id, companyB.id], {
+				ownerId: userId,
+			}),
+		).toEqual({
+			ids: [companyA.id, companyB.id],
+			count: 2,
+		});
+
+		await parked({ contactId: contactA.id });
+		await parked({ contactId: contactB.id });
+		await parked({ companyId: companyA.id });
+		await parked({ companyId: companyB.id });
+
+		expect(await contacts.bulkDelete([contactA.id, contactB.id])).toEqual({
+			ids: [contactA.id, contactB.id],
+			count: 2,
+		});
+		expect(
+			await db.suppressedContact.count({
+				where: { email: { endsWith: `@${bulkContactDomain}` } },
+			}),
+		).toBe(2);
+
+		expect(await companies.bulkDelete([companyA.id, companyB.id])).toEqual({
+			ids: [companyA.id, companyB.id],
+			count: 2,
+		});
 	});
 });
 

@@ -9,6 +9,8 @@ import { EmptyCellValue } from "@crm/ui/components/empty-cell";
 import { PersonAvatar } from "@crm/ui/components/person-avatar";
 import { relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { BulkRecordActions } from "@/components/crm/bulk-record-actions";
 import { CompanyCell } from "@/components/crm/company-cell";
 import { contactName } from "@/components/crm/contact-name";
 import {
@@ -132,6 +134,8 @@ export function ContactsTable() {
 	const trpc = useTRPC();
 	const prefetchRecord = usePrefetchRecord();
 	const { query, input } = useTableQuery(contactsSearchParams);
+	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+	const selected = useMemo(() => [...selectedIds], [selectedIds]);
 
 	const contacts = useQuery({
 		...trpc.contacts.list.queryOptions(input),
@@ -189,6 +193,20 @@ export function ContactsTable() {
 			total={contacts.data?.total ?? 0}
 			facetCounts={facetCounts}
 			facets={facets}
+			selection={{
+				selectedIds,
+				onSelectedIdsChange: setSelectedIds,
+				getRowLabel: contactName,
+			}}
+			leadingActions={
+				<BulkRecordActions
+					kind="contact"
+					ids={selected}
+					users={users.data ?? []}
+					companies={companies.data ?? []}
+					onClear={() => setSelectedIds(new Set())}
+				/>
+			}
 			getRowId={(row) => row.id}
 			loading={contacts.isFetching}
 			onRowHover={(row) => prefetchRecord({ kind: "contact", id: row.id })}
