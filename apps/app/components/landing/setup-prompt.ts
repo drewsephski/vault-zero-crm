@@ -1,4 +1,4 @@
-export const SETUP_PROMPT = `Set up Vault Zero CRM from https://github.com/trycompai/crm in this workspace.
+export const SETUP_PROMPT = `Set up Vault Zero CRM from https://github.com/drewsephski/vault-zero-crm in this workspace.
 
 First read AGENTS.md, README.md, docs/setup.md, and docs/environment.md. Use Bun 1.3.12 and the existing lockfile. Inspect the current git status and preserve unrelated work.
 

@@ -5,4 +5,4 @@
 
 ### Features
 
-* **brand-mapping:** introduce fillable function and enhance brand update logic ([aad5945](https://github.com/trycompai/crm/commit/aad59457baca4d99fcb0e693e86623c593fccae7))
+* **brand-mapping:** introduce fillable function and enhance brand update logic ([aad5945](https://github.com/drewsephski/vault-zero-crm/commit/aad59457baca4d99fcb0e693e86623c593fccae7))

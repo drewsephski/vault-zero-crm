@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img alt="stars" height="21" src="https://afterglow.watch/badge/trycompai/crm">
+  <img alt="stars" height="21" src="https://afterglow.watch/badge/drewsephski/vault-zero-crm">
 </p>
 
 <h1 align="center">Vault Zero CRM</h1>
@@ -192,7 +192,7 @@ Written up where the work happens, not in a style guide:
 You need [Bun](https://bun.com) and Docker.
 
 ```sh
-git clone https://github.com/trycompai/crm.git && cd crm
+git clone https://github.com/drewsephski/vault-zero-crm.git && cd vault-zero-crm
 cp .env.example .env          # then fill in the four values below
 bun install
 

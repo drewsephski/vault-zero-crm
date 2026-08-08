@@ -4,7 +4,7 @@ import type { LanguageModel } from "ai";
 const openrouter = createOpenRouter({
 	apiKey: process.env.OPENROUTER_API_KEY,
 	appName: "Vault Zero CRM",
-	appUrl: "https://github.com/trycompai/crm",
+	appUrl: "https://github.com/drewsephski/vault-zero-crm",
 	compatibility: "strict",
 });
 
