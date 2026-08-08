@@ -12,8 +12,8 @@ import {
 import { requireSession } from "@/lib/session";
 import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
-import { OutreachTable } from "./outreach-table";
 import { outreachSearchParams } from "./outreach-search-params";
+import { OutreachTable } from "./outreach-table";
 
 export const metadata: Metadata = {
 	title: "Outreach",
@@ -28,7 +28,8 @@ export default function OutreachPage({
 				<PageShellHeading>
 					<PageShellTitle>Outreach</PageShellTitle>
 					<PageShellDescription>
-						Every Vault Zero prospect, with Gmail history and the next honest step.
+						Every Vault Zero prospect, with Gmail history and the next honest
+						step.
 					</PageShellDescription>
 				</PageShellHeading>
 			</PageShellHeader>

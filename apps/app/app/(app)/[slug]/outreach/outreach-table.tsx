@@ -5,20 +5,35 @@ import {
 	type DataTableColumn,
 	type DataTableFacet,
 } from "@crm/ui/components/data-table";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuTrigger,
+} from "@crm/ui/components/dropdown-menu";
 import { EmptyCellValue } from "@crm/ui/components/empty-cell";
-import { StatusIndicator, type StatusTone } from "@crm/ui/components/status-indicator";
+import {
+	StatusIndicator,
+	type StatusTone,
+} from "@crm/ui/components/status-indicator";
 import { relativeTimeFromIso } from "@crm/ui/lib/format";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { ListSearch } from "@/components/data-table/list-search";
 import { useTableQuery } from "@/components/data-table/use-table-query";
+import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { outreachSearchParams } from "./outreach-search-params";
 
 type OutreachRow = RouterOutputs["outreach"]["list"]["rows"][number];
 
-const PRESENTATION: Record<OutreachRow["status"], { label: string; tone: StatusTone }> = {
+const PRESENTATION: Record<
+	OutreachRow["status"],
+	{ label: string; tone: StatusTone }
+> = {
 	CONTACTED: { label: "Contacted", tone: "info" },
 	REPLIED: { label: "Replied", tone: "success" },
 	QUALIFIED: { label: "Qualified", tone: "success" },
@@ -62,10 +77,7 @@ const COLUMNS: DataTableColumn<OutreachRow>[] = [
 		header: "Status",
 		sortable: true,
 		width: "w-[15%]",
-		cell: (row) => {
-			const option = PRESENTATION[row.status];
-			return <StatusIndicator tone={option.tone} label={option.label} />;
-		},
+		cell: (row) => <OutreachStatusMenu leadId={row.id} status={row.status} />,
 	},
 	{
 		id: "messages",
@@ -101,6 +113,65 @@ const COLUMNS: DataTableColumn<OutreachRow>[] = [
 		),
 	},
 ];
+
+function OutreachStatusMenu({
+	leadId,
+	status,
+}: {
+	leadId: string;
+	status: OutreachRow["status"];
+}) {
+	const trpc = useTRPC();
+	const cache = useCrmCache();
+	const setStatus = useMutation(
+		trpc.outreach.setStatus.mutationOptions({
+			onSuccess: () => cache.outreach({ settle: "record" }),
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+	const option = PRESENTATION[status];
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<button
+					type="button"
+					onClick={(event) => event.stopPropagation()}
+					disabled={setStatus.isPending}
+					className="flex min-w-0 items-center text-left disabled:opacity-50"
+				>
+					<StatusIndicator tone={option.tone} label={option.label} />
+				</button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align="start"
+				className="min-w-44"
+				onClick={(event) => event.stopPropagation()}
+			>
+				<DropdownMenuRadioGroup
+					value={status}
+					onValueChange={(next) => {
+						if (next !== status) {
+							setStatus.mutate({
+								id: leadId,
+								status: next as OutreachRow["status"],
+							});
+						}
+					}}
+				>
+					{STATUS_OPTIONS.map((statusOption) => (
+						<DropdownMenuRadioItem
+							key={statusOption.value}
+							value={statusOption.value}
+						>
+							{statusOption.label}
+						</DropdownMenuRadioItem>
+					))}
+				</DropdownMenuRadioGroup>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
 
 export function OutreachTable() {
 	const trpc = useTRPC();
@@ -141,7 +212,9 @@ export function OutreachTable() {
 	return (
 		<DataTable
 			query={query}
-			search={<ListSearch placeholder="Search prospects, emails or subjects…" />}
+			search={
+				<ListSearch placeholder="Search prospects, emails or subjects…" />
+			}
 			columns={COLUMNS}
 			rows={outreach.data?.rows ?? []}
 			total={outreach.data?.total ?? 0}
@@ -151,7 +224,8 @@ export function OutreachTable() {
 			loading={outreach.isFetching}
 			onRowClick={(row) => {
 				if (row.contact) openRecord({ kind: "contact", id: row.contact.id });
-				else if (row.company) openRecord({ kind: "company", id: row.company.id });
+				else if (row.company)
+					openRecord({ kind: "company", id: row.company.id });
 			}}
 			empty="No outreach prospects match this view."
 		/>

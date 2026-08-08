@@ -17,6 +17,7 @@ export type CrmCache = {
 	deal(id?: string, options?: Options): Promise<void>;
 	removed(record: RemovedRecord): Promise<void>;
 	activity(options?: Options): Promise<void>;
+	outreach(options?: Options): Promise<void>;
 	google(options?: Options): Promise<void>;
 	settings(options?: Options): Promise<void>;
 	currency(options?: Options): Promise<void>;
@@ -147,6 +148,8 @@ export function useCrmCache(): CrmCache {
 				],
 				options,
 			),
+
+		outreach: (options) => run([trpc.outreach.list.queryKey()], [], options),
 
 		google: (options) =>
 			run(

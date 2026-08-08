@@ -1,10 +1,11 @@
 import {
-	OutreachStatus,
-	Prisma,
 	type Db,
+	OutreachStatus,
 	type OutreachStatus as OutreachStatusType,
+	Prisma,
 } from "@crm/db";
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectDatabase } from "../database/database.constants";
 import {
 	countsByKey,
 	FACET_ALL,
@@ -17,7 +18,6 @@ import type {
 	OutreachListInput,
 	OutreachStatusInput,
 } from "./outreach.contracts";
-import { InjectDatabase } from "../database/database.constants";
 
 const OWNER_SELECT = {
 	id: true,
@@ -91,8 +91,16 @@ export class OutreachService {
 				},
 			}),
 			this.db.outreachLead.count({ where }),
-			this.db.outreachLead.groupBy({ by: ["status"], where, _count: { _all: true } }),
-			this.db.outreachLead.groupBy({ by: ["vertical"], where, _count: { _all: true } }),
+			this.db.outreachLead.groupBy({
+				by: ["status"],
+				where,
+				_count: { _all: true },
+			}),
+			this.db.outreachLead.groupBy({
+				by: ["vertical"],
+				where,
+				_count: { _all: true },
+			}),
 		]);
 
 		return {
@@ -122,7 +130,10 @@ export class OutreachService {
 				select: { id: true, status: true },
 			});
 		} catch (error) {
-			if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+			if (
+				error instanceof Prisma.PrismaClientKnownRequestError &&
+				error.code === "P2025"
+			) {
 				throw new NotFoundException(`No outreach lead with id ${input.id}.`);
 			}
 			throw error;
@@ -139,7 +150,8 @@ export class OutreachService {
 				{ lastSubject: { contains: q, mode: "insensitive" } },
 			];
 		}
-		if (input.status !== FACET_ALL) where.status = input.status as OutreachStatus;
+		if (input.status !== FACET_ALL)
+			where.status = input.status as OutreachStatus;
 		if (input.vertical !== FACET_ALL) where.vertical = input.vertical;
 		const owner = ownerFilter(input.owner);
 		if (owner) Object.assign(where, owner);

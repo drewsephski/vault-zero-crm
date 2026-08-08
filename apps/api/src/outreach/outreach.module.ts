@@ -6,5 +6,5 @@ import { OutreachService } from "./outreach.service";
 @Module({
 	imports: [TrpcModule],
 	providers: [OutreachService, OutreachRouter],
-	})
+})
 export class OutreachModule {}
