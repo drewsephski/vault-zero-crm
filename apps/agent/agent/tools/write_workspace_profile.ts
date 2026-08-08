@@ -42,7 +42,7 @@ export default defineTool({
 			return {
 				written: false as const,
 				reason:
-					"This install has not been told its own website, so there is nothing to file a profile against.",
+					"This install has not been told the website of the company using this CRM, so there is no customer profile to file. This tool is not needed to answer questions about Vault Zero or Vault Zero CRM; those products have built-in context.",
 			};
 		}
 

@@ -26,8 +26,9 @@ export function usMarkdown(us: WorkspaceIdentity | null): string {
 
 	if (!us.profile) {
 		lines.push(
-			"Nothing else about us has been researched yet, so do not guess at what",
-			"we sell.",
+			"Nothing else about the company using this CRM has been researched yet,",
+			"so do not guess at what that customer sells. The built-in Vault Zero product",
+			"context is separate and still applies to questions about Vault Zero itself.",
 		);
 		return lines.join("\n");
 	}

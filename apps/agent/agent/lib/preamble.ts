@@ -1,6 +1,7 @@
 import { db } from "@crm/db";
 import { websiteUrl } from "@crm/db/workspace";
 import { capabilitiesMarkdown } from "./capabilities";
+import { PRODUCT_CONTEXT } from "./product-context";
 import { identity, usMarkdown, type WorkspaceIdentity } from "./workspace";
 
 export type Opened = {
@@ -32,7 +33,7 @@ export async function sessionPreamble(
 export async function composeClosing(
 	us: WorkspaceIdentity | null,
 ): Promise<string> {
-	return [usMarkdown(us), await capabilitiesMarkdown()]
+	return [PRODUCT_CONTEXT, usMarkdown(us), await capabilitiesMarkdown()]
 		.filter(Boolean)
 		.join("\n\n");
 }
@@ -327,7 +328,9 @@ export async function workspacePreamble(
 				"You were asked to write the profile of the company you work for, and",
 				"this install has no web address on record — nobody gave one, or what is",
 				"stored is not one. There is nothing to read. Stop — do not guess at it",
-				"from the email addresses in the CRM.",
+				"from the email addresses in the CRM. This task is only for the company",
+				"using this CRM; Vault Zero and Vault Zero CRM already have built-in product",
+				"context in the agent instructions.",
 			].join("\n"),
 			focus: {},
 		};

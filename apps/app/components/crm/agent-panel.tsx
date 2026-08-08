@@ -60,6 +60,7 @@ import {
 	ConversationPicker,
 	useConversations,
 } from "@/components/crm/agent-conversations";
+import { followUpPrompts } from "@/lib/agent-follow-up";
 import {
 	type AgentRecord,
 	type AgentScope,
@@ -74,6 +75,7 @@ import {
 	offlineThread,
 	type Thread as ThreadState,
 } from "@/lib/agent-session";
+import type { TranscriptMessage } from "@/lib/agent-transcript";
 import {
 	NEW_THREAD,
 	pendingLinkedInFallback,
@@ -312,6 +314,15 @@ function Thread({
 									<LinkedInFallback fallback={linkedinFallback} agent={agent} />
 								</MessageScrollerItem>
 							) : null}
+
+							{!working && !question && !linkedinFallback && !ended ? (
+								<FollowUpPrompts
+									kind={scope.kind}
+									messages={messages}
+									disabled={locked}
+									onAsk={ask}
+								/>
+							) : null}
 						</MessageScrollerContent>
 					</MessageScrollerViewport>
 
@@ -378,6 +389,42 @@ function Thread({
 				</p>
 			</form>
 		</div>
+	);
+}
+
+function FollowUpPrompts({
+	kind,
+	messages,
+	disabled,
+	onAsk,
+}: {
+	kind: AgentScope["kind"];
+	messages: readonly TranscriptMessage[];
+	disabled: boolean;
+	onAsk: (prompt: string) => void;
+}) {
+	const prompts = followUpPrompts({ kind, messages });
+	if (prompts.length === 0) return null;
+
+	return (
+		<MessageScrollerItem messageId="follow-up-prompts">
+			<div className="space-y-2 pt-2">
+				<p className="text-muted-foreground text-[11px]">Continue with</p>
+				<div className="flex flex-wrap gap-2">
+					{prompts.map((prompt) => (
+						<Button
+							disabled={disabled}
+							key={prompt}
+							variant="outline"
+							size="sm"
+							onClick={() => onAsk(prompt)}
+						>
+							{prompt}
+						</Button>
+					))}
+				</div>
+			</div>
+		</MessageScrollerItem>
 	);
 }
 
