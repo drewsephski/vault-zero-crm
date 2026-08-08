@@ -77,14 +77,20 @@ function CardPanel({
 	className,
 	size = "default",
 	...props
-}: React.ComponentProps<"div"> & { size?: "default" | "fill" }) {
+}: React.ComponentProps<"div"> & {
+	size?: "default" | "tall" | "fill";
+}) {
 	return (
 		<div
 			data-slot="card-panel"
 			data-size={size}
 			className={cn(
 				"flex min-h-0 flex-col overflow-hidden rounded-lg border bg-card",
-				size === "default" ? "h-80" : "flex-1",
+				size === "default"
+					? "h-80"
+					: size === "tall"
+						? "h-[clamp(20rem,calc(100svh-12rem),36rem)]"
+						: "flex-1",
 				className,
 			)}
 			{...props}

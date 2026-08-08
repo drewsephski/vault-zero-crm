@@ -4,7 +4,7 @@ import { comprehensiveSearch } from "../lib/research-search";
 
 export default defineTool({
 	description:
-		"Research a person or company on the open web for sales context — recent news, funding, launches, public statements. Returns cited claims. NOT a source of truth for someone's identity or job title; use get_linkedin_profile for that.",
+		"Research the resolved person or company on the open web for public professional context — what they do, what they have built, recent news, funding, launches and public statements. Use the full entity name resolved from the conversation, not a shortened name or pronoun. Returns cited claims. NOT a source of truth for someone's identity or job title; use read_linkedin_profile or get_linkedin_profile for that.",
 	inputSchema: z.object({
 		question: z
 			.string()

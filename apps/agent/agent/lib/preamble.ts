@@ -53,9 +53,11 @@ function opening(opened: Opened, questions: string): string {
 	return [
 		"**A rep has this record open and is talking to you.** Answer what they",
 		`actually asked — usually some form of ${questions} — from what the CRM`,
-		"already holds, and say plainly when we do not know something. Research it",
-		"further only if the answer needs it or they ask you to. Never ask them for",
-		"an id, a name or an address you can look up yourself.",
+		"already holds, and say plainly when we do not know something. Whenever they",
+		"name a person or company, resolve it against the conversation and research",
+		"that entity before answering. Never restart a known person from a shortened",
+		"first name or pronoun, and never ask them for an id, a name or an address you",
+		"can look up yourself.",
 	].join(" ");
 }
 
@@ -306,7 +308,9 @@ export async function noRecordPreamble(): Promise<Preamble> {
 			"No record was named, so nothing is in focus yet.",
 			"`list_outstanding_work` shows contacts with research outstanding, and",
 			"`search_crm` finds any contact, company or deal by name, email address or",
-			"domain. Look the record up rather than asking for an id.",
+			"domain. When the rep names a person or company, resolve the name from the",
+			"conversation, look it up and research it before answering rather than asking",
+			"for an id or restarting from a shortened name.",
 			"",
 			await closing(),
 		].join("\n"),

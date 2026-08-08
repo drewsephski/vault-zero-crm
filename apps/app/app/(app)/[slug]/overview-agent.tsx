@@ -38,7 +38,7 @@ export function OverviewAgent() {
 					</Button>
 				</CardAction>
 			</CardHeader>
-			<CardPanel>
+			<CardPanel size="tall">
 				<AgentChat
 					density="compact"
 					scope={{ kind: "workspace" }}

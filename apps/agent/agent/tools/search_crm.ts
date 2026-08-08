@@ -9,7 +9,7 @@ import { searchCrm } from "../lib/lookup";
 
 export default defineTool({
 	description:
-		"Find contacts, companies and deals by name, email address, domain or deal name — the way a person would search. Returns each match with its id, so you never have to ask a rep for one. Free. Use it whenever a question names a record you do not have the id for. When a person-like query has no CRM match, this tool automatically starts external person discovery and returns its candidates in the same result.",
+		"Find contacts, companies and deals by name, email address, domain or deal name — the way a person would search. Returns each match with its id, so you never have to ask a rep for one. Free. Use it whenever a question names a record you do not have the id for. Resolve shortened names and pronouns from the conversation first, then pass the full resolved name. When a person-like query has no CRM match, this tool automatically starts external person discovery and returns its candidates in the same result.",
 	inputSchema: z.object({
 		query: z
 			.string()

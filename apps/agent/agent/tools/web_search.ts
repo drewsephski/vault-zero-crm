@@ -10,7 +10,7 @@ const PROVIDERS = ["auto", "anysearch", "tavily", "context"] as const;
 
 export default defineTool({
 	description:
-		"Search the open web for current, factual information. Auto routes general discovery to AnySearch, current or identity research to Tavily, and uses both only for deep verification. Context.dev is reserved for known company websites through research_company. Returns source excerpts and URLs for citation.",
+		"Search the open web for current, factual information after the person or company has been resolved from the conversation. Auto routes general discovery to AnySearch, current or identity research to Tavily, and uses both only for deep verification. Do not use it to guess which social profile belongs to a person; use research_external_person and read_linkedin_profile for identity. Context.dev is reserved for known company websites through research_company. Returns source excerpts and URLs for citation.",
 	inputSchema: z.object({
 		query: z.string().trim().min(1).describe("The derived search query."),
 		intent: z
@@ -25,9 +25,7 @@ export default defineTool({
 		provider: z
 			.enum(PROVIDERS)
 			.default("auto")
-			.describe(
-				"Search source to use, or auto for intent-aware routing.",
-			),
+			.describe("Search source to use, or auto for intent-aware routing."),
 		tag: z
 			.string()
 			.trim()
