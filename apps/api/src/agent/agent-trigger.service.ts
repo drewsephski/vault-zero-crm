@@ -1,10 +1,41 @@
 import type { Db } from "@crm/db";
 import { PRIORITY } from "@crm/db/agent-tasks";
 import { Injectable, Logger } from "@nestjs/common";
+import { waitUntil } from "@vercel/functions";
 import { InjectDatabase } from "../database/database.constants";
-import { bridge } from "./bridge";
+import { type Bridge, bridge } from "./bridge";
 
-const POKE_TIMEOUT_MS = 2_000;
+const POKE_TIMEOUT_MS = 15_000;
+
+type Defer = (promise: Promise<unknown>) => void;
+
+export async function requestAgentDispatch(
+	agent: Bridge,
+	fetcher: typeof fetch = fetch,
+): Promise<void> {
+	const response = await fetcher(agent.url("/internal/crm/dispatch"), {
+		method: "POST",
+		headers: { authorization: `Bearer ${agent.secret}` },
+		signal: AbortSignal.timeout(POKE_TIMEOUT_MS),
+	});
+
+	if (!response.ok) {
+		throw new Error(`Agent dispatch returned HTTP ${response.status}.`);
+	}
+}
+
+export function keepAgentDispatchAlive(
+	dispatch: Promise<unknown>,
+	options: { isVercel?: boolean; defer?: Defer } = {},
+): void {
+	const isVercel = options.isVercel ?? Boolean(process.env.VERCEL);
+	if (!isVercel) {
+		void dispatch;
+		return;
+	}
+
+	(options.defer ?? waitUntil)(dispatch);
+}
 
 @Injectable()
 export class AgentTriggerService {
@@ -197,20 +228,27 @@ export class AgentTriggerService {
 		if (!agent) return;
 
 		const missed = (error: unknown) => {
-			this.logger.debug({
+			this.logger.warn({
 				message: "Agent poke did not land; the cron will pick this up",
 				reason: error instanceof Error ? error.message : String(error),
 			});
 		};
 
+		const dispatch = requestAgentDispatch(agent)
+			.then(() => {
+				this.logger.debug({ message: "Agent poke landed" });
+			})
+			.catch(missed);
+
 		try {
-			void fetch(agent.url("/internal/crm/dispatch"), {
-				method: "POST",
-				headers: { authorization: `Bearer ${agent.secret}` },
-				signal: AbortSignal.timeout(POKE_TIMEOUT_MS),
-			}).catch(missed);
+			keepAgentDispatchAlive(dispatch);
 		} catch (error) {
-			missed(error);
+			this.logger.warn({
+				message:
+					"Agent poke could not join the request lifecycle; the cron will pick this up",
+				reason: error instanceof Error ? error.message : String(error),
+			});
+			void dispatch;
 		}
 	}
 }

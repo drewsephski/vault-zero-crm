@@ -35,14 +35,16 @@ import { toast } from "sonner";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
+import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
 
 const UNASSIGNED = "unassigned";
 
 function AddButton(props: ComponentProps<typeof Button>) {
+	const labels = useWorkspaceLabels();
 	return (
 		<Button {...props}>
 			<Icon icon={Add} data-icon="inline-start" />
-			New company
+			New {labels.companyLower}
 		</Button>
 	);
 }
@@ -59,6 +61,7 @@ function CreateCompanyForm() {
 	const openRecord = useOpenRecord();
 	const trpc = useTRPC();
 	const cache = useCrmCache();
+	const labels = useWorkspaceLabels();
 
 	const [open, setOpen] = useQueryState(
 		"new",
@@ -95,10 +98,10 @@ function CreateCompanyForm() {
 			</SheetTrigger>
 			<SheetContent side="right">
 				<SheetHeader>
-					<SheetTitle>New company</SheetTitle>
+					<SheetTitle>New {labels.companyLower}</SheetTitle>
 					<SheetDescription>
-						Give it a name and a domain. The agent fills in the logo,
-						description, industry, address and socials.
+						Give the {labels.companyLower} a name and domain. The agent fills in
+						the logo, description, industry, address and socials.
 					</SheetDescription>
 				</SheetHeader>
 
@@ -169,7 +172,7 @@ function CreateCompanyForm() {
 						disabled={create.isPending || name.trim() === ""}
 					>
 						{create.isPending ? <Spinner /> : null}
-						Add company
+						Add {labels.companyLower}
 					</Button>
 					<SheetClose asChild>
 						<Button variant="outline">Cancel</Button>

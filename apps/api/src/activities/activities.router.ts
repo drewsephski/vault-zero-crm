@@ -14,6 +14,7 @@ import {
 	activityCreateInput,
 	completeInput,
 	myTasksInput,
+	taskCountsInput,
 	timelineCountsInput,
 	timelineInput,
 } from "./activities.contracts";
@@ -42,6 +43,14 @@ export class ActivitiesRouter {
 		@Input() input: z.infer<typeof myTasksInput>,
 	) {
 		return this.activities.myTasks(input, ctx.user.id);
+	}
+
+	@Query({ input: taskCountsInput })
+	async taskCounts(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof taskCountsInput>,
+	) {
+		return this.activities.taskCounts(input, ctx.user.id);
 	}
 
 	@Mutation({ input: activityCreateInput })

@@ -4,12 +4,11 @@ import {
 	PageShell,
 	PageShellActions,
 	PageShellContent,
-	PageShellDescription,
 	PageShellHeader,
 	PageShellHeading,
 	PageShellLoading,
-	PageShellTitle,
 } from "@/components/page-shell";
+import { WorkspaceSectionHeading } from "@/components/workspace-section-heading";
 import { requireSession } from "@/lib/session";
 import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
@@ -28,10 +27,7 @@ export default function DealsPage({
 		<PageShell className="min-h-0">
 			<PageShellHeader>
 				<PageShellHeading>
-					<PageShellTitle>Deals</PageShellTitle>
-					<PageShellDescription>
-						The pipeline, and everything that has already closed.
-					</PageShellDescription>
+					<WorkspaceSectionHeading section="deals" />
 				</PageShellHeading>
 				<PageShellActions>
 					<CreateDealSheet />
@@ -56,9 +52,12 @@ async function Deals({
 
 	const trpc = getServerTrpc();
 	const queryClient = getServerQueryClient();
-	await queryClient.prefetchQuery(
-		trpc.deals.list.queryOptions(dealsSearchParams.toInput(values)),
-	);
+	await Promise.all([
+		queryClient.prefetchQuery(
+			trpc.deals.list.queryOptions(dealsSearchParams.toInput(values)),
+		),
+		queryClient.prefetchQuery(trpc.workspace.get.queryOptions()),
+	]);
 	void queryClient.prefetchQuery(trpc.users.list.queryOptions());
 	void queryClient.prefetchQuery(
 		trpc.companies.options.queryOptions({ q: "" }),

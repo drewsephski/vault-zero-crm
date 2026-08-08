@@ -1,7 +1,13 @@
 "use client";
 
 import { cn } from "@crm/ui/lib/utils";
-import { Streamdown } from "streamdown";
+import { Streamdown, type LinkSafetyConfig } from "streamdown";
+import { LinkSafetyDialog } from "./link-safety-dialog";
+
+const linkSafety = {
+	enabled: true,
+	renderModal: (props) => <LinkSafetyDialog {...props} />,
+} satisfies LinkSafetyConfig;
 
 export function Markdown({
 	children,
@@ -12,6 +18,7 @@ export function Markdown({
 }) {
 	return (
 		<Streamdown
+			linkSafety={linkSafety}
 			shikiTheme={["github-light", "github-dark"]}
 			className={cn(
 				"min-w-0 space-y-2.5 text-xs/5 wrap-break-word",

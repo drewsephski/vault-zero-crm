@@ -20,18 +20,19 @@ import { parseAsBoolean, useQueryState } from "nuqs";
 import { useState } from "react";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { useTRPC } from "@/lib/trpc/client";
-
-const GROUP_LABEL = {
-	company: "Companies",
-	contact: "Contacts",
-	deal: "Deals",
-} as const;
+import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
 
 const KINDS = ["company", "contact", "deal"] as const;
 
 export function QuickSwitcher() {
 	const openRecord = useOpenRecord();
 	const trpc = useTRPC();
+	const labels = useWorkspaceLabels();
+	const groupLabels = {
+		company: labels.companies,
+		contact: "Contacts",
+		deal: labels.deals,
+	};
 
 	const [open, setOpen] = useQueryState("k", parseAsBoolean.withDefault(false));
 	const [query, setQuery] = useState("");
@@ -67,11 +68,11 @@ export function QuickSwitcher() {
 			open={open}
 			onOpenChange={(next) => setOpen(next || null)}
 			title="Search"
-			description="Jump to a company, contact or deal"
+			description={`Jump to a ${labels.companyLower}, contact or ${labels.dealLower}`}
 		>
 			<Command shouldFilter={false}>
 				<CommandInput
-					placeholder="Search companies, contacts and deals…"
+					placeholder={`Search ${labels.companiesLower}, contacts and ${labels.dealsLower}…`}
 					value={query}
 					onValueChange={setQuery}
 				/>
@@ -87,7 +88,7 @@ export function QuickSwitcher() {
 						if (group.length === 0) return null;
 
 						return (
-							<CommandGroup key={kind} heading={GROUP_LABEL[kind]}>
+							<CommandGroup key={kind} heading={groupLabels[kind]}>
 								{group.map((hit) => (
 									<CommandItem
 										key={`${hit.kind}:${hit.id}`}

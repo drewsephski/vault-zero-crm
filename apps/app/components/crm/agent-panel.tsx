@@ -84,6 +84,7 @@ import {
 	type Source,
 	type Tone,
 	type TranscriptItem,
+	threadInstanceKey,
 	toTranscript,
 } from "@/lib/agent-transcript";
 import { useTRPC } from "@/lib/trpc/client";
@@ -125,6 +126,14 @@ export function AgentChat({
 		fromUrl: thread,
 		landedOn: landedOn.current,
 	});
+	const [newThreadRevision, setNewThreadRevision] = useState(0);
+	const startNewThread = () => {
+		setBusy(false);
+		if (openId === NEW_THREAD) {
+			setNewThreadRevision((revision) => revision + 1);
+		}
+		onThreadChange(NEW_THREAD);
+	};
 
 	if (conversations.isPending) return <Loading />;
 
@@ -137,19 +146,16 @@ export function AgentChat({
 					setBusy(false);
 					onThreadChange(conversation.id);
 				}}
-				onNew={() => {
-					setBusy(false);
-					onThreadChange(NEW_THREAD);
-				}}
+				onNew={startNewThread}
 				busy={busy}
 				density={density}
 			/>
 
 			<ThreadWithHistory
-				key={openId ?? NEW_THREAD}
+				key={threadInstanceKey(openId, newThreadRevision)}
 				scope={scope}
 				conversation={current}
-				onNewThread={() => onThreadChange(NEW_THREAD)}
+				onNewThread={startNewThread}
 				onBusyChange={setBusy}
 				density={density}
 			/>

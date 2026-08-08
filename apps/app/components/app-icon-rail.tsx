@@ -7,6 +7,7 @@ import Dashboard from "@carbon/icons-react/es/Dashboard";
 import Email from "@carbon/icons-react/es/Email";
 import Partnership from "@carbon/icons-react/es/Partnership";
 import Settings from "@carbon/icons-react/es/Settings";
+import Task from "@carbon/icons-react/es/Task";
 import UserMultiple from "@carbon/icons-react/es/UserMultiple";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
@@ -27,6 +28,7 @@ import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import { usePrefetchSection } from "@/components/crm/section-prefetch";
 import { useMobileNav } from "@/components/mobile-nav";
+import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 
 type RailItem = {
@@ -48,6 +50,7 @@ const ITEMS: RailItem[] = [
 	},
 	{ title: "Outreach", href: "/outreach", icon: Email, match: "prefix" },
 	{ title: "Deals", href: "/deals", icon: Partnership, match: "prefix" },
+	{ title: "Tasks", href: "/tasks", icon: Task, match: "prefix" },
 	{ title: "Settings", href: "/settings", icon: Settings, match: "prefix" },
 ];
 
@@ -160,6 +163,7 @@ export function AppIconRailFallback() {
 export function AppIconRail() {
 	const pathname = usePathname();
 	const workspaceUrl = useWorkspaceUrl();
+	const labels = useWorkspaceLabels();
 	const { open, setOpen } = useMobileNav();
 	const prefetchSection = usePrefetchSection();
 
@@ -167,10 +171,16 @@ export function AppIconRail() {
 		() =>
 			ITEMS.map((item) => ({
 				...item,
+				title:
+					item.href === "/companies"
+						? labels.companies
+						: item.href === "/deals"
+							? labels.deals
+							: item.title,
 				section: item.href,
 				href: workspaceUrl(item.href),
 			})),
-		[workspaceUrl],
+		[workspaceUrl, labels],
 	);
 
 	return (

@@ -4,12 +4,11 @@ import {
 	PageShell,
 	PageShellActions,
 	PageShellContent,
-	PageShellDescription,
 	PageShellHeader,
 	PageShellHeading,
 	PageShellLoading,
-	PageShellTitle,
 } from "@/components/page-shell";
+import { WorkspaceSectionHeading } from "@/components/workspace-section-heading";
 import { requireSession } from "@/lib/session";
 import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
@@ -28,10 +27,7 @@ export default function CompaniesPage({
 		<PageShell className="min-h-0">
 			<PageShellHeader>
 				<PageShellHeading>
-					<PageShellTitle>Companies</PageShellTitle>
-					<PageShellDescription>
-						Every account in the pipeline.
-					</PageShellDescription>
+					<WorkspaceSectionHeading section="companies" />
 				</PageShellHeading>
 				<PageShellActions>
 					<CreateCompanySheet />
@@ -56,9 +52,12 @@ async function Companies({
 
 	const trpc = getServerTrpc();
 	const queryClient = getServerQueryClient();
-	await queryClient.prefetchQuery(
-		trpc.companies.list.queryOptions(companiesSearchParams.toInput(values)),
-	);
+	await Promise.all([
+		queryClient.prefetchQuery(
+			trpc.companies.list.queryOptions(companiesSearchParams.toInput(values)),
+		),
+		queryClient.prefetchQuery(trpc.workspace.get.queryOptions()),
+	]);
 	void queryClient.prefetchQuery(trpc.users.list.queryOptions());
 
 	return (

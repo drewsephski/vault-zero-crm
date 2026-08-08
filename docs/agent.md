@@ -73,7 +73,10 @@ its sub-select's `ORDER BY`.
 `POST /internal/crm/dispatch` drains **both lanes**; `AgentTriggerService.poke()` calls
 it after writing any `AgentTask`.
 
-- **Fire-and-forget, never awaited** — the row is still the message.
+- **Non-blocking but lifecycle-bound** — the row is still the message, and Vercel's
+  `waitUntil` keeps the dispatch request alive after the API response. The handoff
+  has a fifteen-second deadline and treats non-2xx responses as failures; the cron
+  remains the durable fallback.
 - **Both lanes.** Visible-only made them diverge under `eve dev`, where there is no
   cron: logos resolved instantly while `identify` sat at `attempts = 0` forever.
 - **Calls the channel's own `send`, not `receive`** — it is already on the crm channel.

@@ -12,56 +12,48 @@ import {
 import { requireSession } from "@/lib/session";
 import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
-import { AgentModel } from "./agent-model";
-import { ResearchKey } from "./research-key";
-import { WorkflowModeForm } from "./workflow-mode-form";
-import { WorkspaceForm } from "./workspace-form";
+import { BuyBoxForm } from "./buy-box-form";
 
 export const metadata: Metadata = {
-	title: "General",
+	title: "Buy box",
 };
 
-export default function GeneralSettingsPage() {
+export default function BuyBoxSettingsPage() {
 	return (
 		<PageShell>
 			<PageShellHeader>
 				<PageShellHeading>
-					<PageShellTitle>General</PageShellTitle>
+					<PageShellTitle>Buy box</PageShellTitle>
 					<PageShellDescription>
-						Who you are, and the model the research agent thinks with.
+						Define what this workspace wants to acquire. The agent and screening
+						surfaces can use the same structured criteria.
 					</PageShellDescription>
 				</PageShellHeading>
 			</PageShellHeader>
 
 			<PageShellContent>
 				<Suspense fallback={<PageShellLoading />}>
-					<Settings />
+					<BuyBoxSettings />
 				</Suspense>
 			</PageShellContent>
 		</PageShell>
 	);
 }
 
-async function Settings() {
+async function BuyBoxSettings() {
 	await requireSession();
 
 	const trpc = getServerTrpc();
 	const queryClient = getServerQueryClient();
 
-	await Promise.all([
-		queryClient.prefetchQuery(trpc.workspace.get.queryOptions()),
-		queryClient.prefetchQuery(trpc.settings.agentModel.queryOptions()),
-		queryClient.prefetchQuery(trpc.settings.modelCatalog.queryOptions()),
-		queryClient.prefetchQuery(trpc.settings.researchKey.queryOptions()),
-	]);
+	await queryClient.prefetchQuery(
+		trpc.workspace.acquisitionProfile.queryOptions(),
+	);
 
 	return (
 		<HydrateClient>
 			<div className="flex max-w-3xl flex-col gap-6">
-				<WorkspaceForm />
-				<WorkflowModeForm />
-				<ResearchKey />
-				<AgentModel />
+				<BuyBoxForm />
 			</div>
 		</HydrateClient>
 	);

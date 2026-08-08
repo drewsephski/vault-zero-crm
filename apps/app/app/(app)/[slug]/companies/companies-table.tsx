@@ -27,6 +27,7 @@ import { ListSearch } from "@/components/data-table/list-search";
 import { useTableQuery } from "@/components/data-table/use-table-query";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
+import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
 import { companiesSearchParams } from "./companies-search-params";
 
 type CompanyRow = RouterOutputs["companies"]["list"]["rows"][number];
@@ -144,10 +145,22 @@ const COLUMNS: DataTableColumn<CompanyRow>[] = [
 export function CompaniesTable() {
 	const openRecord = useOpenRecord();
 	const trpc = useTRPC();
+	const labels = useWorkspaceLabels();
 	const prefetchRecord = usePrefetchRecord();
 	const { query, input } = useTableQuery(companiesSearchParams);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 	const selected = useMemo(() => [...selectedIds], [selectedIds]);
+	const columns = useMemo(
+		() =>
+			COLUMNS.map((column) =>
+				column.id === "name"
+					? { ...column, header: labels.company }
+					: column.id === "deals"
+						? { ...column, header: `Open ${labels.dealsLower}` }
+						: column,
+			),
+		[labels],
+	);
 
 	const companies = useQuery({
 		...trpc.companies.list.queryOptions(input),
@@ -194,8 +207,12 @@ export function CompaniesTable() {
 	return (
 		<DataTable
 			query={query}
-			search={<ListSearch placeholder="Search companies by name or domain…" />}
-			columns={COLUMNS}
+			search={
+				<ListSearch
+					placeholder={`Search ${labels.companiesLower} by name or domain…`}
+				/>
+			}
+			columns={columns}
 			rows={companies.data?.rows ?? []}
 			total={companies.data?.total ?? 0}
 			facetCounts={facetCounts}
@@ -217,7 +234,7 @@ export function CompaniesTable() {
 			loading={companies.isFetching}
 			onRowHover={(row) => prefetchRecord({ kind: "company", id: row.id })}
 			onRowClick={(row) => openRecord({ kind: "company", id: row.id })}
-			empty="No companies match this view."
+			empty={`No ${labels.companiesLower} match this view.`}
 		/>
 	);
 }

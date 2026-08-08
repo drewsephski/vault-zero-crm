@@ -327,6 +327,15 @@ function hostOf(url: string): string {
 
 export const NEW_THREAD = "new";
 
+export function threadInstanceKey(
+	openId: string | null,
+	newThreadRevision: number,
+): string {
+	return openId === NEW_THREAD
+		? `${NEW_THREAD}:${newThreadRevision}`
+		: (openId ?? NEW_THREAD);
+}
+
 export function resolveThread<T extends { id: string }>({
 	conversations,
 	fromUrl,

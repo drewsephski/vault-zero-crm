@@ -13,6 +13,8 @@ import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import {
 	memberListInput,
 	setMemberRoleInput,
+	setWorkspaceModeInput,
+	updateAcquisitionProfileInput,
 	updateWorkspaceInput,
 } from "./workspace.contracts";
 import { WorkspaceService } from "./workspace.service";
@@ -29,6 +31,11 @@ export class WorkspaceRouter {
 		return this.workspace.get(ctx.user.id);
 	}
 
+	@Query()
+	async acquisitionProfile(@Ctx() ctx: AuthedTrpcContext) {
+		return this.workspace.acquisitionProfile(ctx.user.id);
+	}
+
 	@Query({ input: memberListInput })
 	async members(
 		@Ctx() ctx: AuthedTrpcContext,
@@ -43,6 +50,22 @@ export class WorkspaceRouter {
 		@Input() input: z.infer<typeof updateWorkspaceInput>,
 	) {
 		return this.workspace.update(ctx.user.id, input);
+	}
+
+	@Mutation({ input: setWorkspaceModeInput })
+	async setMode(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof setWorkspaceModeInput>,
+	) {
+		return this.workspace.setMode(ctx.user.id, input);
+	}
+
+	@Mutation({ input: updateAcquisitionProfileInput })
+	async updateAcquisitionProfile(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof updateAcquisitionProfileInput>,
+	) {
+		return this.workspace.updateAcquisitionProfile(ctx.user.id, input);
 	}
 
 	@Mutation({ input: setMemberRoleInput })

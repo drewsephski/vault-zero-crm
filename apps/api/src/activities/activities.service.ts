@@ -11,9 +11,11 @@ import { InjectDatabase } from "../database/database.constants";
 import type {
 	ActivityCreateInput,
 	MyTasksInput,
+	TaskCountsInput,
 	TimelineFilter,
 	TimelineInput,
 } from "./activities.contracts";
+import { taskDayWindow } from "./task-window";
 
 const AUTHOR_SELECT = {
 	id: true,
@@ -180,15 +182,16 @@ export class ActivitiesService {
 	}
 
 	async myTasks(input: MyTasksInput, actingUserId: string) {
-		const now = new Date();
+		const { start, end } = taskDayWindow(new Date(), input.timezoneOffset);
 		const where: Prisma.ActivityWhereInput = {
 			type: ActivityType.TASK,
 			completedAt: null,
 			createdById: actingUserId,
 		};
 
-		if (input.window === "overdue") where.dueAt = { lt: now };
-		if (input.window === "upcoming") where.dueAt = { gte: now };
+		if (input.window === "overdue") where.dueAt = { lt: start };
+		if (input.window === "today") where.dueAt = { gte: start, lt: end };
+		if (input.window === "upcoming") where.dueAt = { gte: end };
 
 		const tasks = await this.db.activity.findMany({
 			where,
@@ -201,6 +204,27 @@ export class ActivitiesService {
 		});
 
 		return tasks.map(serializeEntry);
+	}
+
+	async taskCounts(input: TaskCountsInput, actingUserId: string) {
+		const { start, end } = taskDayWindow(new Date(), input.timezoneOffset);
+		const base: Prisma.ActivityWhereInput = {
+			type: ActivityType.TASK,
+			completedAt: null,
+			createdById: actingUserId,
+		};
+
+		const [all, overdue, today, upcoming, unscheduled] = await Promise.all([
+			this.db.activity.count({ where: base }),
+			this.db.activity.count({ where: { ...base, dueAt: { lt: start } } }),
+			this.db.activity.count({
+				where: { ...base, dueAt: { gte: start, lt: end } },
+			}),
+			this.db.activity.count({ where: { ...base, dueAt: { gte: end } } }),
+			this.db.activity.count({ where: { ...base, dueAt: null } }),
+		]);
+
+		return { all, overdue, today, upcoming, unscheduled };
 	}
 
 	private anchor(

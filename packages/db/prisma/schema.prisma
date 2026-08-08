@@ -149,6 +149,58 @@ enum OutreachStatus {
   OPTED_OUT
 }
 
+enum WorkspaceMode {
+  SALES
+  ACQUISITION
+}
+
+enum AcquisitionOwnerInvolvement {
+  PASSIVE
+  TRANSITIONAL
+  OPERATOR
+}
+
+enum AcquisitionRevenuePreference {
+  REQUIRED
+  PREFERRED
+  OPTIONAL
+}
+
+enum AcquisitionAssetPreference {
+  ASSET_LIGHT
+  BALANCED
+  ASSET_HEAVY
+}
+
+model AcquisitionProfile {
+  id   String        @id
+  mode WorkspaceMode @default(SALES)
+
+  preferredIndustries String[]
+  geographies         String[]
+  excludedCategories  String[]
+
+  currency String @default("USD")
+
+  revenueMin       Decimal? @db.Decimal(18, 2)
+  revenueMax       Decimal? @db.Decimal(18, 2)
+  ebitdaMin        Decimal? @db.Decimal(18, 2)
+  ebitdaMax        Decimal? @db.Decimal(18, 2)
+  purchasePriceMin Decimal? @db.Decimal(18, 2)
+  purchasePriceMax Decimal? @db.Decimal(18, 2)
+
+  ownerInvolvement           AcquisitionOwnerInvolvement?
+  recurringRevenuePreference AcquisitionRevenuePreference?
+  customerConcentrationMax   Int?
+  assetPreference            AcquisitionAssetPreference?
+  financingAssumptions       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("acquisitionProfile")
+}
+
 model OutreachLead {
   id              String         @id @default(cuid())
   companyName     String

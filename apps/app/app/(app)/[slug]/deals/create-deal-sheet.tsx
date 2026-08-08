@@ -38,14 +38,16 @@ import { dealStageLabel, OPEN_STAGES } from "@/components/crm/deal-stage";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
+import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
 
 const UNSET = "";
 
 function AddButton(props: ComponentProps<typeof Button>) {
+	const labels = useWorkspaceLabels();
 	return (
 		<Button {...props}>
 			<Icon icon={Add} data-icon="inline-start" />
-			New deal
+			New {labels.dealLower}
 		</Button>
 	);
 }
@@ -62,6 +64,7 @@ function CreateDealForm({ companyId }: { companyId?: string }) {
 	const openRecord = useOpenRecord();
 	const trpc = useTRPC();
 	const cache = useCrmCache();
+	const labels = useWorkspaceLabels();
 
 	const [open, setOpen] = useQueryState(
 		"new",
@@ -114,9 +117,10 @@ function CreateDealForm({ companyId }: { companyId?: string }) {
 			</SheetTrigger>
 			<SheetContent side="right">
 				<SheetHeader>
-					<SheetTitle>New deal</SheetTitle>
+					<SheetTitle>New {labels.dealLower}</SheetTitle>
 					<SheetDescription>
-						Every deal belongs to a company and has someone's name against it.
+						Every {labels.dealLower} belongs to a {labels.companyLower} and has
+						someone's name against it.
 					</SheetDescription>
 				</SheetHeader>
 
@@ -153,10 +157,14 @@ function CreateDealForm({ companyId }: { companyId?: string }) {
 						</Field>
 
 						<Field>
-							<FieldLabel htmlFor="create-deal-company">Company</FieldLabel>
+							<FieldLabel htmlFor="create-deal-company">
+								{labels.company}
+							</FieldLabel>
 							<Select value={company} onValueChange={setCompany}>
 								<SelectTrigger id="create-deal-company">
-									<SelectValue placeholder="Choose a company" />
+									<SelectValue
+										placeholder={`Choose a ${labels.companyLower}`}
+									/>
 								</SelectTrigger>
 								<SelectContent>
 									{(companies.data ?? []).map((option) => (
@@ -199,8 +207,8 @@ function CreateDealForm({ companyId }: { companyId?: string }) {
 								</SelectContent>
 							</Select>
 							<FieldDescription>
-								A new deal is an open deal — close it from the pipeline once
-								there is an outcome to record.
+								A new {labels.dealLower} stays open until there is an outcome to
+								record.
 							</FieldDescription>
 						</Field>
 
@@ -252,7 +260,7 @@ function CreateDealForm({ companyId }: { companyId?: string }) {
 						disabled={create.isPending || !ready}
 					>
 						{create.isPending ? <Spinner /> : null}
-						Add deal
+						Add {labels.dealLower}
 					</Button>
 					<SheetClose asChild>
 						<Button variant="outline">Cancel</Button>

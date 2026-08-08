@@ -29,6 +29,7 @@ import { EnrichmentActions } from "@/components/crm/enrichment-actions";
 import {
 	ENRICHMENT_POLL_MS,
 	EnrichmentIndicator,
+	enrichmentActivity,
 	isEnriching,
 } from "@/components/crm/enrichment-status";
 import {
@@ -48,6 +49,7 @@ import {
 	DetailSheetProperties,
 	DetailSheetProse,
 	DetailSheetRail,
+	DetailSheetResearchStatus,
 	DetailSheetSection,
 	DetailSheetSplit,
 	DetailSheetStat,
@@ -178,6 +180,9 @@ export function CompanySheet({ companyId }: { companyId: string }) {
 	});
 
 	const company = query.data;
+	const researchActivity = company
+		? enrichmentActivity(company.enrichmentStatus, company.queued)
+		: null;
 
 	const location = company
 		? [company.city, company.stateCode, company.country]
@@ -267,7 +272,8 @@ export function CompanySheet({ companyId }: { companyId: string }) {
 				) : undefined
 			}
 			note={
-				company && company.enrichmentStatus !== "COMPLETE" ? (
+				company &&
+				(company.enrichmentStatus !== "COMPLETE" || researchActivity) ? (
 					<EnrichmentIndicator
 						status={company.enrichmentStatus}
 						queued={company.queued}
@@ -290,6 +296,7 @@ export function CompanySheet({ companyId }: { companyId: string }) {
 						<EnrichmentActions
 							companyId={company.id}
 							hasDomain={company.domain !== null}
+							activity={researchActivity}
 						/>
 						<RecordActions
 							record={{ kind: "company", id: company.id }}
@@ -359,9 +366,22 @@ function CompanyOverview({
 		update.mutate({ id: company.id, data });
 
 	const isSaving = savingField(update);
+	const fields = pendingFields(company);
+	const researchActivity = enrichmentActivity(
+		company.enrichmentStatus,
+		company.queued,
+	);
 
 	return (
 		<DetailSheetBody>
+			{researchActivity ? (
+				<DetailSheetResearchStatus
+					subject={company.name}
+					fields={fields}
+					state={researchActivity}
+				/>
+			) : null}
+
 			<DetailSheetSplit>
 				<DetailSheetMain>
 					{company.description ? (
@@ -448,10 +468,7 @@ function CompanyOverview({
 						</DetailSheetProperties>
 					</DetailSheetSection>
 
-					<DetailSheetPending
-						fields={pendingFields(company)}
-						running={isEnriching(company.enrichmentStatus, company.queued)}
-					/>
+					{researchActivity ? null : <DetailSheetPending fields={fields} />}
 
 					{hasCompanyLinks(company) ? (
 						<DetailSheetSection title="Links">

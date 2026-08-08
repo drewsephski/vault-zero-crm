@@ -13,6 +13,7 @@ export type Section =
 	| "/companies"
 	| "/contacts"
 	| "/deals"
+	| "/tasks"
 	| "/settings";
 
 export function usePrefetchSection(): (section: string) => void {
@@ -51,6 +52,20 @@ export function usePrefetchSection(): (section: string) => void {
 						trpc.deals.list.queryOptions(dealsSearchParams.defaultInput()),
 					);
 					return;
+				case "/tasks": {
+					const timezoneOffset = new Date().getTimezoneOffset();
+					void queryClient.prefetchQuery(
+						trpc.activities.myTasks.queryOptions({
+							window: "today",
+							limit: 100,
+							timezoneOffset,
+						}),
+					);
+					void queryClient.prefetchQuery(
+						trpc.activities.taskCounts.queryOptions({ timezoneOffset }),
+					);
+					return;
+				}
 				default:
 					return;
 			}

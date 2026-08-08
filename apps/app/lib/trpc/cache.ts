@@ -52,6 +52,7 @@ export function useCrmCache(): CrmCache {
 		trpc.activities.timeline.pathKey(),
 		trpc.activities.timelineCounts.queryKey(),
 		trpc.activities.myTasks.queryKey(),
+		trpc.activities.taskCounts.queryKey(),
 	];
 
 	const listKeys = () => [
@@ -162,8 +163,12 @@ export function useCrmCache(): CrmCache {
 
 		workspace: (options) =>
 			run(
-				[trpc.workspace.get.queryKey(), trpc.workspace.members.queryKey()],
-				[],
+				[
+					trpc.workspace.get.queryKey(),
+					trpc.workspace.members.queryKey(),
+					trpc.workspace.acquisitionProfile.queryKey(),
+				],
+				[trpc.dashboard.summary.queryKey()],
 				options,
 			),
 

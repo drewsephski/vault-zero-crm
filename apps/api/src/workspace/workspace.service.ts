@@ -6,7 +6,15 @@ import {
 	WORKSPACE_ID,
 	type WorkspaceRole,
 } from "@crm/auth";
-import type { Db, Prisma } from "@crm/db";
+import {
+	AcquisitionAssetPreference,
+	AcquisitionOwnerInvolvement,
+	AcquisitionRevenuePreference,
+	type Db,
+	type Prisma,
+	WorkspaceMode,
+} from "@crm/db";
+import { readReportingCurrency } from "@crm/db/settings";
 import { isOnboarded, markOnboarded, workspaceSlug } from "@crm/db/workspace";
 import {
 	BadRequestException,
@@ -18,6 +26,7 @@ import {
 } from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
 import { normalizeDomain } from "../companies/domain";
+import { blankToNull, decimalFromCents, toCents } from "../crm/values";
 import { InjectDatabase } from "../database/database.constants";
 import {
 	countsByKey,
@@ -29,6 +38,8 @@ import {
 import type {
 	MemberListInput,
 	SetMemberRoleInput,
+	SetWorkspaceModeInput,
+	UpdateAcquisitionProfileInput,
 	UpdateWorkspaceInput,
 } from "./workspace.contracts";
 
@@ -41,6 +52,29 @@ export interface Workspace {
 	viewerRole: WorkspaceRole | null;
 	canRename: boolean;
 	canChangeRoles: boolean;
+	canManageAcquisition: boolean;
+	mode: WorkspaceMode;
+}
+
+export interface AcquisitionProfile {
+	mode: WorkspaceMode;
+	preferredIndustries: string[];
+	geographies: string[];
+	excludedCategories: string[];
+	currency: string;
+	revenueMinCents: number | null;
+	revenueMaxCents: number | null;
+	ebitdaMinCents: number | null;
+	ebitdaMaxCents: number | null;
+	purchasePriceMinCents: number | null;
+	purchasePriceMaxCents: number | null;
+	ownerInvolvement: AcquisitionOwnerInvolvement | null;
+	recurringRevenuePreference: AcquisitionRevenuePreference | null;
+	customerConcentrationMax: number | null;
+	assetPreference: AcquisitionAssetPreference | null;
+	financingAssumptions: string | null;
+	updatedAt: string | null;
+	canManage: boolean;
 }
 
 export interface WorkspaceMember {
@@ -101,7 +135,13 @@ export class WorkspaceService {
 			);
 		}
 
-		const role = await this.roleOf(userId);
+		const [role, acquisition] = await Promise.all([
+			this.roleOf(userId),
+			this.db.acquisitionProfile.findUnique({
+				where: { id: WORKSPACE_ID },
+				select: { mode: true },
+			}),
+		]);
 
 		return {
 			id: row.id,
@@ -112,7 +152,105 @@ export class WorkspaceService {
 			viewerRole: role,
 			canRename: canRenameWorkspace(role),
 			canChangeRoles: canChangeRole(role),
+			canManageAcquisition: canRenameWorkspace(role),
+			mode: acquisition?.mode ?? WorkspaceMode.SALES,
 		};
+	}
+
+	async acquisitionProfile(userId: string): Promise<AcquisitionProfile> {
+		const [row, role, reportingCurrency] = await Promise.all([
+			this.db.acquisitionProfile.findUnique({
+				where: { id: WORKSPACE_ID },
+			}),
+			this.roleOf(userId),
+			readReportingCurrency(this.db),
+		]);
+
+		return {
+			mode: row?.mode ?? WorkspaceMode.SALES,
+			preferredIndustries: row?.preferredIndustries ?? [],
+			geographies: row?.geographies ?? [],
+			excludedCategories: row?.excludedCategories ?? [],
+			currency: row?.currency ?? reportingCurrency,
+			revenueMinCents: toCents(row?.revenueMin ?? null),
+			revenueMaxCents: toCents(row?.revenueMax ?? null),
+			ebitdaMinCents: toCents(row?.ebitdaMin ?? null),
+			ebitdaMaxCents: toCents(row?.ebitdaMax ?? null),
+			purchasePriceMinCents: toCents(row?.purchasePriceMin ?? null),
+			purchasePriceMaxCents: toCents(row?.purchasePriceMax ?? null),
+			ownerInvolvement: row?.ownerInvolvement ?? null,
+			recurringRevenuePreference: row?.recurringRevenuePreference ?? null,
+			customerConcentrationMax: row?.customerConcentrationMax ?? null,
+			assetPreference: row?.assetPreference ?? null,
+			financingAssumptions: row?.financingAssumptions ?? null,
+			updatedAt: row?.updatedAt.toISOString() ?? null,
+			canManage: canRenameWorkspace(role),
+		};
+	}
+
+	async setMode(
+		userId: string,
+		input: SetWorkspaceModeInput,
+	): Promise<Workspace> {
+		await this.assertCanManageAcquisition(userId);
+
+		const currency = await readReportingCurrency(this.db);
+
+		await this.db.acquisitionProfile.upsert({
+			where: { id: WORKSPACE_ID },
+			create: {
+				id: WORKSPACE_ID,
+				mode: input.mode,
+				preferredIndustries: [],
+				geographies: [],
+				excludedCategories: [],
+				currency,
+			},
+			update: { mode: input.mode },
+		});
+
+		this.logger.log({
+			message: "Workspace mode changed",
+			userId,
+			mode: input.mode,
+		});
+
+		return this.get(userId);
+	}
+
+	async updateAcquisitionProfile(
+		userId: string,
+		input: UpdateAcquisitionProfileInput,
+	): Promise<AcquisitionProfile> {
+		await this.assertCanManageAcquisition(userId);
+
+		const fields = {
+			preferredIndustries: normalizeList(input.preferredIndustries),
+			geographies: normalizeList(input.geographies),
+			excludedCategories: normalizeList(input.excludedCategories),
+			currency: input.currency,
+			revenueMin: decimalFromCents(input.revenueMinCents),
+			revenueMax: decimalFromCents(input.revenueMaxCents),
+			ebitdaMin: decimalFromCents(input.ebitdaMinCents),
+			ebitdaMax: decimalFromCents(input.ebitdaMaxCents),
+			purchasePriceMin: decimalFromCents(input.purchasePriceMinCents),
+			purchasePriceMax: decimalFromCents(input.purchasePriceMaxCents),
+			ownerInvolvement: input.ownerInvolvement,
+			recurringRevenuePreference: input.recurringRevenuePreference,
+			customerConcentrationMax: input.customerConcentrationMax,
+			assetPreference: input.assetPreference,
+			financingAssumptions: blankToNull(input.financingAssumptions ?? ""),
+		};
+
+		await this.db.acquisitionProfile.upsert({
+			where: { id: WORKSPACE_ID },
+			create: { id: WORKSPACE_ID, mode: WorkspaceMode.SALES, ...fields },
+			update: fields,
+		});
+
+		this.logger.log({ message: "Acquisition profile updated", userId });
+
+		return this.acquisitionProfile(userId);
 	}
 
 	async update(
@@ -309,4 +447,29 @@ export class WorkspaceService {
 
 		return member ? toRole(member.role) : null;
 	}
+
+	private async assertCanManageAcquisition(userId: string): Promise<void> {
+		const role = await this.roleOf(userId);
+
+		if (!canRenameWorkspace(role)) {
+			throw new ForbiddenException(
+				"Only an owner or an admin can change the acquisition workflow.",
+			);
+		}
+	}
+}
+
+function normalizeList(values: string[]): string[] {
+	const seen = new Set<string>();
+	const normalized: string[] = [];
+
+	for (const value of values) {
+		const trimmed = value.trim();
+		const key = trimmed.toLocaleLowerCase();
+		if (!trimmed || seen.has(key)) continue;
+		seen.add(key);
+		normalized.push(trimmed);
+	}
+
+	return normalized;
 }

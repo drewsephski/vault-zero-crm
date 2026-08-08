@@ -18,7 +18,18 @@ const PRESENTATION: Record<
 const QUEUED = { label: "Queued", tone: "neutral" as StatusTone, busy: false };
 
 function present(status: EnrichmentStatus, queued: boolean) {
-	return status === "PENDING" && queued ? QUEUED : PRESENTATION[status];
+	if (status === "RUNNING") return PRESENTATION.RUNNING;
+	return queued ? QUEUED : PRESENTATION[status];
+}
+
+export type EnrichmentActivity = "queued" | "running" | null;
+
+export function enrichmentActivity(
+	status: EnrichmentStatus,
+	queued = false,
+): EnrichmentActivity {
+	if (status === "RUNNING") return "running";
+	return queued ? "queued" : null;
 }
 
 export function EnrichmentIndicator({
@@ -46,7 +57,7 @@ export function EnrichmentIndicator({
 }
 
 export function isEnriching(status: EnrichmentStatus, queued = false): boolean {
-	return status === "RUNNING" || (status === "PENDING" && queued);
+	return enrichmentActivity(status, queued) !== null;
 }
 
 export const ENRICHMENT_POLL_MS = 3_000;

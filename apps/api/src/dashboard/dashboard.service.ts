@@ -1,9 +1,23 @@
-import { ActivityType, type Db, DealStage } from "@crm/db";
+import { WORKSPACE_ID } from "@crm/auth";
+import {
+	ActivityType,
+	type Db,
+	DealStage,
+	EnrichmentStatus,
+	type Prisma,
+	WorkspaceMode,
+} from "@crm/db";
 import { Injectable } from "@nestjs/common";
 import { toCents } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
 import { InjectDatabase } from "../database/database.constants";
 import { OPEN_DEAL_STAGES } from "../deals/deal-stage";
+import {
+	ACQUISITION_STALE_DAYS,
+	emptyAcquisitionSummary,
+	visibleCriteriaCount,
+	visibleFitWhere,
+} from "./acquisition-summary";
 import type { DashboardSummaryInput } from "./dashboard.contracts";
 
 const OWNER_SELECT = {
@@ -47,8 +61,15 @@ export class DashboardService {
 		const trendStart = monthStart(now, -(TREND_MONTHS - 1));
 		const rateStart = new Date(now.getTime() - RATE_WINDOW_DAYS * DAY_MS);
 
-		const base = await this.conversion.reportingCurrency();
+		const [base, acquisitionProfile] = await Promise.all([
+			this.conversion.reportingCurrency(),
+			this.db.acquisitionProfile.findUnique({ where: { id: WORKSPACE_ID } }),
+		]);
 		const counted = this.conversion.countedWhere(base);
+		const acquisitionPromise =
+			acquisitionProfile?.mode === WorkspaceMode.ACQUISITION
+				? this.acquisitionSummary(actingUserId, mine, acquisitionProfile, now)
+				: Promise.resolve(emptyAcquisitionSummary());
 
 		const [
 			openByStage,
@@ -271,8 +292,12 @@ export class DashboardService {
 
 		const decided = wins + losses;
 
+		const acquisition = await acquisitionPromise;
+
 		return {
 			scope: input.scope,
+			mode: acquisitionProfile?.mode ?? WorkspaceMode.SALES,
+			acquisition,
 			reportingCurrency: base,
 			unconverted,
 			pipeline: {
@@ -347,6 +372,127 @@ export class DashboardService {
 					),
 				},
 			},
+		};
+	}
+
+	private async acquisitionSummary(
+		actingUserId: string,
+		mine: boolean,
+		profile: Prisma.AcquisitionProfileGetPayload<object> | null,
+		now: Date,
+	) {
+		const targetWhere: Prisma.CompanyWhereInput = mine
+			? { ownerId: actingUserId }
+			: {};
+		const dealWhere: Prisma.DealWhereInput = mine
+			? { ownerId: actingUserId }
+			: {};
+		const staleBefore = new Date(
+			now.getTime() - ACQUISITION_STALE_DAYS * DAY_MS,
+		);
+		const fitWhere = visibleFitWhere(profile, targetWhere);
+
+		const [
+			totalTargets,
+			visibleMatches,
+			needsResearch,
+			staleTargets,
+			activeAcquisitions,
+			nextActionCount,
+			nextActions,
+		] = await Promise.all([
+			this.db.company.count({ where: targetWhere }),
+			fitWhere
+				? this.db.company.count({ where: fitWhere })
+				: Promise.resolve(null),
+			this.db.company.count({
+				where: {
+					AND: [
+						targetWhere,
+						{
+							OR: [
+								{ enrichedAt: null },
+								{
+									enrichmentStatus: {
+										in: [
+											EnrichmentStatus.PENDING,
+											EnrichmentStatus.RUNNING,
+											EnrichmentStatus.FAILED,
+											EnrichmentStatus.SKIPPED,
+										],
+									},
+								},
+							],
+						},
+					],
+				},
+			}),
+			this.db.company.count({
+				where: {
+					AND: [
+						targetWhere,
+						{
+							OR: [
+								{ lastActivityAt: { lt: staleBefore } },
+								{
+									lastActivityAt: null,
+									createdAt: { lt: staleBefore },
+								},
+							],
+						},
+					],
+				},
+			}),
+			this.db.deal.count({
+				where: {
+					...dealWhere,
+					stage: { in: [...OPEN_DEAL_STAGES] },
+				},
+			}),
+			this.db.activity.count({
+				where: {
+					type: ActivityType.TASK,
+					completedAt: null,
+					createdById: actingUserId,
+				},
+			}),
+			this.db.activity.findMany({
+				where: {
+					type: ActivityType.TASK,
+					completedAt: null,
+					createdById: actingUserId,
+				},
+				orderBy: [
+					{ dueAt: { sort: "asc", nulls: "last" } },
+					{ createdAt: "desc" },
+				],
+				take: 5,
+				select: {
+					id: true,
+					subject: true,
+					dueAt: true,
+					company: { select: { id: true, name: true } },
+					contact: {
+						select: { id: true, firstName: true, lastName: true },
+					},
+					deal: { select: { id: true, name: true } },
+				},
+			}),
+		]);
+
+		return {
+			totalTargets,
+			visibleMatches,
+			visibleCriteria: visibleCriteriaCount(profile),
+			needsResearch,
+			staleTargets,
+			staleAfterDays: ACQUISITION_STALE_DAYS,
+			activeAcquisitions,
+			nextActionCount,
+			nextActions: nextActions.map(({ dueAt, ...task }) => ({
+				...task,
+				dueAt: dueAt?.toISOString() ?? null,
+			})),
 		};
 	}
 }

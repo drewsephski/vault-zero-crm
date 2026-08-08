@@ -8,6 +8,7 @@ import {
 import { EmptyCellValue } from "@crm/ui/components/empty-cell";
 import { formatMoney, relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { CLOSING_OPTIONS } from "@/components/crm/closing-window";
 import { CompanyCell } from "@/components/crm/company-cell";
 import { DEAL_STAGE_OPTIONS } from "@/components/crm/deal-stage";
@@ -19,6 +20,7 @@ import { ListSearch } from "@/components/data-table/list-search";
 import { useTableQuery } from "@/components/data-table/use-table-query";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
+import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
 import { dealsSearchParams } from "./deals-search-params";
 
 type DealRow = RouterOutputs["deals"]["list"]["rows"][number];
@@ -123,8 +125,20 @@ const COLUMNS: DataTableColumn<DealRow>[] = [
 export function DealsTable() {
 	const openRecord = useOpenRecord();
 	const trpc = useTRPC();
+	const labels = useWorkspaceLabels();
 	const prefetchRecord = usePrefetchRecord();
 	const { query, input } = useTableQuery(dealsSearchParams);
+	const columns = useMemo(
+		() =>
+			COLUMNS.map((column) =>
+				column.id === "name"
+					? { ...column, header: labels.deal }
+					: column.id === "company"
+						? { ...column, header: labels.company }
+						: column,
+			),
+		[labels],
+	);
 
 	const deals = useQuery({
 		...trpc.deals.list.queryOptions(input),
@@ -167,15 +181,19 @@ export function DealsTable() {
 	return (
 		<DataTable
 			query={query}
-			search={<ListSearch placeholder="Search deals by name or company…" />}
-			columns={COLUMNS}
+			search={
+				<ListSearch
+					placeholder={`Search ${labels.dealsLower} by name or ${labels.companyLower}…`}
+				/>
+			}
+			columns={columns}
 			rows={deals.data?.rows ?? []}
 			total={deals.data?.total ?? 0}
 			facetCounts={facetCounts}
 			facets={facets}
 			tabs={{
 				id: "status",
-				allLabel: "All deals",
+				allLabel: `All ${labels.dealsLower}`,
 				options: [
 					{ value: "open", label: "Open" },
 					{ value: "closed", label: "Closed" },
@@ -185,11 +203,11 @@ export function DealsTable() {
 			loading={deals.isFetching}
 			onRowHover={(row) => prefetchRecord({ kind: "deal", id: row.id })}
 			onRowClick={(row) => openRecord({ kind: "deal", id: row.id })}
-			empty="No deals match this view."
+			empty={`No ${labels.dealsLower} match this view.`}
 			meta={
 				openPipelineCents === null ? undefined : (
 					<span>
-						{deals.data?.total ?? 0} deals ·{" "}
+						{deals.data?.total ?? 0} {labels.dealsLower} ·{" "}
 						<span className="tabular-nums">
 							{formatMoney(openPipelineCents, reportingCurrency)}
 						</span>{" "}

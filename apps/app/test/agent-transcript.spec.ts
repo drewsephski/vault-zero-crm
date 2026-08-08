@@ -10,6 +10,7 @@ import {
 	resolveThread,
 	sourcesOf,
 	TOOL_VERBS,
+	threadInstanceKey,
 	toTranscript,
 } from "../lib/agent-transcript";
 
@@ -380,6 +381,20 @@ describe("resolveThread", () => {
 
 		expect(openId).toBe("gone");
 		expect(current).toBeNull();
+	});
+});
+
+describe("threadInstanceKey", () => {
+	it("creates a fresh instance each time an already-new thread is reset", () => {
+		expect(threadInstanceKey(NEW_THREAD, 0)).not.toBe(
+			threadInstanceKey(NEW_THREAD, 1),
+		);
+	});
+
+	it("keeps saved conversations stable across new-thread resets", () => {
+		expect(threadInstanceKey("conversation-1", 0)).toBe(
+			threadInstanceKey("conversation-1", 1),
+		);
 	});
 });
 

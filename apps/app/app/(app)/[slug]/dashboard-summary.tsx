@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceMode } from "@crm/db/enums";
 import { Button } from "@crm/ui/components/button";
 import {
 	Card,
@@ -45,6 +46,7 @@ import { activityLabel } from "@/components/crm/timeline/activity-icon";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
+import { AcquisitionDashboard } from "./acquisition-dashboard";
 import { OverviewAgent } from "./overview-agent";
 import { overviewParsers } from "./overview-search-params";
 import { SalesDashboard } from "./sales-dashboard";
@@ -90,6 +92,10 @@ function DashboardData() {
 				<Spinner />
 			</div>
 		);
+	}
+
+	if (summary.mode === WorkspaceMode.ACQUISITION) {
+		return <AcquisitionDashboard summary={summary} />;
 	}
 
 	const { biggestOpen, overdueTasks, recentActivity } = summary;

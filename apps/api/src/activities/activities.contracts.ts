@@ -70,8 +70,15 @@ export const completeInput = z.object({
 });
 
 export const myTasksInput = z.object({
-	window: z.enum(["overdue", "upcoming", "all"]).default("all"),
+	window: z.enum(["today", "overdue", "upcoming", "all"]).default("today"),
 	limit: z.number().int().min(1).max(100).default(25),
+	timezoneOffset: z.number().int().min(-840).max(840).default(0),
 });
 
 export type MyTasksInput = z.infer<typeof myTasksInput>;
+
+export const taskCountsInput = z.object({
+	timezoneOffset: z.number().int().min(-840).max(840).default(0),
+});
+
+export type TaskCountsInput = z.infer<typeof taskCountsInput>;

@@ -15,6 +15,7 @@ import type { CarbonIcon } from "@crm/ui/components/icon";
 import { Icon } from "@crm/ui/components/icon";
 import { Separator } from "@crm/ui/components/separator";
 import type { SheetSize } from "@crm/ui/components/sheet";
+import { StatusIndicator } from "@crm/ui/components/status-indicator";
 import {
 	Tabs,
 	TabsContent,
@@ -299,13 +300,7 @@ export function DetailSheetProperties({
 	);
 }
 
-export function DetailSheetPending({
-	fields,
-	running,
-}: {
-	fields: string[];
-	running: boolean;
-}) {
+export function DetailSheetPending({ fields }: { fields: string[] }) {
 	if (fields.length === 0) return null;
 
 	return (
@@ -313,19 +308,64 @@ export function DetailSheetPending({
 			<div className="flex items-center gap-2">
 				<span
 					aria-hidden
-					className={cn(
-						"size-1.5 shrink-0 rounded-full",
-						running ? "bg-primary" : "bg-muted-foreground",
-					)}
+					className="size-1.5 shrink-0 rounded-full bg-muted-foreground"
 				/>
-				<span className="font-medium text-xs">
-					{running ? "Agent is researching" : "Not known yet"}
-				</span>
+				<span className="font-medium text-xs">Profile incomplete</span>
 			</div>
 			<p className="text-pretty text-muted-foreground text-xs/5">
-				{fields.join(", ")}
+				Missing {fields.join(", ")}.
 			</p>
 		</div>
+	);
+}
+
+const fieldList = new Intl.ListFormat(undefined, {
+	style: "long",
+	type: "conjunction",
+});
+
+export function DetailSheetResearchStatus({
+	subject,
+	fields,
+	state,
+}: {
+	subject: string;
+	fields: string[];
+	state: "queued" | "running";
+}) {
+	const detail =
+		fields.length > 0
+			? `Looking for ${fieldList.format(fields)}.`
+			: "Reviewing the company website and public sources.";
+
+	return (
+		<section
+			role="status"
+			aria-live="polite"
+			className={cn(
+				"flex flex-col gap-2 border-b bg-muted/40 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6",
+				GUTTER,
+			)}
+		>
+			<div className="min-w-0 space-y-1">
+				<p className="font-medium text-sm">
+					{state === "running"
+						? `Researching ${subject}`
+						: `Research queued for ${subject}`}
+				</p>
+				<p className="text-pretty text-muted-foreground text-xs/5">
+					{state === "queued" ? "Waiting for the agent to start. " : ""}
+					{detail} Updates will appear here automatically.
+				</p>
+			</div>
+			<StatusIndicator
+				tone={state === "running" ? "info" : "neutral"}
+				busy={state === "running"}
+				pulse={state === "queued"}
+				label={state === "running" ? "Researching now" : "In queue"}
+				size="sm"
+			/>
+		</section>
 	);
 }
 

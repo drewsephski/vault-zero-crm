@@ -4,6 +4,7 @@ import Asleep from "@carbon/icons-react/es/Asleep";
 import Light from "@carbon/icons-react/es/Light";
 import Logout from "@carbon/icons-react/es/Logout";
 import Menu from "@carbon/icons-react/es/Menu";
+import Search from "@carbon/icons-react/es/Search";
 import UserAvatar from "@carbon/icons-react/es/UserAvatar";
 import { signOut } from "@crm/auth/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@crm/ui/components/avatar";
@@ -22,6 +23,7 @@ import { Skeleton } from "@crm/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTheme } from "next-themes";
+import { parseAsBoolean, useQueryState } from "nuqs";
 import { toast } from "sonner";
 import { useMobileNav } from "@/components/mobile-nav";
 import { useTRPC } from "@/lib/trpc/client";
@@ -42,6 +44,10 @@ export function AppHeader({ user }: { user: User }) {
 	const trpc = useTRPC();
 	const workspaceUrl = useWorkspaceUrl();
 	const workspace = useQuery(trpc.workspace.get.queryOptions());
+	const [, setQuickOpen] = useQueryState(
+		"k",
+		parseAsBoolean.withDefault(false),
+	);
 	const label = workspaceLabel(workspace.data?.name);
 
 	async function handleSignOut() {
@@ -79,6 +85,17 @@ export function AppHeader({ user }: { user: User }) {
 			</div>
 
 			<div className="ml-auto flex shrink-0 items-center gap-1.5">
+				<Button
+					variant="ghost"
+					size="sm"
+					aria-label="Open quick search"
+					onClick={() => void setQuickOpen(true)}
+				>
+					<Search />
+					<span className="hidden text-muted-foreground text-xs sm:inline">
+						⌘K / Ctrl K
+					</span>
+				</Button>
 				<UserMenu
 					user={user}
 					onSignOut={() => {

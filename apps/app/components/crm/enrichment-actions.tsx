@@ -9,13 +9,16 @@ import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
+import type { EnrichmentActivity } from "./enrichment-status";
 
 export function EnrichmentActions({
 	companyId,
 	hasDomain,
+	activity,
 }: {
 	companyId: string;
 	hasDomain: boolean;
+	activity: EnrichmentActivity;
 }) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
@@ -51,7 +54,12 @@ export function EnrichmentActions({
 			<Button
 				variant="outline"
 				size="sm"
-				disabled={!hasDomain || enrich.isPending}
+				disabled={
+					!hasDomain ||
+					enrich.isPending ||
+					research.isPending ||
+					activity !== null
+				}
 				onClick={() => enrich.mutate({ id: companyId })}
 			>
 				{enrich.isPending ? (
@@ -64,15 +72,26 @@ export function EnrichmentActions({
 
 			<Button
 				size="sm"
-				disabled={!hasDomain || research.isPending}
+				disabled={
+					!hasDomain ||
+					research.isPending ||
+					enrich.isPending ||
+					activity !== null
+				}
 				onClick={() => research.mutate({ id: companyId })}
 			>
-				{research.isPending ? (
+				{research.isPending || activity !== null ? (
 					<Spinner />
 				) : (
 					<Icon icon={MagicWand} data-icon="inline-start" />
 				)}
-				<span className="hidden sm:inline">Research</span>
+				<span className="hidden sm:inline">
+					{activity === "queued"
+						? "Queued"
+						: activity === "running"
+							? "Researching"
+							: "Research"}
+				</span>
 			</Button>
 		</>
 	);
