@@ -192,7 +192,7 @@ if (!process.env.VERCEL) {
 }
 
 async function deployMigrations({ bun, cwd, directDatabaseUrl }) {
-	const attempts = 3;
+	const attempts = 6;
 
 	for (let attempt = 1; attempt <= attempts; attempt += 1) {
 		try {
