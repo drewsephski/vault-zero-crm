@@ -54,9 +54,13 @@ async function Summary({
 	const { scope } = await loadOverviewSearchParams(searchParams);
 
 	const queryClient = getServerQueryClient();
-	await queryClient.prefetchQuery(
-		getServerTrpc().dashboard.summary.queryOptions({ scope }),
-	);
+	const trpc = getServerTrpc();
+	await Promise.all([
+		queryClient.prefetchQuery(trpc.dashboard.summary.queryOptions({ scope })),
+		queryClient.prefetchQuery(
+			trpc.conversations.list.queryOptions({ scope: "workspace" }),
+		),
+	]);
 
 	return (
 		<HydrateClient>

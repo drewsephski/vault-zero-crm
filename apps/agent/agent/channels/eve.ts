@@ -41,6 +41,13 @@ export function repFromCrm(secret: string): AuthFn<Request> {
 	);
 }
 
+export async function authenticateCrmRep(request: Request): Promise<boolean> {
+	const secret = process.env.AGENT_BRIDGE_SECRET;
+	if (!secret) return false;
+
+	return Boolean(await repFromCrm(secret)(request));
+}
+
 const secret = process.env.AGENT_BRIDGE_SECRET;
 
 export default eveChannel({

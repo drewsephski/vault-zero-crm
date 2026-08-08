@@ -60,7 +60,7 @@ import {
 	ConversationPicker,
 	useConversations,
 } from "@/components/crm/agent-conversations";
-import { followUpPrompts } from "@/lib/agent-follow-up";
+import { followUpContext, readFollowUpPrompts } from "@/lib/agent-follow-up";
 import {
 	type AgentRecord,
 	type AgentScope,
@@ -75,7 +75,6 @@ import {
 	offlineThread,
 	type Thread as ThreadState,
 } from "@/lib/agent-session";
-import type { TranscriptMessage } from "@/lib/agent-transcript";
 import {
 	NEW_THREAD,
 	pendingLinkedInFallback,
@@ -232,6 +231,8 @@ function Thread({
 			: { initialEvents: eventsOf(thread) }),
 	});
 	const [draft, setDraft] = useState("");
+	const [followUps, setFollowUps] = useState<string[]>([]);
+	const followUpContextRef = useRef<ReturnType<typeof followUpContext>>([]);
 
 	const opening = useRef<string | null>(conversation?.title ?? null);
 
@@ -255,10 +256,45 @@ function Thread({
 			: false;
 
 	const { locked, ended } = composerState(thread, busy);
+	const followUpsReady =
+		!working &&
+		!ended &&
+		!question &&
+		!linkedinFallback &&
+		latestMessage?.mine === false;
+	const latestAssistantId = followUpsReady ? latestMessage?.id : null;
+	followUpContextRef.current = followUpContext(messages);
 
 	useEffect(() => {
 		onBusyChange(working);
 	}, [onBusyChange, working]);
+
+	useEffect(() => {
+		if (!latestAssistantId) {
+			setFollowUps([]);
+			return;
+		}
+
+		const controller = new AbortController();
+		const context = followUpContextRef.current;
+
+		void fetch("/api/agent/follow-ups", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ scope: scope.kind, messages: context }),
+			signal: controller.signal,
+		})
+			.then(async (response) => {
+				if (!response.ok) return null;
+				return response.json();
+			})
+			.then((value) => {
+				if (value) setFollowUps(readFollowUpPrompts(value));
+			})
+			.catch(() => undefined);
+
+		return () => controller.abort();
+	}, [latestAssistantId, scope.kind]);
 
 	const ask = (message: string) => {
 		if (!message.trim() || locked) return;
@@ -315,10 +351,9 @@ function Thread({
 								</MessageScrollerItem>
 							) : null}
 
-							{!working && !question && !linkedinFallback && !ended ? (
+							{followUpsReady && followUps.length > 0 ? (
 								<FollowUpPrompts
-									kind={scope.kind}
-									messages={messages}
+									prompts={followUps}
 									disabled={locked}
 									onAsk={ask}
 								/>
@@ -393,19 +428,14 @@ function Thread({
 }
 
 function FollowUpPrompts({
-	kind,
-	messages,
+	prompts,
 	disabled,
 	onAsk,
 }: {
-	kind: AgentScope["kind"];
-	messages: readonly TranscriptMessage[];
+	prompts: readonly string[];
 	disabled: boolean;
 	onAsk: (prompt: string) => void;
 }) {
-	const prompts = followUpPrompts({ kind, messages });
-	if (prompts.length === 0) return null;
-
 	return (
 		<MessageScrollerItem messageId="follow-up-prompts">
 			<div className="space-y-2 pt-2">

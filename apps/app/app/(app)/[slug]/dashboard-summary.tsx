@@ -45,6 +45,7 @@ import { activityLabel } from "@/components/crm/timeline/activity-icon";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
+import { OverviewAgent } from "./overview-agent";
 import { overviewParsers } from "./overview-search-params";
 import { SalesDashboard } from "./sales-dashboard";
 
@@ -112,6 +113,7 @@ export function DashboardSummary() {
 
 	return (
 		<div className="flex flex-col gap-6">
+			<OverviewAgent />
 			<SalesDashboard summary={summary} />
 			<VaultZeroPipeline summary={summary.vaultZero} />
 

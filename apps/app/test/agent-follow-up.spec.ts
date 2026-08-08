@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { followUpPrompts } from "../lib/agent-follow-up";
+import { followUpContext, readFollowUpPrompts } from "../lib/agent-follow-up";
 import type { TranscriptMessage } from "../lib/agent-transcript";
 
 const assistant = (text: string): TranscriptMessage => ({
@@ -8,40 +8,41 @@ const assistant = (text: string): TranscriptMessage => ({
 	items: [{ kind: "said", id: "said", mine: false, text }],
 });
 
-describe("follow-up prompts", () => {
-	it("returns no prompts before the agent has answered", () => {
+describe("follow-up context", () => {
+	it("keeps recent user and agent context in model-ready form", () => {
 		expect(
-			followUpPrompts({
-				kind: "company",
-				messages: [{ id: "user", mine: true, items: [] }],
-			}),
-		).toEqual([]);
-	});
-
-	it("prioritizes prompts that match the conversation context", () => {
-		expect(
-			followUpPrompts({
-				kind: "deal",
-				messages: [
-					assistant(
-						"The deal is stalled and the biggest risk is a missing decision maker.",
-					),
-				],
-			}),
+			followUpContext([
+				{
+					id: "old",
+					mine: true,
+					items: [{ kind: "said", id: "old", mine: true, text: "Old" }],
+				},
+				assistant("The deal is stalled and the decision maker is missing."),
+			]),
 		).toEqual([
-			"What is the biggest risk right now?",
-			"Who should we involve next?",
-			"What should happen next on this deal?",
+			{ role: "user", content: "Old" },
+			{
+				role: "assistant",
+				content: "The deal is stalled and the decision maker is missing.",
+			},
 		]);
 	});
 
-	it("keeps prompts scoped to the record type", () => {
-		const prompts = followUpPrompts({
-			kind: "contact",
-			messages: [assistant("I found their current role and LinkedIn profile.")],
-		});
+	it("validates model output without inventing a fallback", () => {
+		expect(
+			readFollowUpPrompts({
+				prompts: ["  Ask about the missing decision maker. ", "", 3],
+			}),
+		).toEqual(["Ask about the missing decision maker."]);
+		expect(readFollowUpPrompts({ prompts: [] })).toEqual([]);
+	});
 
-		expect(prompts).toContain("What else should we verify about them?");
-		expect(prompts.join(" ")).not.toContain("deal");
+	it("limits context to the recent conversation", () => {
+		const messages = Array.from({ length: 10 }, (_, index) =>
+			assistant(`Message ${index}`),
+		);
+
+		expect(followUpContext(messages)).toHaveLength(8);
+		expect(followUpContext(messages)[0]?.content).toBe("Message 2");
 	});
 });

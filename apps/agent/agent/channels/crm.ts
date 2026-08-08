@@ -3,7 +3,9 @@ import { defineChannel, POST } from "eve/channels";
 import { verifyKey } from "../lib/context-dev";
 import { brief, drainAll, taskAuth } from "../lib/dispatch";
 import { settle } from "../lib/enrichment";
+import { followUpRequestSchema, generateFollowUps } from "../lib/follow-ups";
 import { completeTask, failTask } from "../lib/tasks";
+import { authenticateCrmRep } from "./eve";
 
 const TASK_MARKER = "task:";
 
@@ -30,6 +32,34 @@ export function taskFromToken(token: string | undefined): string | null {
 
 export default defineChannel({
 	routes: [
+		POST("/internal/crm/follow-ups", async (request) => {
+			if (!(await authenticateCrmRep(request))) {
+				return new Response("Unauthorized", { status: 401 });
+			}
+
+			const body = await request.json().catch(() => null);
+			const input = followUpRequestSchema.safeParse(body);
+			if (!input.success) {
+				return Response.json(
+					{ error: "Invalid follow-up context." },
+					{ status: 400 },
+				);
+			}
+
+			try {
+				return Response.json(await generateFollowUps(input.data));
+			} catch (error) {
+				console.error(
+					"[follow-ups] generation failed",
+					error instanceof Error ? error.message : String(error),
+				);
+				return Response.json(
+					{ error: "Follow-up prompts are unavailable." },
+					{ status: 503 },
+				);
+			}
+		}),
+
 		POST("/internal/crm/dispatch", async (request, { send, waitUntil }) => {
 			if (!authorised(request)) {
 				return new Response("Unauthorized", { status: 401 });
