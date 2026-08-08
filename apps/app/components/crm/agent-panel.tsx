@@ -277,7 +277,7 @@ function Thread({
 
 							{messages.map((message) => (
 								<MessageScrollerItem key={message.id} messageId={message.id}>
-									<div className="space-y-3">
+									<div className="space-y-4">
 										{message.items.map((item) => (
 											<Item
 												key={item.id}

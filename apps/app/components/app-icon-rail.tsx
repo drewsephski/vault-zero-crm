@@ -4,6 +4,7 @@ import Building from "@carbon/icons-react/es/Building";
 import type { CarbonIconType } from "@carbon/icons-react/es/CarbonIcon";
 import ChatBot from "@carbon/icons-react/es/ChatBot";
 import Dashboard from "@carbon/icons-react/es/Dashboard";
+import Email from "@carbon/icons-react/es/Email";
 import Partnership from "@carbon/icons-react/es/Partnership";
 import Settings from "@carbon/icons-react/es/Settings";
 import UserMultiple from "@carbon/icons-react/es/UserMultiple";
@@ -45,6 +46,7 @@ const ITEMS: RailItem[] = [
 		icon: UserMultiple,
 		match: "prefix",
 	},
+	{ title: "Outreach", href: "/outreach", icon: Email, match: "prefix" },
 	{ title: "Deals", href: "/deals", icon: Partnership, match: "prefix" },
 	{ title: "Settings", href: "/settings", icon: Settings, match: "prefix" },
 ];

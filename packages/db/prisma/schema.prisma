@@ -30,6 +30,7 @@ model User {
   mailboxSyncs   MailboxSync[]
   factDecisions  ContactFact[]       @relation("FactDecider")
   conversations  AgentConversation[] @relation("ConversationOwner")
+  outreachLeads   OutreachLead[]
 
   members     Member[]
   invitations Invitation[]
@@ -136,6 +137,49 @@ enum RecordSource {
   VAULT_ZERO
 }
 
+enum OutreachStatus {
+  CONTACTED
+  REPLIED
+  QUALIFIED
+  DEMO_BOOKED
+  PILOT
+  WON
+  LOST
+  BOUNCED
+  OPTED_OUT
+}
+
+model OutreachLead {
+  id              String         @id @default(cuid())
+  companyName     String
+  email           String         @unique
+  vertical        String?
+  status          OutreachStatus @default(CONTACTED)
+  source          String         @default("GMAIL")
+  sourceThreadId  String?
+  lastSubject     String?
+  lastNote        String?
+  messageCount    Int            @default(0)
+  lastContactedAt DateTime?
+  lastRespondedAt DateTime?
+  nextActionAt    DateTime?
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contactId String?  @unique
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, lastContactedAt])
+  @@index([companyId, status])
+  @@index([ownerId, status])
+  @@map("outreachLead")
+}
+
 enum VaultZeroEventStatus {
   PROCESSING
   PROCESSED
@@ -191,6 +235,7 @@ model Company {
   activities     Activity[]
   emailThreads   EmailThread[]
   calendarEvents CalendarEvent[]
+  outreachLeads  OutreachLead[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
@@ -247,6 +292,7 @@ model Contact {
   emailThreads    EmailThread[]
   calendarEvents  CalendarEvent[]
   eventAttendance CalendarAttendee[]
+  outreachLead    OutreachLead?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
