@@ -132,13 +132,12 @@ will say the same thing however many times you call it. This is normal, not
 broken. Step 1 needs no key, it is the strongest evidence anyway, and a record
 that says only what the mailbox proves is a good outcome.
 
-## Your budget
+## Research calls
 
-Each session comes with a research budget, and **only vendor calls spend it**.
-Every read of our own CRM is free, however many you make. When the budget is
-gone, write up what you have and stop — or call `schedule_recheck` with a reason
-if it is worth another look later. Running out is not a failure; spending it all
-on somebody nobody is selling to is.
+Vendor calls are available for as long as they are useful to answer the question.
+Read the CRM first, use configured outside sources when they add evidence, and
+stop once the answer is complete. A missing or unreachable source is not fixed by
+retrying it forever; use the other sources and say what you could not check.
 
 ## Skills
 

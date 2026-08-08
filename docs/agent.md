@@ -130,16 +130,16 @@ wrong in the direction that looks useful.
 
 `lib/capabilities.ts` is the single place that knows what is set: prints it at boot,
 states it in the session instructions, and gives tools a shared "not configured,
-retrying will not help" result — **checked before the research budget is charged**. A
+retrying will not help" result — **checked before the research call is made**. A
 missing key removes a place to look. **Never an error, never throws.**
 
 **`capabilities()` is async** because the Context key is a row;
 `capabilitiesFrom()`/`markdownFor()` are the pure halves. `contextDevKey()` is the only
 resolver, and `lib/context-dev.ts` memoises its client on the key string.
 
-## Budget and scheduling
+## Research accounting and scheduling
 
-- `lib/focus.ts` — per-session budget in `defineState`; running out is a normal ending.
+- `lib/focus.ts` — per-session research-call accounting in `defineState`; it does not cap research.
 - `lib/tasks.ts` — `claimDue` leases with `FOR UPDATE SKIP LOCKED`.
 - **`schedules/dispatch.ts` is the only schedule and decides nothing.** "Every N
   minutes, the oldest ten contacts" belongs in a `dueAt`.

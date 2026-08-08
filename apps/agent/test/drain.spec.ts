@@ -109,15 +109,15 @@ describe("taskAuth", () => {
 		expect(isAutomated({ auth: { current: auth } })).toBe(true);
 	});
 
-	it("carries the record and the budget the preamble needs", () => {
+	it("carries the record context", () => {
 		const auth = taskAuth(task({ companyId: "company_1" }));
 
 		expect(auth.attributes).toMatchObject({
 			taskKind: "identify",
-			budget: "4",
 			contactId: "contact_1",
 			companyId: "company_1",
 		});
+		expect(auth.attributes).not.toHaveProperty("budget");
 	});
 
 	it("omits the id of a record the task does not name", () => {

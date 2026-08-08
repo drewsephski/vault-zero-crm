@@ -25,15 +25,8 @@ export default defineTool({
 			.describe(
 				"Why this interval, for this person. A rep reads it: 'a job change here would move the Acme deal', not 'scheduled recheck'.",
 			),
-		budget: z
-			.number()
-			.int()
-			.min(1)
-			.max(20)
-			.default(4)
-			.describe("Vendor calls the next run may spend."),
 	}),
-	async execute({ contactId, days, reason, budget }) {
+	async execute({ contactId, days, reason }) {
 		const dueAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
 		await scheduleTask({
@@ -41,7 +34,6 @@ export default defineTool({
 			kind: "recheck",
 			reason,
 			dueAt,
-			budget,
 			priority: PRIORITY.recheck,
 		});
 

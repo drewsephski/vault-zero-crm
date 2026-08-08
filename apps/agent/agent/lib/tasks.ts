@@ -191,7 +191,6 @@ export async function scheduleTask(input: {
 	reason: string;
 	dueAt: Date;
 	priority?: number;
-	budget?: number;
 }): Promise<{ id: string }> {
 	const existing = await db.agentTask.findFirst({
 		where: {
@@ -219,7 +218,6 @@ export async function scheduleTask(input: {
 			reason: input.reason,
 			dueAt: input.dueAt,
 			priority: input.priority ?? 0,
-			budget: input.budget ?? 4,
 		},
 		select: { id: true },
 	});

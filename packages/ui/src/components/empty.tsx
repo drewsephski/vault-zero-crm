@@ -105,6 +105,7 @@ const emptyContentVariants = cva(
 			layout: {
 				stack: "flex-col",
 				row: "flex-row flex-wrap justify-center",
+				grid: "grid grid-cols-1 gap-2.5 sm:grid-cols-2 [&>button]:w-full",
 			},
 		},
 		defaultVariants: {

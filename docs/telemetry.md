@@ -115,7 +115,7 @@ Each is only whether the key is set. `cap_context_dev` is whether an `AppSetting
 | `tools_per_session_mean` | Tool calls divided by sessions that made one |
 | `tasks_claimed` / `tasks_completed` / `tasks_retired` | `AgentTask` counts keyed by `kind` |
 | `task_attempts_mean` / `task_attempts_max` | Attempts per kind |
-| `budget_exhausted` | Sessions that stopped because the research budget ran out. Once per session, not once per blocked tool call |
+| `budget_exhausted` | Legacy counter retained for telemetry compatibility; new sessions no longer stop on a research budget |
 | `recheck_scheduled` | `recheck` tasks queued in the window |
 | `recheck_interval_days` | Their intervals, in day bands |
 | `agent_conversations` | How many `AgentConversation` rows exist |
@@ -290,7 +290,7 @@ actually drops it. See `adrs/telemetry.md`.
 | `packages/telemetry` | The only place `posthog-node` is imported. Allowlist, install accessor, event builders |
 | `install` table | The UUID, the version, and when the last rollup went. One row, made by the migration |
 | `telemetryMilestone` table | Which funnel steps have fired |
-| `telemetryCounter` table | The one runtime number no other row records — `budget_exhausted` — drained by each rollup and put back if the send fails |
+| `telemetryCounter` table | Runtime counters, including the legacy `budget_exhausted` counter, drained by each rollup and put back if the send fails |
 | `packages/telemetry/src/project.ts` | The key, the ingest host and the UI host. Three constants, no imports, so the browser can read them too |
 | `apps/api/src/telemetry` | The daily rollup, the funnel sweep, the boot-and-hourly timer, the optional cron route |
 | `apps/agent/agent/hooks/telemetry.ts` | Tool, turn and session failures |

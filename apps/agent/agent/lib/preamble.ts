@@ -7,7 +7,6 @@ export type Opened = {
 	dispatched: boolean;
 	kind?: string | null;
 	reason?: string | null;
-	budget?: number | null;
 };
 
 export type Preamble = {
@@ -110,9 +109,6 @@ export async function contactPreamble(
 		}${contact.title ? `, ${contact.title}` : ""}.`,
 		opened.kind ? `Task: **${opened.kind}**.` : "",
 		opened.reason ? `Why now: ${opened.reason}` : "",
-		opened.budget
-			? `Budget: **${opened.budget}** vendor calls. Spend them where they matter.`
-			: "",
 		"",
 		opening(
 			opened,

@@ -402,7 +402,7 @@ function Idle({
 				<EmptyDescription>{copy.blurb}</EmptyDescription>
 			</EmptyHeader>
 
-			<EmptyContent layout="row">
+			<EmptyContent layout="grid">
 				{copy.suggestions.map((suggestion) => (
 					<Button
 						key={suggestion}

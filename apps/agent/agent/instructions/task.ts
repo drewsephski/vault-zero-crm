@@ -1,15 +1,12 @@
 import { defineDynamic, defineInstructions } from "eve/instructions";
-import { focusOn, setBudget } from "../lib/focus";
+import { focusOn } from "../lib/focus";
 import { sessionPreamble } from "../lib/preamble";
 
 export default defineDynamic({
 	events: {
 		"session.started": async (_event, ctx) => {
 			const attributes = ctx.session.auth.current?.attributes ?? {};
-			const budget = asNumber(attributes.budget);
 			const kind = asString(attributes.taskKind);
-
-			if (budget) setBudget(budget);
 
 			const { markdown, focus } = await sessionPreamble(
 				{
@@ -21,7 +18,6 @@ export default defineDynamic({
 					dispatched: Boolean(kind),
 					kind,
 					reason: asString(attributes.reason),
-					budget,
 				},
 			);
 
@@ -34,9 +30,4 @@ export default defineDynamic({
 
 function asString(value: unknown): string | null {
 	return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function asNumber(value: unknown): number | null {
-	const parsed = typeof value === "string" ? Number(value) : value;
-	return typeof parsed === "number" && Number.isFinite(parsed) ? parsed : null;
 }
