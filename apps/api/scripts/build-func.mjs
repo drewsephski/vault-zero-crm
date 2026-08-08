@@ -158,7 +158,10 @@ writeFileSync(
 );
 
 if (process.env.VERCEL === "1") {
-	rmSync(join(apiDir, "api/index.ts"), { force: true });
+	writeFileSync(
+		join(apiDir, "api/index.ts"),
+		'export { default } from "./index.mjs";\n',
+	);
 }
 
 const outputConfig = {
