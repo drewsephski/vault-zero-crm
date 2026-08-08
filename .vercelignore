@@ -22,6 +22,7 @@ node_modules
 .eve
 dist
 .vercel/output
+apps/api/api/index.mjs
 
 # Nothing here affects the build.
 docs/images
