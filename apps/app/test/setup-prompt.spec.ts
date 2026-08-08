@@ -3,7 +3,9 @@ import { SETUP_PROMPT } from "../components/landing/setup-prompt";
 
 describe("SETUP_PROMPT", () => {
 	it("contains the complete local bootstrap workflow", () => {
-		expect(SETUP_PROMPT).toContain("https://github.com/drewsephski/vault-zero-crm");
+		expect(SETUP_PROMPT).toContain(
+			"https://github.com/drewsephski/vault-zero-crm",
+		);
 		expect(SETUP_PROMPT).toContain("AGENTS.md");
 		expect(SETUP_PROMPT).toContain("bun install --frozen-lockfile");
 		expect(SETUP_PROMPT).toContain("docker compose up -d");

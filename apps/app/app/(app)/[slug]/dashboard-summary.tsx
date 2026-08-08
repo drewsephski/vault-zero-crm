@@ -52,6 +52,17 @@ import { SalesDashboard } from "./sales-dashboard";
 const CELL = "px-3 py-2.5 align-middle";
 
 export function DashboardSummary() {
+	return (
+		<div className="grid items-start gap-6 @5xl/page-content:grid-cols-2">
+			<div className="order-first @5xl/page-content:order-last @5xl/page-content:sticky @5xl/page-content:top-6">
+				<OverviewAgent />
+			</div>
+			<DashboardData />
+		</div>
+	);
+}
+
+function DashboardData() {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
 	const openRecord = useOpenRecord();
@@ -112,8 +123,7 @@ export function DashboardSummary() {
 	];
 
 	return (
-		<div className="flex flex-col gap-6">
-			<OverviewAgent />
+		<div className="order-last flex min-w-0 flex-col gap-6 @5xl/page-content:order-first">
 			<SalesDashboard summary={summary} />
 			<VaultZeroPipeline summary={summary.vaultZero} />
 

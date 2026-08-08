@@ -52,6 +52,7 @@ import {
 } from "@crm/ui/components/message-scroller";
 import { Spinner } from "@crm/ui/components/spinner";
 import { StatusIndicator } from "@crm/ui/components/status-indicator";
+import { cn } from "@crm/ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEveAgent } from "eve/react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
@@ -88,6 +89,8 @@ import {
 import { useTRPC } from "@/lib/trpc/client";
 import { useRecordSheetView } from "./record-sheet/record-stack";
 
+type AgentChatDensity = "default" | "compact";
+
 export function AgentPanel({ record }: { record: AgentRecord }) {
 	const { thread, setThread } = useRecordSheetView("overview");
 
@@ -100,10 +103,12 @@ export function AgentChat({
 	scope,
 	thread,
 	onThreadChange,
+	density = "default",
 }: {
 	scope: AgentScope;
 	thread: string | null;
 	onThreadChange: (thread: string | null) => void;
+	density?: AgentChatDensity;
 }) {
 	const conversations = useConversations(recordFilter(scope));
 	const [busy, setBusy] = useState(false);
@@ -137,6 +142,7 @@ export function AgentChat({
 					onThreadChange(NEW_THREAD);
 				}}
 				busy={busy}
+				density={density}
 			/>
 
 			<ThreadWithHistory
@@ -145,6 +151,7 @@ export function AgentChat({
 				conversation={current}
 				onNewThread={() => onThreadChange(NEW_THREAD)}
 				onBusyChange={setBusy}
+				density={density}
 			/>
 		</div>
 	);
@@ -158,11 +165,13 @@ function ThreadWithHistory({
 	conversation,
 	onNewThread,
 	onBusyChange,
+	density,
 }: {
 	scope: AgentScope;
 	conversation: Conversation | null;
 	onNewThread: () => void;
 	onBusyChange: (busy: boolean) => void;
+	density: AgentChatDensity;
 }) {
 	const trpc = useTRPC();
 
@@ -198,6 +207,7 @@ function ThreadWithHistory({
 			}
 			onNewThread={onNewThread}
 			onBusyChange={onBusyChange}
+			density={density}
 		/>
 	);
 }
@@ -216,12 +226,14 @@ function Thread({
 	thread,
 	onNewThread,
 	onBusyChange,
+	density,
 }: {
 	scope: AgentScope;
 	conversation: Conversation | null;
 	thread: ThreadState | undefined;
 	onNewThread: () => void;
 	onBusyChange: (busy: boolean) => void;
+	density: AgentChatDensity;
 }) {
 	const copy = recordCopy(scope.kind);
 	const agent = useEveAgent({
@@ -308,14 +320,26 @@ function Thread({
 			<MessageScrollerProvider autoScroll defaultScrollPosition="end">
 				<MessageScroller className="flex-1">
 					<MessageScrollerViewport>
-						<MessageScrollerContent className="mx-auto w-full max-w-4xl gap-6 px-4 py-6 sm:px-6">
+						<MessageScrollerContent
+							className={cn(
+								"mx-auto w-full max-w-4xl",
+								density === "compact"
+									? "gap-4 px-3 py-4"
+									: "gap-6 px-4 py-6 sm:px-6",
+							)}
+						>
 							{messages.length === 0 && !busy ? (
 								<Idle kind={scope.kind} onAsk={ask} />
 							) : null}
 
 							{messages.map((message) => (
 								<MessageScrollerItem key={message.id} messageId={message.id}>
-									<div className="space-y-4">
+									<div
+										className={cn(
+											"flex flex-col",
+											density === "compact" ? "gap-3" : "gap-4",
+										)}
+									>
 										{message.items.map((item) => (
 											<Item
 												key={item.id}
@@ -386,7 +410,10 @@ function Thread({
 			) : null}
 
 			<form
-				className="mx-auto w-full max-w-4xl border-t px-4 py-4 sm:px-6"
+				className={cn(
+					"mx-auto w-full max-w-4xl border-t",
+					density === "compact" ? "px-3 py-3" : "px-4 py-4 sm:px-6",
+				)}
 				onSubmit={(event) => {
 					event.preventDefault();
 					ask(draft);

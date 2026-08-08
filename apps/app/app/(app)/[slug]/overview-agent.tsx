@@ -40,6 +40,7 @@ export function OverviewAgent() {
 			</CardHeader>
 			<CardPanel>
 				<AgentChat
+					density="compact"
 					scope={{ kind: "workspace" }}
 					thread={thread}
 					onThreadChange={(next) => void setThread(next)}
