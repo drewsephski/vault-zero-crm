@@ -201,45 +201,13 @@ export async function search(
 	| { outcome: "found"; results: SearchResult[] }
 	| { outcome: "failed"; reason: string }
 > {
-	const api = await contextDev();
-	if (!api) {
-		return { outcome: "failed", reason: "Context.dev is not configured." };
-	}
-
-	try {
-		const response = await api.web.search({
-			query,
-			numResults: Math.min(Math.max(options.limit ?? 10, 10), 100),
-			...(options.freshness ? { freshness: options.freshness } : {}),
-			...(options.queryFanout ? { queryFanout: true } : {}),
-			...(options.includeMarkdown
-				? {
-						markdownOptions: {
-							enabled: true,
-							maxAgeMs: 604_800_000,
-							useMainContentOnly: true,
-						},
-					}
-				: {}),
-			...(options.excludeDomains
-				? { excludeDomains: options.excludeDomains }
-				: {}),
-			...(options.includeDomains
-				? { includeDomains: options.includeDomains }
-				: {}),
-		});
-
-		const results = (response.results ?? []).map((result) => ({
-			url: result.url ?? null,
-			title: result.title ?? null,
-			description: result.description ?? null,
-			markdown: result.markdown?.markdown ?? null,
-		}));
-
-		return { outcome: "found", results };
-	} catch (error) {
-		return { outcome: "failed", reason: describe(error) };
-	}
+	void query;
+	void options;
+	return {
+		outcome: "failed",
+		reason:
+			"Context.dev web search is retired. Use AnySearch or Tavily for discovery, or research_company for a known company website.",
+	};
 }
 
 async function lookup(

@@ -86,4 +86,19 @@ describe("AnySearch", () => {
 		});
 		expect(requests).toHaveLength(0);
 	});
+
+	it("surfaces structured provider failures", async () => {
+		stub(
+			{
+				message: "Quota exhausted",
+				request_id: "request-2",
+			},
+			402,
+		);
+
+		expect(await search("Acme")).toEqual({
+			ok: false,
+			reason: "HTTP 402 — Quota exhausted — request request-2",
+		});
+	});
 });

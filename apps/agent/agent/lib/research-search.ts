@@ -1,10 +1,16 @@
 import { search as searchAnySearch } from "./anysearch";
 import { enabled } from "./capabilities";
-import { contextDevEnabled, search as searchContextDev } from "./context-dev";
 import { spend } from "./focus";
 import { ask as askTavily } from "./tavily";
 
 export type SearchProvider = "anysearch" | "tavily" | "context";
+export type SearchIntent =
+	| "general"
+	| "current"
+	| "news"
+	| "identity"
+	| "company"
+	| "vertical";
 
 export type ResearchSource = {
 	providers: SearchProvider[];
@@ -30,46 +36,52 @@ export type ResearchSearchResult =
 
 export type ResearchSearchOptions = {
 	providers?: readonly SearchProvider[];
+	intent?: SearchIntent;
 	domains?: string[];
 	maxResults?: number;
 	deep?: boolean;
 	tag?: string;
 	params?: Record<string, string>;
+	topic?: "general" | "news" | "finance";
+	timeRange?: "day" | "week" | "month" | "year";
+	startDate?: string;
+	endDate?: string;
+	country?: string;
+	exactMatch?: boolean;
 };
 
-const ALL_PROVIDERS: readonly SearchProvider[] = [
-	"anysearch",
-	"tavily",
-	"context",
-];
+type SearchAvailability = {
+	anysearch: boolean;
+	tavily: boolean;
+};
+
+const DEFAULT_PROVIDER_ORDER: Record<
+	SearchIntent,
+	readonly ("anysearch" | "tavily")[]
+> = {
+	general: ["anysearch", "tavily"],
+	current: ["tavily", "anysearch"],
+	news: ["tavily", "anysearch"],
+	identity: ["tavily", "anysearch"],
+	company: ["anysearch", "tavily"],
+	vertical: ["anysearch"],
+};
 
 export async function comprehensiveSearch(
 	query: string,
 	options: ResearchSearchOptions = {},
 ): Promise<ResearchSearchResult> {
-	const requested = [...new Set(options.providers ?? ALL_PROVIDERS)];
+	const requested = options.providers
+		? [...new Set(options.providers)]
+		: undefined;
 	const available = await availability();
 	const providerErrors: { provider: SearchProvider; reason: string }[] = [];
-	const providers = requested.filter((provider) => {
-		if (options.tag || options.params) {
-			if (provider !== "anysearch") return false;
-			if (!available.anysearch) {
-				providerErrors.push({
-					provider,
-					reason: "AnySearch is not configured.",
-				});
-				return false;
-			}
-			return true;
-		}
-
-		if (available[provider]) return true;
-		providerErrors.push({
-			provider,
-			reason: unavailableReason(provider),
-		});
-		return false;
-	});
+	const providers = selectProviders(
+		options,
+		available,
+		providerErrors,
+		requested,
+	);
 
 	if (providers.length === 0) {
 		return {
@@ -77,7 +89,9 @@ export async function comprehensiveSearch(
 			reason:
 				options.tag || options.params
 					? "AnySearch vertical research is not configured. Set ANYSEARCH_API_KEY or remove the vertical parameters."
-					: "No configured web research provider is available.",
+					: providerErrors.some(({ provider }) => provider === "context")
+						? "Context.dev web search is retired. Use AnySearch or Tavily for discovery, or research_company for a known company website."
+						: "No configured web research provider is available.",
 			providerErrors,
 		};
 	}
@@ -127,14 +141,64 @@ export async function comprehensiveSearch(
 	};
 }
 
-async function availability(): Promise<Record<SearchProvider, boolean>> {
-	const [anysearch, tavily, context] = await Promise.all([
+export function plannedProviders(
+	options: Pick<
+		ResearchSearchOptions,
+		"providers" | "intent" | "tag" | "params" | "deep"
+	>,
+	available: SearchAvailability,
+): SearchProvider[] {
+	return selectProviders(options, available, [], options.providers);
+}
+
+async function availability(): Promise<SearchAvailability> {
+	const [anysearch, tavily] = await Promise.all([
 		enabled("ANYSEARCH_API_KEY"),
 		enabled("TAVILY_API_KEY"),
-		contextDevEnabled(),
 	]);
 
-	return { anysearch, tavily, context };
+	return { anysearch, tavily };
+}
+
+function selectProviders(
+	options: Pick<
+		ResearchSearchOptions,
+		"providers" | "intent" | "tag" | "params" | "deep"
+	>,
+	available: SearchAvailability,
+	providerErrors: { provider: SearchProvider; reason: string }[],
+	requested?: readonly SearchProvider[],
+): SearchProvider[] {
+	const explicit = requested !== undefined;
+	const candidates: SearchProvider[] = explicit
+		? [...new Set(requested)]
+		: [
+				...(DEFAULT_PROVIDER_ORDER[options.intent ?? "general"] ??
+					DEFAULT_PROVIDER_ORDER.general),
+			];
+	const verticalOnly = Boolean(options.tag || options.params);
+	const routed = verticalOnly ? ["anysearch" as const] : candidates;
+	const supported = routed.filter(
+		(provider): provider is "anysearch" | "tavily" =>
+			provider === "anysearch" || provider === "tavily",
+	);
+	const configured = supported.filter((provider) => available[provider]);
+	const limited = explicit || options.deep
+		? configured
+		: configured.slice(0, 1);
+
+	for (const provider of candidates) {
+		if (provider === "context") {
+			providerErrors.push({ provider, reason: unavailableReason(provider) });
+			continue;
+		}
+		if (verticalOnly && provider !== "anysearch") continue;
+		if (!available[provider]) {
+			providerErrors.push({ provider, reason: unavailableReason(provider) });
+		}
+	}
+
+	return limited;
 }
 
 async function searchOne(
@@ -163,10 +227,16 @@ async function searchOne(
 
 	if (provider === "tavily") {
 		const result = await askTavily(query, {
-			depth: options.deep ? "advanced" : "basic",
+			depth: options.deep ? "advanced" : "fast",
 			domains: options.domains,
 			maxResults: options.maxResults,
-			includeRawContent: "markdown",
+			includeRawContent: options.deep ? "markdown" : false,
+			topic: options.topic,
+			timeRange: options.timeRange,
+			startDate: options.startDate,
+			endDate: options.endDate,
+			country: options.country,
+			exactMatch: options.exactMatch,
 		});
 		return result.ok
 			? {
@@ -179,32 +249,11 @@ async function searchOne(
 			: result;
 	}
 
-	const result = await searchContextDev(query, {
-		includeDomains: options.domains,
-		includeMarkdown: true,
-		limit: options.maxResults,
-		queryFanout: Boolean(options.deep),
-	});
-	if (result.outcome === "failed") {
-		return { ok: false, reason: result.reason };
-	}
-
-	const sources = result.results.flatMap((source) => {
-		if (!source.url) return [];
-		return [
-			{
-				providers: ["context"] as SearchProvider[],
-				title: source.title ?? source.url,
-				url: source.url,
-				content: source.markdown ?? source.description ?? "",
-				score: null,
-			},
-		];
-	});
-
-	return sources.length > 0
-		? { ok: true, sources }
-		: { ok: false, reason: "No search results." };
+	return {
+		ok: false,
+		reason:
+			"Context.dev web search is retired. Use AnySearch or Tavily for discovery, or research_company for a known company website.",
+	};
 }
 
 function mergeSources(sources: ResearchSource[]): ResearchSource[] {
@@ -229,14 +278,22 @@ function mergeSources(sources: ResearchSource[]): ResearchSource[] {
 		}
 	}
 
-	return [...merged.values()];
+	return [...merged.values()].sort(
+		(a, b) =>
+			b.providers.length - a.providers.length ||
+			(b.score ?? 0) - (a.score ?? 0),
+	);
 }
 
 function canonicalUrl(value: string): string {
 	try {
 		const url = new URL(value);
+		url.hostname = url.hostname.toLowerCase();
 		url.hash = "";
 		url.pathname = url.pathname.replace(/\/$/, "") || "/";
+		for (const key of [...url.searchParams.keys()]) {
+			if (/^(utm_|gclid$|fbclid$)/i.test(key)) url.searchParams.delete(key);
+		}
 		return url.toString();
 	} catch {
 		return value;
@@ -251,5 +308,5 @@ function toSiteQuery(query: string, domains?: string[]): string {
 function unavailableReason(provider: SearchProvider): string {
 	if (provider === "anysearch") return "ANYSEARCH_API_KEY is not configured.";
 	if (provider === "tavily") return "TAVILY_API_KEY is not configured.";
-	return "Context.dev is not configured in Settings → General.";
+	return "Context.dev web search is retired; use research_company for known company websites.";
 }

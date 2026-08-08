@@ -2,6 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import {
 	comprehensiveSearch,
+	type SearchIntent,
 	type SearchProvider,
 } from "../lib/research-search";
 
@@ -9,9 +10,13 @@ const PROVIDERS = ["auto", "anysearch", "tavily", "context"] as const;
 
 export default defineTool({
 	description:
-		"Search the open web for current, factual information. Auto runs every configured web source (AnySearch, Tavily, and Context.dev) in parallel, merges duplicate URLs, and reports provider coverage. Returns source excerpts and URLs for citation.",
+		"Search the open web for current, factual information. Auto routes general discovery to AnySearch, current or identity research to Tavily, and uses both only for deep verification. Context.dev is reserved for known company websites through research_company. Returns source excerpts and URLs for citation.",
 	inputSchema: z.object({
 		query: z.string().trim().min(1).describe("The derived search query."),
+		intent: z
+			.enum(["general", "current", "news", "identity", "company", "vertical"])
+			.default("general")
+			.describe("Research intent used by auto provider routing."),
 		domains: z
 			.array(z.string().trim().min(1))
 			.max(20)
@@ -21,7 +26,7 @@ export default defineTool({
 			.enum(PROVIDERS)
 			.default("auto")
 			.describe(
-				"Search source to use, or auto for the best configured source.",
+				"Search source to use, or auto for intent-aware routing.",
 			),
 		tag: z
 			.string()
@@ -40,8 +45,36 @@ export default defineTool({
 			.max(10)
 			.default(5)
 			.describe("Maximum number of results."),
+		deep: z
+			.boolean()
+			.default(false)
+			.describe("Use more expensive, higher-recall search and corroboration."),
+		topic: z
+			.enum(["general", "news", "finance"])
+			.optional()
+			.describe("Tavily content topic."),
+		timeRange: z
+			.enum(["day", "week", "month", "year"])
+			.optional()
+			.describe("Tavily relative freshness window."),
+		exactMatch: z
+			.boolean()
+			.default(false)
+			.describe("Require quoted phrases to appear verbatim in Tavily results."),
 	}),
-	async execute({ query, domains, provider, tag, params, maxResults }) {
+	async execute({
+		query,
+		intent,
+		domains,
+		provider,
+		tag,
+		params,
+		maxResults,
+		deep,
+		topic,
+		timeRange,
+		exactMatch,
+	}) {
 		if ((tag || params) && provider !== "auto" && provider !== "anysearch") {
 			return {
 				ok: false as const,
@@ -52,11 +85,15 @@ export default defineTool({
 
 		const answer = await comprehensiveSearch(query, {
 			providers: provider === "auto" ? undefined : [provider as SearchProvider],
+			intent: intent as SearchIntent,
 			domains,
 			maxResults,
-			deep: true,
+			deep,
 			tag,
 			params,
+			topic,
+			timeRange,
+			exactMatch,
 		});
 		if (!answer.ok) return { ok: false as const, reason: answer.reason };
 

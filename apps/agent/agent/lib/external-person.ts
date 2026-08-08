@@ -141,7 +141,7 @@ export async function researchExternalPerson(input: {
 			: undefined;
 	const web = await comprehensiveSearch(
 		[
-			`Research the professional background of ${input.name}.`,
+			`Research the professional background of "${input.name}".`,
 			input.companyName ? `They may work at ${input.companyName}.` : "",
 			input.title ? `Their title may be ${input.title}.` : "",
 			"Find an official LinkedIn profile if available, plus employer pages, public talks, publications, GitHub, news, interviews, and other professional sources.",
@@ -150,8 +150,10 @@ export async function researchExternalPerson(input: {
 			.join(" "),
 		{
 			providers: publicSearchProviders,
+			intent: "identity",
 			deep: true,
 			maxResults: limit,
+			exactMatch: true,
 		},
 	);
 	const publicSources = web.ok ? web.sources : [];

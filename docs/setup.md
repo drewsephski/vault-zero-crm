@@ -44,8 +44,9 @@ inventory, including a `diagnostics` count that finds files eve silently ignored
 ## Agent providers
 
 Model-backed sessions use OpenRouter directly through the AI SDK. Search can use
-AnySearch first, Tavily next, and Context.dev as a fallback; company-site briefs
-use Context.dev's structured extraction:
+general discovery through AnySearch, current and identity research through Tavily,
+and both for deep verification; company-site briefs use Context.dev's structured
+extraction:
 
 ```sh
 OPENROUTER_API_KEY="sk-or-v1-..."

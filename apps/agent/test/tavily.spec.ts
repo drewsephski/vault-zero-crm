@@ -89,8 +89,33 @@ describe("Tavily search", () => {
 	});
 
 	it("returns provider failures instead of throwing", async () => {
-		stub({ detail: "rate limited" }, 429);
-		expect(await ask("Acme")).toEqual({ ok: false, reason: "HTTP 429" });
+		stub({ detail: { error: "rate limited" } }, 429);
+		expect(await ask("Acme")).toEqual({
+			ok: false,
+			reason: "HTTP 429 — rate limited",
+		});
+	});
+
+	it("supports current-news and exact-match controls", async () => {
+		stub({ results: [{ title: "Acme news", url: "https://example.com/news" }] });
+
+		await ask('"Acme" funding', {
+			depth: "fast",
+			topic: "news",
+			timeRange: "month",
+			exactMatch: true,
+			includeRawContent: false,
+			chunksPerSource: 2,
+		});
+
+		expect(JSON.parse(String(requests[0]?.init?.body))).toMatchObject({
+			search_depth: "fast",
+			topic: "news",
+			time_range: "month",
+			exact_match: true,
+			include_raw_content: false,
+			chunks_per_source: 2,
+		});
 	});
 
 	it("extracts a LinkedIn profile slug from restricted search results", async () => {

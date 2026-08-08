@@ -20,6 +20,9 @@ export type AnySearchOptions = {
 	maxResults?: number;
 	tag?: string;
 	params?: Record<string, string>;
+	zone?: "cn" | "intl";
+	language?: string;
+	format?: "json" | "markdown";
 };
 
 function text(value: unknown): string {
@@ -75,15 +78,26 @@ export async function search(
 				max_results: Math.min(Math.max(options.maxResults ?? 5, 1), 20),
 				...(options.tag ? { tag: options.tag } : {}),
 				...(options.params ? { params: options.params } : {}),
+				...(options.zone ? { zone: options.zone } : {}),
+				...(options.language ? { language: options.language } : {}),
+				...(options.format ? { format: options.format } : {}),
 			}),
 		});
 
-		if (!response.ok) return { ok: false, reason: `HTTP ${response.status}` };
+		if (!response.ok) return { ok: false, reason: await describeFailure(response) };
 
 		const body = (await response.json()) as {
+			code?: unknown;
+			message?: unknown;
 			request_id?: unknown;
 			data?: { results?: unknown };
 		};
+		if (typeof body.code === "number" && body.code !== 0) {
+			return {
+				ok: false,
+				reason: text(body.message) || "AnySearch returned an error.",
+			};
+		}
 		const sources = Array.isArray(body.data?.results)
 			? body.data.results.flatMap((value) => {
 					const parsed = source(value);
@@ -117,13 +131,40 @@ export async function search(
 	}
 }
 
+async function describeFailure(response: Response): Promise<string> {
+	const raw = await response.text();
+	let body: unknown;
+	try {
+		body = JSON.parse(raw);
+	} catch {
+		body = null;
+	}
+
+	if (body && typeof body === "object" && !Array.isArray(body)) {
+		const row = body as Record<string, unknown>;
+		const message = text(row.message);
+		const requestId = text(row.request_id);
+		if (message || requestId) {
+			return [
+				`HTTP ${response.status}`,
+				message,
+				requestId ? `request ${requestId}` : "",
+			]
+				.filter(Boolean)
+				.join(" — ");
+		}
+	}
+
+	return `HTTP ${response.status}`;
+}
+
 export async function findPersonProfileCandidates(
 	name: string,
 	companyName?: string,
 	title?: string,
 ): Promise<AnySearchSource[]> {
 	const query = [
-		`Find the LinkedIn profile for ${name}`,
+		`Find the LinkedIn profile for "${name}"`,
 		companyName ? `who works at ${companyName}` : "",
 		title ? `and has the title ${title}` : "",
 	]

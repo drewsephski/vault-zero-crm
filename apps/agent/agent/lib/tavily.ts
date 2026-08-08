@@ -6,6 +6,7 @@ export type SearchSource = {
 	url: string;
 	content: string;
 	score: number | null;
+	publishedAt?: string;
 };
 
 export type Answer = {
@@ -25,10 +26,18 @@ export type ProfileSearchCandidate = {
 type Outcome<T> = { ok: true; data: T } | { ok: false; reason: string };
 
 export type AskOptions = {
-	depth?: "basic" | "advanced";
+	depth?: "ultra-fast" | "fast" | "basic" | "advanced";
 	domains?: string[];
-	includeRawContent?: "markdown" | "text" | true;
+	includeRawContent?: "markdown" | "text" | true | false;
 	maxResults?: number;
+	topic?: "general" | "news" | "finance";
+	timeRange?: "day" | "week" | "month" | "year";
+	startDate?: string;
+	endDate?: string;
+	country?: string;
+	exactMatch?: boolean;
+	autoParameters?: boolean;
+	chunksPerSource?: number;
 };
 
 function text(value: unknown): string {
@@ -60,11 +69,13 @@ function source(value: unknown): SearchSource | null {
 	const url = httpUrl(row.url);
 	if (!url) return null;
 
+	const publishedAt = text(row.published_date);
 	return {
 		title: text(row.title) || url,
 		url,
 		content: text(row.content),
 		score: score(row.score),
+		...(publishedAt ? { publishedAt } : {}),
 	};
 }
 
@@ -96,18 +107,30 @@ export async function ask(
 				query: question,
 				search_depth: options.depth ?? "basic",
 				max_results: Math.min(Math.max(options.maxResults ?? 5, 1), 20),
-				topic: "general",
+				topic: options.topic ?? "general",
+				...(options.timeRange ? { time_range: options.timeRange } : {}),
+				...(options.startDate ? { start_date: options.startDate } : {}),
+				...(options.endDate ? { end_date: options.endDate } : {}),
 				include_answer: false,
 				include_raw_content: options.includeRawContent ?? "markdown",
 				...(options.domains ? { include_domains: options.domains } : {}),
+				...(options.country ? { country: options.country } : {}),
+				...(options.exactMatch ? { exact_match: true } : {}),
+				...(options.autoParameters ? { auto_parameters: true } : {}),
+				...(options.chunksPerSource
+					? { chunks_per_source: Math.min(Math.max(options.chunksPerSource, 1), 3) }
+					: {}),
 			}),
 		});
 
 		if (!response.ok) {
-			return { ok: false, reason: `HTTP ${response.status}` };
+			return { ok: false, reason: await describeFailure(response) };
 		}
 
-		const body = (await response.json()) as { results?: unknown };
+		const body = (await response.json()) as {
+			results?: unknown;
+			answer?: unknown;
+		};
 		const sources = Array.isArray(body.results)
 			? body.results.flatMap((value) => {
 					const parsed = source(value);
@@ -142,6 +165,30 @@ export async function ask(
 	}
 }
 
+async function describeFailure(response: Response): Promise<string> {
+	const raw = await response.text();
+	let body: unknown;
+	try {
+		body = JSON.parse(raw);
+	} catch {
+		body = null;
+	}
+
+	if (body && typeof body === "object" && !Array.isArray(body)) {
+		const row = body as Record<string, unknown>;
+		const detail = row.detail;
+		const message =
+			typeof detail === "string"
+				? detail
+				: detail && typeof detail === "object"
+					? text((detail as Record<string, unknown>).error)
+					: text(row.message);
+		if (message) return `HTTP ${response.status} — ${message}`;
+	}
+
+	return `HTTP ${response.status}`;
+}
+
 export async function findProfileUrls(
 	terms: string[],
 	companyName: string,
@@ -152,7 +199,7 @@ export async function findProfileUrls(
 	const names = terms.map((term) => `"${term}"`).join(" or ");
 	const answer = await ask(
 		`Find the LinkedIn profile of the person called ${names} who works at ${companyName}.`,
-		{ domains: ["linkedin.com"], maxResults: 5 },
+		{ domains: ["linkedin.com"], maxResults: 5, exactMatch: true },
 	);
 
 	if (!answer.ok) return slugs;
@@ -183,6 +230,7 @@ export async function findPersonProfileCandidates(
 	const answer = await ask(query, {
 		domains: ["linkedin.com"],
 		maxResults: 5,
+		exactMatch: true,
 	});
 
 	if (!answer.ok) return [];

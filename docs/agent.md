@@ -210,7 +210,7 @@ egress:
 
 `agent/sandbox/sandbox.ts`: `bash`, file tools, `/workspace`, **`deny-all` egress on
 the backend factory** so it cannot be forgotten per session. Costs nothing —
-`web_fetch` and the Tavily-backed `web_search` run in the app runtime.
+`web_fetch` and the AnySearch/Tavily-backed `web_search` run in the app runtime.
 
 **Never give the sandbox `DATABASE_URL`.** CRM access is authored tools. A shell with
 credentials and network is exfiltration-shaped; with neither it is a text processor.
