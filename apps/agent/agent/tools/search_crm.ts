@@ -46,11 +46,13 @@ export default defineTool({
 			note: result.needsQuery
 				? "This is a search action, not a search target. Ask the rep for the person's name, email address, or company domain before calling search_crm again."
 				: result.total === 0
-					? externalResearch?.found
+					? externalResearch?.found && externalResearch.candidates.length > 0
 						? "Nothing in the CRM matched, so external person discovery has already started. Read the best candidate before asking the rep for more information."
-						: externalResearch
-							? "Nothing in the CRM matched. External person discovery has already run. If no candidate was found, ask for a LinkedIn profile URL or username — not an email, company or domain unless the rep volunteers it."
-							: "Nothing in the CRM matches. That is an answer: say so rather than asking the rep to search for you. Try a shorter or differently spelled term first — a surname alone often works where a full name does not."
+						: externalResearch?.found
+							? "Nothing in the CRM matched. External public-web context was found, but no LinkedIn identity candidate was confirmed. Review the cited sources and ask the rep to confirm the right profile before writing anything."
+							: externalResearch
+								? "Nothing in the CRM matched. External person discovery has already run. If no candidate was found, ask for a LinkedIn profile URL or username — not an email, company or domain unless the rep volunteers it."
+								: "Nothing in the CRM matches. That is an answer: say so rather than asking the rep to search for you. Try a shorter or differently spelled term first — a surname alone often works where a full name does not."
 					: result.total > 1
 						? "More than one match. If it is genuinely ambiguous, name the candidates and ask which — never ask for an id."
 						: undefined,

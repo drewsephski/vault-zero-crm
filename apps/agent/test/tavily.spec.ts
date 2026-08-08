@@ -80,10 +80,10 @@ describe("Tavily search", () => {
 		expect(JSON.parse(String(requests[0]?.init?.body))).toEqual({
 			query: "Acme funding",
 			search_depth: "advanced",
-			max_results: 10,
+			max_results: 20,
 			topic: "general",
 			include_answer: false,
-			include_raw_content: false,
+			include_raw_content: "markdown",
 			include_domains: ["example.com"],
 		});
 	});

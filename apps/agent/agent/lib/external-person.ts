@@ -1,9 +1,12 @@
-import { findPersonProfileCandidates as findAnySearchCandidates } from "./anysearch";
 import { enabled, unavailable } from "./capabilities";
 import { spend } from "./focus";
-import { lookupCompany, searchPeople } from "./linkdapi";
+import { lookupCompany, searchPeople, slugFromProfileUrl } from "./linkdapi";
 import { normalise } from "./names";
-import { findPersonProfileCandidates } from "./tavily";
+import {
+	comprehensiveSearch,
+	type ResearchSource,
+	type SearchProvider,
+} from "./research-search";
 
 const NON_PERSON_TERMS = new Set([
 	"a",
@@ -31,13 +34,18 @@ export type ExternalPersonCandidate = {
 	location: string | null;
 	content: string | null;
 	score: number | null;
+	source: "linkedin" | "web";
 };
 
 export type ExternalPersonResult =
 	| {
 			found: true;
 			candidates: ExternalPersonCandidate[];
-			discovery: "web" | "linkedin";
+			publicSources: Pick<
+				ResearchSource,
+				"providers" | "title" | "url" | "content"
+			>[];
+			discovery: "web" | "linkedin" | "combined";
 			searchedFor: {
 				name: string;
 				companyName: string | null;
@@ -69,134 +77,171 @@ export async function researchExternalPerson(input: {
 	const anySearchEnabled = await enabled("ANYSEARCH_API_KEY");
 	const rapidEnabled = await enabled("RAPIDAPI_KEY");
 	const tavilyEnabled = await enabled("TAVILY_API_KEY");
-
-	if (anySearchEnabled) {
-		const charge = spend();
-		if (!charge.ok) return { found: false, reason: charge.reason };
-
-		const candidates = await findAnySearchCandidates(
-			input.name,
-			input.companyName,
-			input.title,
-		);
-		if (candidates.length > 0) {
-			return {
-				found: true,
-				candidates: candidates.slice(0, limit).map((candidate) => ({
-					profileUrl: candidate.url,
-					fullName: null,
-					title: candidate.title,
-					headline: null,
-					location: null,
-					content: candidate.content,
-					score: candidate.score,
-				})),
-				discovery: "web",
-				searchedFor: {
-					name: input.name,
-					companyName: input.companyName ?? null,
-					title: input.title ?? null,
-				},
-				note: "AnySearch found these profile candidates. Search results are not identity evidence; read a profile before asking the rep to confirm it.",
-			};
-		}
-	}
-
-	if (tavilyEnabled) {
-		const charge = spend();
-		if (!charge.ok) return { found: false, reason: charge.reason };
-
-		const candidates = await findPersonProfileCandidates(
-			input.name,
-			input.companyName,
-			input.title,
-		);
-		if (candidates.length > 0) {
-			return {
-				found: true,
-				candidates: candidates.slice(0, limit).map((candidate) => ({
-					profileUrl: candidate.profileUrl,
-					fullName: null,
-					title: candidate.title,
-					headline: null,
-					location: null,
-					content: candidate.content,
-					score: candidate.score,
-				})),
-				discovery: "web",
-				searchedFor: {
-					name: input.name,
-					companyName: input.companyName ?? null,
-					title: input.title ?? null,
-				},
-				note: "Tavily found these profile candidates. Search results are not identity evidence; read a profile before asking the rep to confirm it.",
-			};
-		}
-	}
+	const linkedinCandidates: ExternalPersonCandidate[] = [];
+	let rapidReason: string | undefined;
 
 	if (rapidEnabled) {
 		let currentCompany: string | undefined;
 		if (input.companyName) {
 			const companyCharge = spend();
-			if (!companyCharge.ok) {
-				return { found: false, reason: companyCharge.reason };
-			}
-
-			const company = await lookupCompany(input.companyName);
-			if (company.ok) {
-				const exact = company.data.find(
-					(candidate) =>
-						normalise(candidate.displayName) ===
-						normalise(input.companyName ?? ""),
-				);
-				currentCompany = (exact ?? company.data[0])?.id;
+			if (companyCharge.ok) {
+				const company = await lookupCompany(input.companyName);
+				if (company.ok) {
+					const exact = company.data.find(
+						(candidate) =>
+							normalise(candidate.displayName) ===
+							normalise(input.companyName ?? ""),
+					);
+					currentCompany = (exact ?? company.data[0])?.id;
+				} else {
+					rapidReason = "LinkedIn company lookup was unavailable.";
+				}
+			} else {
+				rapidReason = companyCharge.reason;
 			}
 		}
 
 		const peopleCharge = spend();
-		if (!peopleCharge.ok) return { found: false, reason: peopleCharge.reason };
+		if (peopleCharge.ok) {
+			const people = await searchPeople({
+				keyword: input.name,
+				title: input.title,
+				currentCompany,
+				count: limit,
+			});
 
-		const people = await searchPeople({
-			keyword: input.name,
-			title: input.title,
-			currentCompany,
-			count: limit,
-		});
-
-		if (people.ok && people.data.length > 0) {
-			return {
-				found: true,
-				candidates: people.data.slice(0, limit).map((candidate) => ({
-					profileUrl: candidate.profileUrl,
-					fullName: candidate.fullName,
-					title: null,
-					headline: candidate.headline,
-					location: candidate.location,
-					content: null,
-					score: null,
-				})),
-				discovery: "linkedin",
-				searchedFor: {
-					name: input.name,
-					companyName: input.companyName ?? null,
-					title: input.title ?? null,
-				},
-				note: "These are candidates only. Read the selected profile and corroborate it before treating it as the person being researched.",
-			};
+			if (people.ok) {
+				linkedinCandidates.push(
+					...people.data.map((candidate) => ({
+						profileUrl: candidate.profileUrl,
+						fullName: candidate.fullName,
+						title: null,
+						headline: candidate.headline,
+						location: candidate.location,
+						content: null,
+						score: null,
+						source: "linkedin" as const,
+					})),
+				);
+			} else {
+				rapidReason = "LinkedIn people search was unavailable.";
+			}
+		} else {
+			rapidReason = peopleCharge.reason;
 		}
 	}
 
-	if (!anySearchEnabled && !rapidEnabled && !tavilyEnabled) {
+	const budgetedProviders: SearchProvider[] = [
+		...(anySearchEnabled ? ["anysearch" as const] : []),
+		...(tavilyEnabled ? ["tavily" as const] : []),
+	];
+	const publicSearchProviders: readonly SearchProvider[] | undefined =
+		rapidEnabled && budgetedProviders.length > 0
+			? budgetedProviders
+			: undefined;
+	const web = await comprehensiveSearch(
+		[
+			`Research the professional background of ${input.name}.`,
+			input.companyName ? `They may work at ${input.companyName}.` : "",
+			input.title ? `Their title may be ${input.title}.` : "",
+			"Find an official LinkedIn profile if available, plus employer pages, public talks, publications, GitHub, news, interviews, and other professional sources.",
+		]
+			.filter(Boolean)
+			.join(" "),
+		{
+			providers: publicSearchProviders,
+			deep: true,
+			maxResults: limit,
+		},
+	);
+	const publicSources = web.ok ? web.sources : [];
+	const webLinkedinCandidates = publicSources.flatMap((source) => {
+		const slug = slugFromProfileUrl(source.url);
+		if (!slug) return [];
+
+		return [
+			{
+				profileUrl: `https://www.linkedin.com/in/${slug}`,
+				fullName: null,
+				title: source.title,
+				headline: null,
+				location: null,
+				content: source.content || null,
+				score: source.score,
+				source: "linkedin" as const,
+			},
+		];
+	});
+	const candidates = dedupeCandidates([
+		...linkedinCandidates,
+		...webLinkedinCandidates,
+	]);
+
+	if (candidates.length > 0 || publicSources.length > 0) {
+		const discovery =
+			candidates.length > 0 && publicSources.length > 0
+				? "combined"
+				: candidates.length > 0
+					? "linkedin"
+					: "web";
+		return {
+			found: true,
+			candidates: candidates.slice(0, limit),
+			publicSources: publicSources.map(
+				({ providers, title, url, content }) => ({
+					providers,
+					title,
+					url,
+					content,
+				}),
+			),
+			discovery,
+			searchedFor: {
+				name: input.name,
+				companyName: input.companyName ?? null,
+				title: input.title ?? null,
+			},
+			note: "LinkedIn candidates are prioritized for identity and current-role verification. The other public sources add context only; open the best LinkedIn profile and corroborate it before treating it as the person being researched.",
+		};
+	}
+
+	const configuredWebProvider =
+		web.ok ||
+		web.providerErrors.some(({ reason }) => !/not configured/i.test(reason));
+	if (
+		!anySearchEnabled &&
+		!rapidEnabled &&
+		!tavilyEnabled &&
+		!configuredWebProvider
+	) {
 		return {
 			found: false,
-			...unavailable("ANYSEARCH_API_KEY, RAPIDAPI_KEY or TAVILY_API_KEY"),
+			...unavailable(
+				"ANYSEARCH_API_KEY, RAPIDAPI_KEY, TAVILY_API_KEY or Context.dev",
+			),
 		};
 	}
 
 	return {
 		found: false,
-		reason: "No external LinkedIn profile candidates matched.",
+		reason:
+			rapidReason ??
+			(web.ok ? "No public professional sources matched." : web.reason),
 	};
+}
+
+function dedupeCandidates(
+	candidates: ExternalPersonCandidate[],
+): ExternalPersonCandidate[] {
+	const seen = new Set<string>();
+	return candidates.filter((candidate) => {
+		const key = candidate.profileUrl
+			? candidate.profileUrl.toLowerCase()
+			: `${candidate.fullName ?? ""}|${candidate.headline ?? ""}`.toLowerCase();
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
 }
 
 export function looksLikePersonSearch(

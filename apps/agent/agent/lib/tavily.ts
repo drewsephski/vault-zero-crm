@@ -27,6 +27,7 @@ type Outcome<T> = { ok: true; data: T } | { ok: false; reason: string };
 export type AskOptions = {
 	depth?: "basic" | "advanced";
 	domains?: string[];
+	includeRawContent?: "markdown" | "text" | true;
 	maxResults?: number;
 };
 
@@ -94,10 +95,10 @@ export async function ask(
 			body: JSON.stringify({
 				query: question,
 				search_depth: options.depth ?? "basic",
-				max_results: Math.min(Math.max(options.maxResults ?? 5, 1), 10),
+				max_results: Math.min(Math.max(options.maxResults ?? 5, 1), 20),
 				topic: "general",
 				include_answer: false,
-				include_raw_content: false,
+				include_raw_content: options.includeRawContent ?? "markdown",
 				...(options.domains ? { include_domains: options.domains } : {}),
 			}),
 		});
