@@ -67,9 +67,12 @@ describe("acquisition interface accessibility", () => {
 				]}
 			/>,
 		);
+		const scrollerIndex = markup.indexOf('data-slot="tabs-list-scroll"');
+		const tablistIndex = markup.indexOf('data-slot="tabs-list"');
 
 		expect(markup).toContain('aria-label="Record sections"');
 		expect(markup).toContain('role="tablist"');
-		expect(markup).toContain("overflow-x-auto");
+		expect(scrollerIndex).toBeGreaterThanOrEqual(0);
+		expect(tablistIndex).toBeGreaterThan(scrollerIndex);
 	});
 });

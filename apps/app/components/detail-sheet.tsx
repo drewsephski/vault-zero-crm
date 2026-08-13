@@ -196,14 +196,7 @@ export function DetailSheetTabs({
 			onValueChange={onValueChange}
 			className="flex min-h-0 flex-1 flex-col gap-0"
 		>
-			<TabsList
-				variant="line"
-				aria-label="Record sections"
-				className={cn(
-					"w-full shrink-0 justify-start gap-6 overflow-x-auto border-b",
-					GUTTER,
-				)}
-			>
+			<TabsList variant="line" scrollable aria-label="Record sections">
 				{tabs.map((tab) => (
 					<TabsTrigger key={tab.value} value={tab.value}>
 						{tab.label}

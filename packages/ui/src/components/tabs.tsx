@@ -38,19 +38,68 @@ const tabsListVariants = cva(
 	},
 );
 
+const tabsListScrollVariants = cva(
+	"scrollbar-none w-full shrink-0 overflow-x-auto overflow-y-hidden overscroll-x-contain pt-0.5 pb-1.5",
+	{
+		variants: {
+			variant: {
+				default: "",
+				line: "border-b",
+			},
+		},
+		defaultVariants: {
+			variant: "default",
+		},
+	},
+);
+
+const scrollableTabsListVariants = cva(
+	"w-max min-w-full justify-start",
+	{
+		variants: {
+			variant: {
+				default: "",
+				line: "gap-6 px-5",
+			},
+		},
+		defaultVariants: {
+			variant: "default",
+		},
+	},
+);
+
 function TabsList({
 	className,
 	variant = "default",
+	scrollable = false,
 	...props
 }: React.ComponentProps<typeof TabsPrimitive.List> &
-	VariantProps<typeof tabsListVariants>) {
-	return (
+	VariantProps<typeof tabsListVariants> & {
+		scrollable?: boolean;
+	}) {
+	const list = (
 		<TabsPrimitive.List
 			data-slot="tabs-list"
 			data-variant={variant}
-			className={cn(tabsListVariants({ variant }), className)}
+			className={cn(
+				tabsListVariants({ variant }),
+				scrollable && scrollableTabsListVariants({ variant }),
+				className,
+			)}
 			{...props}
 		/>
+	);
+
+	if (!scrollable) return list;
+
+	return (
+		<div
+			data-slot="tabs-list-scroll"
+			data-variant={variant}
+			className={tabsListScrollVariants({ variant })}
+		>
+			{list}
+		</div>
 	);
 }
 
