@@ -72,6 +72,30 @@ const DISCOVERY_COLUMNS: SimpleTableColumn[] = [
 	{ srLabel: "Actions", width: "w-36", align: "right" },
 ];
 
+export function acquisitionApprovalFeedback(
+	research: RouterOutputs["acquisition"]["approveCandidate"]["research"],
+): { kind: "success" | "error"; message: string } {
+	if (research.status === "queued") {
+		return { kind: "success", message: "Target added. Research queued." };
+	}
+	if (research.blocker === "missing-domain") {
+		return {
+			kind: "error",
+			message: "Target added. Add a domain to start research.",
+		};
+	}
+	if (research.blocker === "missing-buy-box") {
+		return {
+			kind: "error",
+			message: "Target added. Complete the buy box to start research.",
+		};
+	}
+	return {
+		kind: "error",
+		message: "Target added. Unable to queue research. Try again.",
+	};
+}
+
 export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
@@ -89,9 +113,14 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 	);
 	const approveCandidate = useMutation(
 		trpc.acquisition.approveCandidate.mutationOptions({
-			onSuccess: async () => {
+			onSuccess: async (result) => {
 				await cache.everything();
-				toast.success("Target added and research queued.");
+				const feedback = acquisitionApprovalFeedback(result.research);
+				if (feedback.kind === "success") {
+					toast.success(feedback.message);
+				} else {
+					toast.error(feedback.message);
+				}
 			},
 			onError: (error) => toast.error(error.message),
 		}),

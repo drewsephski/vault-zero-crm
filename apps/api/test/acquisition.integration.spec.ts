@@ -316,6 +316,47 @@ describe("acquisition target mutations", () => {
 			}),
 		).toBe(1);
 	});
+
+	for (const stage of [
+		AcquisitionStage.QUALIFIED,
+		AcquisitionStage.REJECTED,
+		AcquisitionStage.ACQUIRED,
+	]) {
+		it(`preserves ${stage} when an existing target is promoted again`, async () => {
+			const domain = `repeat-${stage.toLowerCase()}-${crypto.randomUUID()}.test`;
+			domains.push(domain);
+			const company = await db.company.create({
+				data: {
+					name: `${stage} Target`,
+					domain,
+					acquisitionTarget: {
+						create: {
+							stage,
+							strengths: [],
+							concerns: [],
+							missingInformation: [],
+							sourceUrls: [],
+						},
+					},
+				},
+			});
+			companyIds.push(company.id);
+
+			const result = await service().addTarget(company.id, "reviewer-1");
+
+			expect(result).toMatchObject({
+				companyId: company.id,
+				targetCreated: false,
+				stage,
+				research: { status: "queued" },
+			});
+			expect(
+				await db.acquisitionTarget.findUniqueOrThrow({
+					where: { companyId: company.id },
+				}),
+			).toMatchObject({ stage });
+		});
+	}
 });
 
 describe("acquisition candidate review", () => {
@@ -520,6 +561,64 @@ describe("acquisition candidate review", () => {
 			status: AcquisitionCandidateStatus.APPROVED,
 		});
 	});
+
+	for (const stage of [
+		AcquisitionStage.QUALIFIED,
+		AcquisitionStage.REJECTED,
+		AcquisitionStage.ACQUIRED,
+	]) {
+		it(`preserves ${stage} when an approved candidate is retried`, async () => {
+			const domain = `approved-${stage.toLowerCase()}-${crypto.randomUUID()}.test`;
+			domains.push(domain);
+			const company = await db.company.create({
+				data: {
+					name: `${stage} Approved Candidate`,
+					domain,
+					source: RecordSource.DISCOVERY,
+					acquisitionTarget: {
+						create: {
+							stage,
+							strengths: [],
+							concerns: [],
+							missingInformation: [],
+							sourceUrls: [`https://${domain}`],
+						},
+					},
+				},
+			});
+			companyIds.push(company.id);
+			const candidate = await db.acquisitionCandidate.create({
+				data: {
+					name: company.name,
+					domain,
+					website: `https://${domain}`,
+					rationale: "The candidate remains linked to its target.",
+					evidence: "The source confirms the existing company.",
+					sourceUrl: `https://${domain}`,
+					status: AcquisitionCandidateStatus.APPROVED,
+					companyId: company.id,
+				},
+			});
+
+			const result = await service().approveCandidate(
+				candidate.id,
+				"reviewer-1",
+			);
+
+			expect(result).toMatchObject({
+				candidateId: candidate.id,
+				companyId: company.id,
+				targetCreated: false,
+				stage,
+				research: { status: "queued" },
+			});
+			expect(
+				await db.acquisitionTarget.findUniqueOrThrow({
+					where: { companyId: company.id },
+				}),
+			).toMatchObject({ stage });
+		});
+	}
 
 	it("keeps detail refresh separate from acquisition analysis", async () => {
 		const domain = `actions-${crypto.randomUUID()}.test`;

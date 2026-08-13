@@ -216,8 +216,8 @@ export class AcquisitionService {
 		}
 		if (!queued) return { status: "failed", blocker: "queue-unavailable" };
 
-		await this.db.acquisitionTarget.update({
-			where: { companyId },
+		await this.db.acquisitionTarget.updateMany({
+			where: { companyId, stage: AcquisitionStage.DISCOVERED },
 			data: { stage: AcquisitionStage.RESEARCHING },
 		});
 
