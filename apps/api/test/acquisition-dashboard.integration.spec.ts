@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import {
 	AcquisitionFit,
 	AcquisitionStage,
+	ActivityType,
 	db,
 	EnrichmentStatus,
 	WorkspaceMode,
@@ -39,6 +40,7 @@ let previousProfile: {
 	excludedCategories: string[];
 } | null = null;
 let baselineAcquisitionWork = 0;
+let activeContactId = "";
 
 async function createCompany(
 	name: string,
@@ -84,6 +86,18 @@ const ids = {
 	otherActive: "",
 	needsResearch: "",
 };
+const dealIds = {
+	active: "",
+	generic: "",
+	rejected: "",
+	acquired: "",
+};
+
+const activeTaskSubjects = [
+	"Active company task",
+	"Active contact task",
+	"Active deal task",
+];
 
 beforeAll(async () => {
 	previousProfile = await db.acquisitionProfile.findUnique({
@@ -156,6 +170,94 @@ beforeAll(async () => {
 		{ enrichmentStatus: EnrichmentStatus.COMPLETE },
 	);
 
+	const activeContact = await db.contact.create({
+		data: {
+			firstName: "Active Target Contact",
+			companyId: ids.active,
+		},
+		select: { id: true },
+	});
+	activeContactId = activeContact.id;
+	const [activeDeal, genericDeal, rejectedDeal, acquiredDeal] =
+		await Promise.all([
+			db.deal.create({
+				data: {
+					name: "Active target opportunity",
+					companyId: ids.active,
+					ownerId: viewerId,
+				},
+				select: { id: true },
+			}),
+			db.deal.create({
+				data: {
+					name: "Generic company opportunity",
+					companyId: ids.generic,
+					ownerId: viewerId,
+				},
+				select: { id: true },
+			}),
+			db.deal.create({
+				data: {
+					name: "Rejected target opportunity",
+					companyId: ids.rejected,
+					ownerId: viewerId,
+				},
+				select: { id: true },
+			}),
+			db.deal.create({
+				data: {
+					name: "Acquired target opportunity",
+					companyId: ids.acquired,
+					ownerId: viewerId,
+				},
+				select: { id: true },
+			}),
+		]);
+	dealIds.active = activeDeal.id;
+	dealIds.generic = genericDeal.id;
+	dealIds.rejected = rejectedDeal.id;
+	dealIds.acquired = acquiredDeal.id;
+
+	await db.activity.createMany({
+		data: [
+			{
+				type: ActivityType.TASK,
+				subject: activeTaskSubjects[0],
+				companyId: ids.needsResearch,
+				createdById: viewerId,
+			},
+			{
+				type: ActivityType.TASK,
+				subject: activeTaskSubjects[1],
+				contactId: activeContact.id,
+				createdById: viewerId,
+			},
+			{
+				type: ActivityType.TASK,
+				subject: activeTaskSubjects[2],
+				dealId: activeDeal.id,
+				createdById: viewerId,
+			},
+			{
+				type: ActivityType.TASK,
+				subject: "Generic company task",
+				companyId: ids.generic,
+				createdById: viewerId,
+			},
+			{
+				type: ActivityType.TASK,
+				subject: "Rejected target deal task",
+				dealId: rejectedDeal.id,
+				createdById: viewerId,
+			},
+			{
+				type: ActivityType.TASK,
+				subject: "Recordless task",
+				createdById: viewerId,
+			},
+		],
+	});
+
 	baselineAcquisitionWork = await db.agentTask.count({
 		where: {
 			kind: { in: [...ACQUISITION_TASK_KINDS] },
@@ -182,6 +284,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
 	await db.agentTask.deleteMany({ where: { companyId: { in: companyIds } } });
+	await db.activity.deleteMany({ where: { createdById: viewerId } });
+	await db.contact.deleteMany({ where: { id: activeContactId } });
 	await db.company.deleteMany({ where: { id: { in: companyIds } } });
 	await db.user.deleteMany({ where: { id: { in: [viewerId, otherUserId] } } });
 	if (previousProfile) {
@@ -261,9 +365,20 @@ describe("acquisition target query semantics", () => {
 			visibleMatches: 1,
 			needsResearch: 1,
 			activeAgentWork: baselineAcquisitionWork + 1,
+			activeAcquisitions: 1,
+			missingNextActions: 0,
+			nextActionCount: 3,
 		});
 		expect(
 			summary.acquisition?.priorityTargets.map((target) => target.company.id),
 		).toEqual([ids.active]);
+		expect(
+			summary.acquisition?.activeOpportunities.map(
+				(opportunity) => opportunity.id,
+			),
+		).toEqual([dealIds.active]);
+		expect(
+			summary.acquisition?.nextActions.map((task) => task.subject).sort(),
+		).toEqual(activeTaskSubjects.toSorted());
 	});
 });

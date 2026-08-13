@@ -10,7 +10,10 @@ import {
 } from "@crm/db";
 import { ACQUISITION_TASK_KINDS } from "@crm/db/acquisition";
 import { Injectable } from "@nestjs/common";
-import { acquisitionTargetWhere } from "../acquisition/acquisition-where";
+import {
+	acquisitionTargetWhere,
+	companyTargetWhere,
+} from "../acquisition/acquisition-where";
 import { toCents } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
 import { InjectDatabase } from "../database/database.constants";
@@ -397,6 +400,36 @@ export class DashboardService {
 		const dealWhere: Prisma.DealWhereInput = mine
 			? { ownerId: actingUserId }
 			: {};
+		const activeCompanyWhere = companyTargetWhere("active", {});
+		const activeDealWhere: Prisma.DealWhereInput = {
+			AND: [
+				dealWhere,
+				{ stage: { in: [...OPEN_DEAL_STAGES] } },
+				{ company: { is: activeCompanyWhere } },
+			],
+		};
+		const activeTaskWhere: Prisma.ActivityWhereInput = {
+			AND: [
+				{
+					type: ActivityType.TASK,
+					completedAt: null,
+					createdById: actingUserId,
+				},
+				{
+					OR: [
+						{ company: { is: activeCompanyWhere } },
+						{
+							contact: {
+								is: { company: { is: activeCompanyWhere } },
+							},
+						},
+						{
+							deal: { is: { company: { is: activeCompanyWhere } } },
+						},
+					],
+				},
+			],
+		};
 		const staleBefore = new Date(
 			now.getTime() - ACQUISITION_STALE_DAYS * DAY_MS,
 		);
@@ -443,25 +476,22 @@ export class DashboardService {
 				},
 			}),
 			this.db.deal.count({
-				where: {
-					...dealWhere,
-					stage: { in: [...OPEN_DEAL_STAGES] },
-				},
+				where: activeDealWhere,
 			}),
 			this.db.deal.count({
 				where: {
-					...dealWhere,
-					stage: { in: [...OPEN_DEAL_STAGES] },
-					activities: {
-						none: { type: ActivityType.TASK, completedAt: null },
-					},
+					AND: [
+						activeDealWhere,
+						{
+							activities: {
+								none: { type: ActivityType.TASK, completedAt: null },
+							},
+						},
+					],
 				},
 			}),
 			this.db.deal.findMany({
-				where: {
-					...dealWhere,
-					stage: { in: [...OPEN_DEAL_STAGES] },
-				},
+				where: activeDealWhere,
 				orderBy: [{ stageChangedAt: "asc" }, { createdAt: "desc" }],
 				take: 6,
 				select: {
@@ -479,18 +509,10 @@ export class DashboardService {
 				},
 			}),
 			this.db.activity.count({
-				where: {
-					type: ActivityType.TASK,
-					completedAt: null,
-					createdById: actingUserId,
-				},
+				where: activeTaskWhere,
 			}),
 			this.db.activity.findMany({
-				where: {
-					type: ActivityType.TASK,
-					completedAt: null,
-					createdById: actingUserId,
-				},
+				where: activeTaskWhere,
 				orderBy: [
 					{ dueAt: { sort: "asc", nulls: "last" } },
 					{ createdAt: "desc" },
