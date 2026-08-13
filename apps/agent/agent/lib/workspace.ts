@@ -4,31 +4,14 @@ import {
 	WORKSPACE_ID,
 	type WorkspaceIdentity,
 } from "@crm/db/workspace";
+import {
+	ACQUISITION_PROFILE_SELECT,
+	type AcquisitionProfileRecord,
+} from "./acquisition-profile";
 
 export type { WorkspaceIdentity };
 
-const ACQUISITION_SELECT = {
-	mode: true,
-	preferredIndustries: true,
-	geographies: true,
-	excludedCategories: true,
-	currency: true,
-	revenueMin: true,
-	revenueMax: true,
-	ebitdaMin: true,
-	ebitdaMax: true,
-	purchasePriceMin: true,
-	purchasePriceMax: true,
-	ownerInvolvement: true,
-	recurringRevenuePreference: true,
-	customerConcentrationMax: true,
-	assetPreference: true,
-	financingAssumptions: true,
-} as const;
-
-export type AcquisitionContext = Prisma.AcquisitionProfileGetPayload<{
-	select: typeof ACQUISITION_SELECT;
-}>;
+export type AcquisitionContext = AcquisitionProfileRecord;
 
 export async function identity(): Promise<WorkspaceIdentity | null> {
 	try {
@@ -43,7 +26,7 @@ export async function acquisitionContext(): Promise<AcquisitionContext | null> {
 	try {
 		return await db.acquisitionProfile.findUnique({
 			where: { id: WORKSPACE_ID },
-			select: ACQUISITION_SELECT,
+			select: ACQUISITION_PROFILE_SELECT,
 		});
 	} catch (error) {
 		console.error("[agent] could not read the acquisition profile", error);

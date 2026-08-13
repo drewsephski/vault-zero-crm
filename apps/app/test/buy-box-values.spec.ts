@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
+	appendListValues,
 	type BuyBoxDraft,
+	listValues,
 	moneyCents,
 	validateBuyBoxDraft,
 } from "../app/(app)/[slug]/settings/buy-box/buy-box-values";
@@ -24,6 +26,17 @@ const draft = {
 } satisfies BuyBoxDraft;
 
 describe("buy box values", () => {
+	it("parses selected values and appends distinct custom entries", () => {
+		expect(listValues("HVAC, Commercial services\nManufacturing")).toEqual([
+			"HVAC",
+			"Commercial services",
+			"Manufacturing",
+		]);
+		expect(
+			appendListValues("HVAC, Commercial services", "hvac, Plumbing"),
+		).toBe("HVAC, Commercial services, Plumbing");
+	});
+
 	it("converts valid amounts to safe integer cents", () => {
 		expect(moneyCents("1234.56")).toBe(123_456);
 		expect(moneyCents("")).toBeNull();

@@ -17,11 +17,22 @@ import { Input } from "@crm/ui/components/input";
 import {
 	Select,
 	SelectContent,
+	SelectGroup,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
 } from "@crm/ui/components/select";
 import { Textarea } from "@crm/ui/components/textarea";
+import { BuyBoxMultiSelect } from "./buy-box-multi-select";
+import {
+	EARNINGS_RANGE_PRESETS,
+	EXCLUDED_CATEGORY_OPTIONS,
+	GEOGRAPHY_OPTIONS,
+	INDUSTRY_OPTIONS,
+	type MoneyRangePreset,
+	PURCHASE_PRICE_RANGE_PRESETS,
+	REVENUE_RANGE_PRESETS,
+} from "./buy-box-options";
 import {
 	BUY_BOX_FIELD_IDS,
 	type BuyBoxDraft,
@@ -37,76 +48,36 @@ type StepProps = {
 export function FocusStep({ values, errors, edit }: StepProps) {
 	return (
 		<FieldGroup>
-			<Field data-invalid={Boolean(errors.preferredIndustries)}>
-				<FieldLabel htmlFor={BUY_BOX_FIELD_IDS.preferredIndustries}>
-					Preferred industries
-				</FieldLabel>
-				<Input
-					id={BUY_BOX_FIELD_IDS.preferredIndustries}
-					aria-invalid={Boolean(errors.preferredIndustries)}
-					aria-describedby={
-						errors.preferredIndustries
-							? `${BUY_BOX_FIELD_IDS.preferredIndustries}-error`
-							: undefined
-					}
-					value={values.preferredIndustries}
-					onChange={(event) =>
-						edit({ preferredIndustries: event.target.value })
-					}
-					placeholder="HVAC, commercial services, specialty manufacturing"
-				/>
-				<FieldDescription>Separate industries with commas.</FieldDescription>
-				<FieldError id={`${BUY_BOX_FIELD_IDS.preferredIndustries}-error`}>
-					{errors.preferredIndustries}
-				</FieldError>
-			</Field>
-			<Field data-invalid={Boolean(errors.geographies)}>
-				<FieldLabel htmlFor={BUY_BOX_FIELD_IDS.geographies}>
-					Geography
-				</FieldLabel>
-				<Input
-					id={BUY_BOX_FIELD_IDS.geographies}
-					aria-invalid={Boolean(errors.geographies)}
-					aria-describedby={
-						errors.geographies
-							? `${BUY_BOX_FIELD_IDS.geographies}-error`
-							: undefined
-					}
-					value={values.geographies}
-					onChange={(event) => edit({ geographies: event.target.value })}
-					placeholder="Texas, Midwest, remote"
-				/>
-				<FieldDescription>
-					Use cities, states, regions, or countries and separate them with
-					commas.
-				</FieldDescription>
-				<FieldError id={`${BUY_BOX_FIELD_IDS.geographies}-error`}>
-					{errors.geographies}
-				</FieldError>
-			</Field>
-			<Field data-invalid={Boolean(errors.excludedCategories)}>
-				<FieldLabel htmlFor={BUY_BOX_FIELD_IDS.excludedCategories}>
-					Excluded categories
-				</FieldLabel>
-				<Input
-					id={BUY_BOX_FIELD_IDS.excludedCategories}
-					aria-invalid={Boolean(errors.excludedCategories)}
-					aria-describedby={
-						errors.excludedCategories
-							? `${BUY_BOX_FIELD_IDS.excludedCategories}-error`
-							: undefined
-					}
-					value={values.excludedCategories}
-					onChange={(event) => edit({ excludedCategories: event.target.value })}
-					placeholder="Restaurants, pre-revenue, franchises"
-				/>
-				<FieldDescription>
-					Targets matching these categories should be screened out.
-				</FieldDescription>
-				<FieldError id={`${BUY_BOX_FIELD_IDS.excludedCategories}-error`}>
-					{errors.excludedCategories}
-				</FieldError>
-			</Field>
+			<BuyBoxMultiSelect
+				id={BUY_BOX_FIELD_IDS.preferredIndustries}
+				label="Preferred industries"
+				value={values.preferredIndustries}
+				options={INDUSTRY_OPTIONS}
+				placeholder="Select or add industries"
+				description="Choose multiple suggestions or type a custom industry and press Enter."
+				error={errors.preferredIndustries}
+				onChange={(preferredIndustries) => edit({ preferredIndustries })}
+			/>
+			<BuyBoxMultiSelect
+				id={BUY_BOX_FIELD_IDS.geographies}
+				label="Geography"
+				value={values.geographies}
+				options={GEOGRAPHY_OPTIONS}
+				placeholder="Select or add places"
+				description="Choose multiple suggestions or type a city, state, region, or country and press Enter."
+				error={errors.geographies}
+				onChange={(geographies) => edit({ geographies })}
+			/>
+			<BuyBoxMultiSelect
+				id={BUY_BOX_FIELD_IDS.excludedCategories}
+				label="Excluded categories"
+				value={values.excludedCategories}
+				options={EXCLUDED_CATEGORY_OPTIONS}
+				placeholder="Select or add exclusions"
+				description="Choose multiple suggestions or type a custom exclusion and press Enter. Matching targets will be screened out."
+				error={errors.excludedCategories}
+				onChange={(excludedCategories) => edit({ excludedCategories })}
+			/>
 		</FieldGroup>
 	);
 }
@@ -134,6 +105,8 @@ export function FinancialStep({ values, errors, edit }: StepProps) {
 			</Field>
 			<MoneyRange
 				label="Annual revenue"
+				currency={values.currency}
+				presets={REVENUE_RANGE_PRESETS}
 				minimum={values.revenueMin}
 				maximum={values.revenueMax}
 				minimumId={BUY_BOX_FIELD_IDS.revenueMin}
@@ -142,9 +115,14 @@ export function FinancialStep({ values, errors, edit }: StepProps) {
 				maximumError={errors.revenueMax}
 				onMinimum={(revenueMin) => edit({ revenueMin })}
 				onMaximum={(revenueMax) => edit({ revenueMax })}
+				onRange={(revenueMin, revenueMax) =>
+					edit({ revenueMin, revenueMax })
+				}
 			/>
 			<MoneyRange
 				label="EBITDA or SDE"
+				currency={values.currency}
+				presets={EARNINGS_RANGE_PRESETS}
 				minimum={values.ebitdaMin}
 				maximum={values.ebitdaMax}
 				minimumId={BUY_BOX_FIELD_IDS.ebitdaMin}
@@ -153,9 +131,14 @@ export function FinancialStep({ values, errors, edit }: StepProps) {
 				maximumError={errors.ebitdaMax}
 				onMinimum={(ebitdaMin) => edit({ ebitdaMin })}
 				onMaximum={(ebitdaMax) => edit({ ebitdaMax })}
+				onRange={(ebitdaMin, ebitdaMax) =>
+					edit({ ebitdaMin, ebitdaMax })
+				}
 			/>
 			<MoneyRange
 				label="Purchase price"
+				currency={values.currency}
+				presets={PURCHASE_PRICE_RANGE_PRESETS}
 				minimum={values.purchasePriceMin}
 				maximum={values.purchasePriceMax}
 				minimumId={BUY_BOX_FIELD_IDS.purchasePriceMin}
@@ -164,6 +147,9 @@ export function FinancialStep({ values, errors, edit }: StepProps) {
 				maximumError={errors.purchasePriceMax}
 				onMinimum={(purchasePriceMin) => edit({ purchasePriceMin })}
 				onMaximum={(purchasePriceMax) => edit({ purchasePriceMax })}
+				onRange={(purchasePriceMin, purchasePriceMax) =>
+					edit({ purchasePriceMin, purchasePriceMax })
+				}
 			/>
 		</FieldGroup>
 	);
@@ -274,6 +260,8 @@ export function FinancingStep({ values, errors, edit }: StepProps) {
 
 function MoneyRange({
 	label,
+	currency,
+	presets,
 	minimum,
 	maximum,
 	minimumId,
@@ -282,8 +270,11 @@ function MoneyRange({
 	maximumError,
 	onMinimum,
 	onMaximum,
+	onRange,
 }: {
 	label: string;
+	currency: string;
+	presets: readonly MoneyRangePreset[];
 	minimum: string;
 	maximum: string;
 	minimumId: string;
@@ -292,9 +283,50 @@ function MoneyRange({
 	maximumError?: string;
 	onMinimum: (value: string) => void;
 	onMaximum: (value: string) => void;
+	onRange: (minimum: string, maximum: string) => void;
 }) {
+	const selectedPresetIndex = presets.findIndex(
+		(preset) => preset.minimum === minimum && preset.maximum === maximum,
+	);
+	const selectedPreset =
+		selectedPresetIndex >= 0 ? `PRESET_${selectedPresetIndex}` : "CUSTOM";
+	const presetId = `${minimumId}-preset`;
+
 	return (
-		<div className="grid gap-3 sm:grid-cols-2">
+		<FieldGroup className="grid gap-3 sm:grid-cols-2">
+			<Field className="sm:col-span-2">
+				<FieldLabel htmlFor={presetId}>{label} range</FieldLabel>
+				<Select
+					value={selectedPreset}
+					onValueChange={(nextValue) => {
+						if (nextValue === "CUSTOM") return;
+						const preset = presets[Number(nextValue.replace("PRESET_", ""))];
+						if (preset) onRange(preset.minimum, preset.maximum);
+					}}
+				>
+					<SelectTrigger id={presetId} className="w-full">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent position="popper" align="start">
+						<SelectGroup>
+							{presets.map((preset, index) => (
+								<SelectItem
+									key={`${preset.minimum}-${preset.maximum}`}
+									value={`PRESET_${index}`}
+								>
+									{moneyRangeLabel(preset, currency)}
+								</SelectItem>
+							))}
+							<SelectItem value="CUSTOM" disabled>
+								Custom range
+							</SelectItem>
+						</SelectGroup>
+					</SelectContent>
+				</Select>
+				<FieldDescription>
+					Choose a preset or enter exact minimum and maximum amounts below.
+				</FieldDescription>
+			</Field>
 			<Field data-invalid={Boolean(minimumError)}>
 				<FieldLabel htmlFor={minimumId}>{label} minimum</FieldLabel>
 				<Input
@@ -321,8 +353,27 @@ function MoneyRange({
 				/>
 				<FieldError id={`${maximumId}-error`}>{maximumError}</FieldError>
 			</Field>
-		</div>
+		</FieldGroup>
 	);
+}
+
+function moneyRangeLabel(
+	preset: MoneyRangePreset,
+	currency: string,
+): string {
+	if (!preset.minimum && !preset.maximum) return "Any range";
+	if (!preset.minimum) return `Up to ${moneyLabel(preset.maximum, currency)}`;
+	if (!preset.maximum) return `${moneyLabel(preset.minimum, currency)}+`;
+	return `${moneyLabel(preset.minimum, currency)}–${moneyLabel(preset.maximum, currency)}`;
+}
+
+function moneyLabel(value: string, currency: string): string {
+	return new Intl.NumberFormat(undefined, {
+		style: "currency",
+		currency,
+		notation: "compact",
+		maximumFractionDigits: 1,
+	}).format(Number(value));
 }
 
 function PreferenceSelect<T extends string>({
@@ -348,14 +399,16 @@ function PreferenceSelect<T extends string>({
 				<SelectTrigger id={id}>
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+			<SelectContent>
+				<SelectGroup>
 					<SelectItem value="ANY">No preference</SelectItem>
 					{options.map(([option, optionLabel]) => (
 						<SelectItem key={option} value={option}>
 							{optionLabel}
 						</SelectItem>
 					))}
-				</SelectContent>
+				</SelectGroup>
+			</SelectContent>
 			</Select>
 		</Field>
 	);

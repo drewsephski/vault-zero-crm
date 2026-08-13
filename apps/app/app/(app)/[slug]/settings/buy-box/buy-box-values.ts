@@ -87,6 +87,18 @@ export function listValues(value: string): string[] {
 		.filter(Boolean);
 }
 
+export function appendListValues(value: string, additions: string): string {
+	const entries = listValues(value);
+	const seen = new Set(entries.map((entry) => entry.toLowerCase()));
+	for (const entry of listValues(additions)) {
+		const normalized = entry.toLowerCase();
+		if (seen.has(normalized)) continue;
+		entries.push(entry);
+		seen.add(normalized);
+	}
+	return entries.join(", ");
+}
+
 function moneyInput(cents: number | null): string {
 	return cents === null ? "" : String(cents / 100);
 }

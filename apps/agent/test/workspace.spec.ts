@@ -14,6 +14,10 @@ import {
 	type WorkspaceProfile,
 	websiteUrl,
 } from "@crm/db/workspace";
+import {
+	acquisitionProfileIsEmpty,
+	acquisitionProfileValues,
+} from "../agent/lib/acquisition-profile";
 import { composeClosing } from "../agent/lib/preamble";
 import { PRODUCT_CONTEXT } from "../agent/lib/product-context";
 import {
@@ -141,6 +145,15 @@ describe("every session is told who we are", () => {
 });
 
 describe("acquisition context", () => {
+	it("recognizes a missing buy box as empty", () => {
+		expect(acquisitionProfileIsEmpty(acquisitionProfileValues(null))).toBe(
+			true,
+		);
+		expect(
+			acquisitionProfileIsEmpty(acquisitionProfileValues(acquisition)),
+		).toBe(false);
+	});
+
 	it("gives the agent the buy box without claiming missing evidence", () => {
 		const markdown = acquisitionMarkdown(acquisition);
 
