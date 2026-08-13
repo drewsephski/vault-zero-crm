@@ -327,6 +327,8 @@ export function CompanySheet({ companyId }: { companyId: string }) {
 							companyId={company.id}
 							hasDomain={company.domain !== null}
 							activity={researchActivity}
+							acquisition={labels.acquisition}
+							queuedKinds={company.queuedKinds}
 						/>
 						<RecordActions
 							record={{ kind: "company", id: company.id }}
@@ -439,14 +441,19 @@ function CompanyOverview({
 		company.enrichmentStatus,
 		company.queued,
 	);
+	const detailsActivity = company.queuedKinds.some((kind) =>
+		["brand", "company-details"].includes(kind),
+	)
+		? researchActivity
+		: null;
 
 	return (
 		<DetailSheetBody>
-			{researchActivity ? (
+			{detailsActivity ? (
 				<DetailSheetResearchStatus
 					subject={company.name}
 					fields={fields}
-					state={researchActivity}
+					state={detailsActivity}
 				/>
 			) : null}
 
@@ -536,7 +543,7 @@ function CompanyOverview({
 						</DetailSheetProperties>
 					</DetailSheetSection>
 
-					{researchActivity ? null : <DetailSheetPending fields={fields} />}
+					{detailsActivity ? null : <DetailSheetPending fields={fields} />}
 
 					{hasCompanyLinks(company) ? (
 						<DetailSheetSection title="Links">
@@ -554,6 +561,9 @@ function AcquisitionDossier({ company }: { company: Company }) {
 	const cache = useCrmCache();
 	const target = company.acquisitionTarget;
 	const stage = target?.stage ?? AcquisitionStage.DISCOVERED;
+	const analysisActivity = company.queuedKinds.includes("acquisition-refresh")
+		? enrichmentActivity(company.enrichmentStatus, company.queued)
+		: null;
 
 	const updateStage = useMutation(
 		trpc.acquisition.updateTarget.mutationOptions({
@@ -573,6 +583,14 @@ function AcquisitionDossier({ company }: { company: Company }) {
 
 	return (
 		<DetailSheetBody>
+			{analysisActivity ? (
+				<DetailSheetResearchStatus
+					subject={company.name}
+					fields={[]}
+					state={analysisActivity}
+					mode="acquisition"
+				/>
+			) : null}
 			<DetailSheetSplit>
 				<DetailSheetMain>
 					{target?.summary ? (

@@ -5,6 +5,11 @@ import Renew from "@carbon/icons-react/es/Renew";
 import { Button } from "@crm/ui/components/button";
 import { Icon } from "@crm/ui/components/icon";
 import { Spinner } from "@crm/ui/components/spinner";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@crm/ui/components/tooltip";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useCrmCache } from "@/lib/trpc/cache";
@@ -15,10 +20,14 @@ export function EnrichmentActions({
 	companyId,
 	hasDomain,
 	activity,
+	acquisition,
+	queuedKinds,
 }: {
 	companyId: string;
 	hasDomain: boolean;
 	activity: EnrichmentActivity;
+	acquisition: boolean;
+	queuedKinds: string[];
 }) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
@@ -39,60 +48,83 @@ export function EnrichmentActions({
 
 	const research = useMutation(
 		trpc.companies.research.mutationOptions({
-			onSuccess: async () => {
-				await cache.activity();
+			onSuccess: async (result) => {
+				await Promise.all([cache.company(companyId), cache.activity()]);
 				toast.success(
-					"Research queued — this page will update when it finishes.",
+					result.kind === "acquisition"
+						? "Fit analysis queued — the dossier will update when Eve finishes."
+						: "Research brief queued — this page will update when Eve finishes.",
 				);
 			},
 			onError: (error) => toast.error(error.message),
 		}),
 	);
+	const detailsBusy = queuedKinds.some((kind) =>
+		["brand", "company-details"].includes(kind),
+	);
+	const researchKind = acquisition ? "acquisition-refresh" : "company-profile";
+	const researchBusy = queuedKinds.includes(researchKind);
+	const researchLabel = acquisition ? "Analyze fit" : "Research brief";
+	const researchDescription = acquisition
+		? "Compare this company with the buy box and write an evidence-backed acquisition dossier."
+		: "Read CRM history and current public information to write an account brief.";
 
 	return (
 		<>
-			<Button
-				variant="outline"
-				size="sm"
-				disabled={
-					!hasDomain ||
-					enrich.isPending ||
-					research.isPending ||
-					activity !== null
-				}
-				onClick={() => enrich.mutate({ id: companyId })}
-			>
-				{enrich.isPending ? (
-					<Spinner />
-				) : (
-					<Icon icon={Renew} data-icon="inline-start" />
-				)}
-				<span className="hidden sm:inline">Re-enrich</span>
-			</Button>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<Button
+						variant="outline"
+						size="sm"
+						aria-label="Refresh company details"
+						disabled={
+							!hasDomain ||
+							enrich.isPending ||
+							research.isPending ||
+							activity !== null
+						}
+						onClick={() => enrich.mutate({ id: companyId })}
+					>
+						{enrich.isPending || detailsBusy ? (
+							<Spinner />
+						) : (
+							<Icon icon={Renew} data-icon="inline-start" />
+						)}
+						<span className="hidden sm:inline">
+							{detailsBusy ? "Refreshing" : "Refresh details"}
+						</span>
+					</Button>
+				</TooltipTrigger>
+				<TooltipContent>
+					Refresh the logo, industry, location, website, and company links.
+				</TooltipContent>
+			</Tooltip>
 
-			<Button
-				size="sm"
-				disabled={
-					!hasDomain ||
-					research.isPending ||
-					enrich.isPending ||
-					activity !== null
-				}
-				onClick={() => research.mutate({ id: companyId })}
-			>
-				{research.isPending || activity !== null ? (
-					<Spinner />
-				) : (
-					<Icon icon={MagicWand} data-icon="inline-start" />
-				)}
-				<span className="hidden sm:inline">
-					{activity === "queued"
-						? "Queued"
-						: activity === "running"
-							? "Researching"
-							: "Research"}
-				</span>
-			</Button>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<Button
+						size="sm"
+						aria-label={researchLabel}
+						disabled={
+							!hasDomain ||
+							research.isPending ||
+							enrich.isPending ||
+							activity !== null
+						}
+						onClick={() => research.mutate({ id: companyId })}
+					>
+						{research.isPending || researchBusy ? (
+							<Spinner />
+						) : (
+							<Icon icon={MagicWand} data-icon="inline-start" />
+						)}
+						<span className="hidden sm:inline">
+							{researchBusy ? "Working" : researchLabel}
+						</span>
+					</Button>
+				</TooltipTrigger>
+				<TooltipContent>{researchDescription}</TooltipContent>
+			</Tooltip>
 		</>
 	);
 }

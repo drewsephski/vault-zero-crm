@@ -31,9 +31,9 @@ afterEach(async () => {
 	else process.env.AGENT_BRIDGE_SECRET = realBridgeSecret;
 });
 
-function service() {
+function companyService() {
 	delete process.env.AGENT_BRIDGE_SECRET;
-	const companies = new CompaniesService(
+	return new CompaniesService(
 		db,
 		new AgentTriggerService(db),
 		new AgentQueueService(db),
@@ -41,7 +41,10 @@ function service() {
 		{} as never,
 		{} as never,
 	);
-	return new AcquisitionService(db, companies);
+}
+
+function service() {
+	return new AcquisitionService(db, companyService());
 }
 
 describe("acquisition candidate review", () => {
@@ -82,8 +85,9 @@ describe("acquisition candidate review", () => {
 			AcquisitionCandidateStatus.APPROVED,
 		);
 		expect(tasks.map((task) => task.kind).sort()).toEqual([
+			"acquisition-refresh",
 			"brand",
-			"company-profile",
+			"company-details",
 		]);
 
 		const approvedAgain = await service().approveCandidate(
@@ -102,7 +106,7 @@ describe("acquisition candidate review", () => {
 			await db.agentTask.count({
 				where: { companyId: company.id, finishedAt: null },
 			}),
-		).toBe(2);
+		).toBe(3);
 	});
 
 	it("keeps dismissed candidates out of the CRM", async () => {
@@ -168,10 +172,42 @@ describe("acquisition candidate review", () => {
 			await db.agentTask.count({
 				where: {
 					companyId: company.id,
-					kind: "company-profile",
+					kind: "acquisition-refresh",
 					finishedAt: null,
 				},
 			}),
 		).toBe(1);
+	});
+
+	it("keeps detail refresh separate from acquisition analysis", async () => {
+		const domain = `actions-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const company = await db.company.create({
+			data: { name: "Action Target", domain, website: `https://${domain}` },
+		});
+		const companies = companyService();
+
+		await companies.enrich(company.id);
+
+		expect(
+			(
+				await db.agentTask.findMany({
+					where: { companyId: company.id, finishedAt: null },
+					select: { kind: true },
+				})
+			)
+				.map((task) => task.kind)
+				.sort(),
+		).toEqual(["brand", "company-details"]);
+
+		await db.agentTask.deleteMany({ where: { companyId: company.id } });
+		await companies.analyzeAcquisition(company.id, "reviewer-1");
+
+		expect(
+			await db.agentTask.findMany({
+				where: { companyId: company.id, finishedAt: null },
+				select: { kind: true },
+			}),
+		).toEqual([{ kind: "acquisition-refresh" }]);
 	});
 });

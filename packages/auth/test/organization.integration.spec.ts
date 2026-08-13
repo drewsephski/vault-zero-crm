@@ -160,4 +160,18 @@ describe("ensureWorkspaceMembership", () => {
 
 		expect(owners).toBe(1);
 	});
+
+	it("repairs an ownerless workspace by promoting its earliest member", async () => {
+		await ensureWorkspaceMembership(secondId);
+
+		await db.member.updateMany({
+			where: { organizationId: WORKSPACE_ID },
+			data: { role: "member" },
+		});
+
+		await ensureWorkspaceMembership(secondId);
+
+		expect(await roleOf(firstId)).toBe("owner");
+		expect(await roleOf(secondId)).toBe("member");
+	});
 });

@@ -6,7 +6,9 @@ import {
 	type Prisma,
 	Prisma as PrismaNamespace,
 	RecordSource,
+	WorkspaceMode,
 } from "@crm/db";
+import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
 	BadRequestException,
 	ConflictException,
@@ -277,9 +279,12 @@ export class CompaniesService {
 			...rest
 		} = company;
 
+		const queuedKinds = await this.queue.pendingKinds({ companyId: id });
+
 		return {
 			...rest,
-			queued: await this.queue.isQueued({ companyId: id }),
+			queued: queuedKinds.length > 0,
+			queuedKinds,
 			createdAt: createdAt.toISOString(),
 			enrichedAt: enrichedAt?.toISOString() ?? null,
 			acquisitionTarget: acquisitionTarget
@@ -546,16 +551,25 @@ export class CompaniesService {
 			where: { id },
 			data: { enrichmentStatus: "PENDING", enrichmentError: null },
 		});
-		await this.agent.companyRequested(id, "A rep asked for a fresh look");
+		await this.agent.companyDetailsRequested(
+			id,
+			"A rep asked to refresh the company details",
+		);
 
 		return { id, queued: true };
 	}
 
 	async research(id: string, actingUserId: string) {
-		const company = await this.db.company.findUnique({
-			where: { id },
-			select: { id: true, domain: true },
-		});
+		const [company, profile] = await Promise.all([
+			this.db.company.findUnique({
+				where: { id },
+				select: { id: true, domain: true },
+			}),
+			this.db.acquisitionProfile.findUnique({
+				where: { id: WORKSPACE_ID },
+				select: { mode: true },
+			}),
+		]);
 
 		if (!company) {
 			throw new NotFoundException(`No company with id ${id}.`);
@@ -567,12 +581,50 @@ export class CompaniesService {
 			);
 		}
 
-		await this.agent.companyRequested(
+		if (profile?.mode === WorkspaceMode.ACQUISITION) {
+			return this.analyzeAcquisition(id, actingUserId);
+		} else {
+			await this.agent.companyResearchRequested(
+				id,
+				`Company briefing requested by a rep (${actingUserId})`,
+			);
+		}
+
+		return {
+			ok: true as const,
+			queued: true as const,
+			kind:
+				profile?.mode === WorkspaceMode.ACQUISITION
+					? ("acquisition" as const)
+					: ("brief" as const),
+		};
+	}
+
+	async analyzeAcquisition(id: string, actingUserId: string) {
+		const company = await this.db.company.findUnique({
+			where: { id },
+			select: { id: true, domain: true },
+		});
+
+		if (!company) {
+			throw new NotFoundException(`No company with id ${id}.`);
+		}
+		if (!company.domain) {
+			throw new BadRequestException(
+				"There is nothing to analyze without a domain — add one first.",
+			);
+		}
+
+		await this.agent.acquisitionTargetRequested(
 			id,
-			`Briefing requested by a rep (${actingUserId})`,
+			`Acquisition analysis requested by a rep (${actingUserId})`,
 		);
 
-		return { ok: true as const, queued: true as const };
+		return {
+			ok: true as const,
+			queued: true as const,
+			kind: "acquisition" as const,
+		};
 	}
 
 	async setPrimaryContact(companyId: string, contactId: string | null) {

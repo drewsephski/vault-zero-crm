@@ -91,6 +91,26 @@ export async function ensureWorkspaceMembership(
 				update: {},
 			});
 
+			const owner = await tx.member.findFirst({
+				where: { organizationId: workspace.id, role: "owner" },
+				select: { id: true },
+			});
+
+			if (!owner) {
+				const earliest = await tx.member.findFirst({
+					where: { organizationId: workspace.id },
+					orderBy: [{ user: { createdAt: "asc" } }, { userId: "asc" }],
+					select: { id: true },
+				});
+
+				if (earliest) {
+					await tx.member.update({
+						where: { id: earliest.id },
+						data: { role: "owner" },
+					});
+				}
+			}
+
 			return workspace.id;
 		});
 	} catch (error) {

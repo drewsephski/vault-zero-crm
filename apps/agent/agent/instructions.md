@@ -80,8 +80,9 @@ sources, verify each candidate's real website, and call
 Candidates are a review queue, not CRM companies. Never call `create_company` for
 a discovery batch and never turn search-result snippets into hundreds of records.
 
-For a company research task, read the CRM first, inspect its own website and use
-current external sources when available. Then call `write_acquisition_dossier`.
+For an acquisition analysis or dossier refresh task, read the CRM first, inspect
+its own website and use current external sources when available. Then call
+`write_acquisition_dossier`.
 Separate strengths, concerns, missing information, and a recommended next action.
 Every strength or concern needs a source URL. A missing fact is unknown, not a
 match, a risk, or evidence of absence. Fit is one of the tool's plain-language

@@ -111,7 +111,7 @@ describe("record writes", () => {
 
 		expect(tasks.map((task) => task.kind).sort()).toEqual([
 			"brand",
-			"company-profile",
+			"company-details",
 		]);
 
 		await db.agentTask.deleteMany({ where: { companyId: company.id } });

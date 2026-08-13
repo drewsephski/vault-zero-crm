@@ -112,6 +112,13 @@ function toRole(value: string): WorkspaceRole {
 	return isWorkspaceRole(value) ? value : "member";
 }
 
+export function hasDiscoveryFocus(input: {
+	preferredIndustries: readonly string[];
+	geographies: readonly string[];
+}): boolean {
+	return input.preferredIndustries.length > 0 || input.geographies.length > 0;
+}
+
 @Injectable()
 export class WorkspaceService {
 	private readonly logger = new Logger(WorkspaceService.name);
@@ -191,12 +198,12 @@ export class WorkspaceService {
 	async setMode(
 		userId: string,
 		input: SetWorkspaceModeInput,
-	): Promise<Workspace> {
+	): Promise<Workspace & { discoveryQueued: boolean }> {
 		await this.assertCanManageAcquisition(userId);
 
 		const currency = await readReportingCurrency(this.db);
 
-		await this.db.acquisitionProfile.upsert({
+		const profile = await this.db.acquisitionProfile.upsert({
 			where: { id: WORKSPACE_ID },
 			create: {
 				id: WORKSPACE_ID,
@@ -207,11 +214,14 @@ export class WorkspaceService {
 				currency,
 			},
 			update: { mode: input.mode },
+			select: { preferredIndustries: true, geographies: true },
 		});
 
-		if (input.mode === WorkspaceMode.ACQUISITION) {
+		const discoveryQueued =
+			input.mode === WorkspaceMode.ACQUISITION && hasDiscoveryFocus(profile);
+		if (discoveryQueued) {
 			await this.agent.acquisitionProfileChanged(
-				"Acquisition mode was enabled; find a small first set of candidates",
+				"Acquisition mode was enabled with a focused buy box; find a small first set of candidates",
 			);
 		}
 
@@ -221,13 +231,13 @@ export class WorkspaceService {
 			mode: input.mode,
 		});
 
-		return this.get(userId);
+		return { ...(await this.get(userId)), discoveryQueued };
 	}
 
 	async updateAcquisitionProfile(
 		userId: string,
 		input: UpdateAcquisitionProfileInput,
-	): Promise<AcquisitionProfile> {
+	): Promise<AcquisitionProfile & { discoveryQueued: boolean }> {
 		await this.assertCanManageAcquisition(userId);
 
 		const fields = {
@@ -254,13 +264,16 @@ export class WorkspaceService {
 			update: fields,
 		});
 
-		await this.agent.acquisitionProfileChanged(
-			"The buy box changed; refresh the discovery strategy",
-		);
+		const discoveryQueued = hasDiscoveryFocus(fields);
+		if (discoveryQueued) {
+			await this.agent.acquisitionProfileChanged(
+				"The buy box changed; refresh the discovery strategy",
+			);
+		}
 
 		this.logger.log({ message: "Acquisition profile updated", userId });
 
-		return this.acquisitionProfile(userId);
+		return { ...(await this.acquisitionProfile(userId)), discoveryQueued };
 	}
 
 	async update(
@@ -321,12 +334,6 @@ export class WorkspaceService {
 					: "The company using this CRM said what its website is",
 			);
 		}
-		if (!isOnboarded(before?.metadata ?? null)) {
-			await this.agent.acquisitionProfileChanged(
-				"The workspace is ready; begin a bounded buy-box discovery pass",
-			);
-		}
-
 		return this.get(userId);
 	}
 

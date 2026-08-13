@@ -24,6 +24,7 @@ import {
 	setWorkspaceModeInput,
 	updateAcquisitionProfileInput,
 } from "../src/workspace/workspace.contracts";
+import { hasDiscoveryFocus } from "../src/workspace/workspace.service";
 
 const validProfile = {
 	preferredIndustries: ["HVAC"],
@@ -78,6 +79,15 @@ describe("acquisition profile contracts", () => {
 				currency: "ZZZ",
 			}).success,
 		).toBe(false);
+	});
+
+	it("requires an industry or geography before discovery starts", () => {
+		expect(
+			hasDiscoveryFocus({ preferredIndustries: [], geographies: [] }),
+		).toBe(false);
+		expect(
+			hasDiscoveryFocus({ preferredIndustries: ["HVAC"], geographies: [] }),
+		).toBe(true);
 	});
 });
 

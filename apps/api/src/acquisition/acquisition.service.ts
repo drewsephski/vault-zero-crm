@@ -94,9 +94,7 @@ export class AcquisitionService {
 				},
 			}),
 		]);
-		if (!created) {
-			await this.companies.research(existing.id, actingUserId);
-		}
+		await this.companies.analyzeAcquisition(existing.id, actingUserId);
 
 		this.logger.log({
 			message: "Acquisition candidate approved",

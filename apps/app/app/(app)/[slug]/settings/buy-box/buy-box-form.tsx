@@ -57,12 +57,16 @@ export function BuyBoxForm() {
 
 	const save = useMutation(
 		trpc.workspace.updateAcquisitionProfile.mutationOptions({
-			onSuccess: async () => {
+			onSuccess: async (result) => {
 				await cache.workspace();
 				setDraft(null);
 				setErrors({});
 				setStep(0);
-				toast.success("Buy box saved.");
+				toast.success(
+					result.discoveryQueued
+						? "Buy box saved. Eve is refreshing the discovery strategy."
+						: "Buy box saved. Add an industry or geography to start discovery.",
+				);
 			},
 			onError: (error) => toast.error(error.message),
 		}),

@@ -46,7 +46,9 @@ here, what do we sell.
 - **Signing in is the join; no invite flow.** `ensureWorkspaceMembership` runs in
   `databaseHooks.session.create.before` and **degrades, never throws** — a throw fails
   the session create and locks everyone out. The plugin's `invitation` table is unused.
-- **First account is owner**, and the hook enrols pre-existing users, oldest first.
+- **First account is owner**, and the hook enrols pre-existing users, oldest first. If
+  a legacy or partially migrated workspace has members but no owner, the same hook
+  repairs the invariant by promoting the earliest member.
 - **Permissions come from `@crm/auth`** — `canRenameWorkspace`, `canChangeRole`,
   `canConfigureSso`, `canManageCurrency` — enforced by the service *and* used to
   disable the UI control, so the button and the 403 cannot disagree.

@@ -328,13 +328,17 @@ export function DetailSheetResearchStatus({
 	subject,
 	fields,
 	state,
+	mode = "details",
 }: {
 	subject: string;
 	fields: string[];
 	state: "queued" | "running";
+	mode?: "details" | "acquisition";
 }) {
-	const detail =
-		fields.length > 0
+	const acquisition = mode === "acquisition";
+	const detail = acquisition
+		? "Comparing the evidence with your buy box and preparing a decision-ready dossier."
+		: fields.length > 0
 			? `Looking for ${fieldList.format(fields)}.`
 			: "Reviewing the company website and public sources.";
 
@@ -349,9 +353,13 @@ export function DetailSheetResearchStatus({
 		>
 			<div className="min-w-0 space-y-1">
 				<p className="font-medium text-sm">
-					{state === "running"
-						? `Researching ${subject}`
-						: `Research queued for ${subject}`}
+					{acquisition
+						? state === "running"
+							? `Analyzing ${subject}`
+							: `Fit analysis queued for ${subject}`
+						: state === "running"
+							? `Refreshing ${subject}`
+							: `Detail refresh queued for ${subject}`}
 				</p>
 				<p className="text-pretty text-muted-foreground text-xs/5">
 					{state === "queued" ? "Waiting for the agent to start. " : ""}
@@ -362,7 +370,13 @@ export function DetailSheetResearchStatus({
 				tone={state === "running" ? "info" : "neutral"}
 				busy={state === "running"}
 				pulse={state === "queued"}
-				label={state === "running" ? "Researching now" : "In queue"}
+				label={
+					state === "running"
+						? acquisition
+							? "Analyzing now"
+							: "Refreshing now"
+						: "In queue"
+				}
 				size="sm"
 			/>
 		</section>

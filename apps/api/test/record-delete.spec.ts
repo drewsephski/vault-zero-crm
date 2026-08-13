@@ -28,7 +28,9 @@ const stamp = new ActivityStampService(db);
 const agent = {
 	contactCreated: async () => undefined,
 	companyCreated: async () => undefined,
-	companyRequested: async () => undefined,
+	companyDetailsRequested: async () => undefined,
+	companyResearchRequested: async () => undefined,
+	acquisitionTargetRequested: async () => undefined,
 } as unknown as AgentTriggerService;
 
 const directory = new CompanyDirectoryService(db, agent);

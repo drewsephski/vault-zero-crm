@@ -48,10 +48,16 @@ export function WorkflowModeForm() {
 
 	const save = useMutation(
 		trpc.workspace.setMode.mutationOptions({
-			onSuccess: async () => {
+			onSuccess: async (result) => {
 				await cache.workspace();
 				setDraft(null);
-				toast.success("Workspace mode saved.");
+				toast.success(
+					result.mode === WorkspaceMode.ACQUISITION
+						? result.discoveryQueued
+							? "Acquisition mode saved. Eve is finding an initial candidate set."
+							: "Acquisition mode saved. Add an industry or geography to start discovery."
+						: "Sales mode saved.",
+				);
 			},
 			onError: (error) => toast.error(error.message),
 		}),

@@ -63,8 +63,13 @@ what the work is; the lane only says whether it needs a conversation.**
 
 **Priority**: `brand` 900 · `portrait` 800 · `workspace` 500 · `requested` 300 ·
 `acquisitionDiscovery` 250 · `meeting` 200 · `identify` 100 · `sweep` 50 ·
-`companyProfile` 40 · `acquisitionRefresh` 30 · `recheck` 0. Visible identity work
-remains ahead of model-backed analysis.
+`companyDetails` 40 · `companyProfile` 40 · `acquisitionRefresh` 30 · `recheck` 0.
+Visible identity work remains ahead of model-backed analysis.
+
+Company actions are deliberately separate: **Refresh details** queues `brand` plus
+`company-details` for structured public fields; **Research brief** queues
+`company-profile`; and acquisition-mode **Analyze fit** queues
+`acquisition-refresh` for the evidence-backed dossier.
 
 **`claimDue` sorts what it claims** — Postgres does not order `UPDATE … RETURNING` by
 its sub-select's `ORDER BY`.

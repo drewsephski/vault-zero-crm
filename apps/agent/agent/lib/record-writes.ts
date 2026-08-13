@@ -352,7 +352,7 @@ async function enqueueCompanyTasks(
 	companyId: string,
 	reason: string,
 ): Promise<void> {
-	const kinds = ["brand", "company-profile"] as const;
+	const kinds = ["brand", "company-details"] as const;
 	const existing = await tx.agentTask.findMany({
 		where: { companyId, kind: { in: [...kinds] }, finishedAt: null },
 		select: { kind: true },

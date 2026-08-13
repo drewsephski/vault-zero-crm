@@ -18,16 +18,24 @@ export class AgentQueueService {
 		companyId?: string;
 		contactId?: string;
 	}): Promise<boolean> {
-		const row = await this.db.agentTask.findFirst({
+		return (await this.pendingKinds(subject)).length > 0;
+	}
+
+	async pendingKinds(subject: {
+		companyId?: string;
+		contactId?: string;
+	}): Promise<string[]> {
+		const rows = await this.db.agentTask.findMany({
 			where: {
 				finishedAt: null,
 				...(subject.companyId ? { companyId: subject.companyId } : {}),
 				...(subject.contactId ? { contactId: subject.contactId } : {}),
 			},
-			select: { id: true },
+			select: { kind: true },
+			distinct: ["kind"],
 		});
 
-		return row !== null;
+		return rows.map((row) => row.kind).sort();
 	}
 
 	private async queued(

@@ -162,7 +162,7 @@ export class BackfillService implements OnModuleInit {
 		});
 
 		const profile = await this.agent.backfill({
-			kind: "company-profile",
+			kind: "company-details",
 			reason: "Backfill — this company was never successfully looked up",
 			companyIds: rows.map((row) => row.id),
 		});

@@ -57,14 +57,17 @@ export class AgentTriggerService {
 
 		await this.enqueue({
 			companyId,
-			kind: "company-profile",
+			kind: "company-details",
 			reason,
-			priority: PRIORITY.companyProfile,
+			priority: PRIORITY.companyDetails,
 			budget: 4,
 		});
 	}
 
-	async companyRequested(companyId: string, reason: string): Promise<void> {
+	async companyDetailsRequested(
+		companyId: string,
+		reason: string,
+	): Promise<void> {
 		await this.enqueue({
 			companyId,
 			kind: "brand",
@@ -75,10 +78,36 @@ export class AgentTriggerService {
 
 		await this.enqueue({
 			companyId,
+			kind: "company-details",
+			reason,
+			priority: PRIORITY.requested,
+			budget: 8,
+		});
+	}
+
+	async companyResearchRequested(
+		companyId: string,
+		reason: string,
+	): Promise<void> {
+		await this.enqueue({
+			companyId,
 			kind: "company-profile",
 			reason,
 			priority: PRIORITY.requested,
 			budget: 8,
+		});
+	}
+
+	async acquisitionTargetRequested(
+		companyId: string,
+		reason: string,
+	): Promise<void> {
+		await this.enqueue({
+			companyId,
+			kind: "acquisition-refresh",
+			reason,
+			priority: PRIORITY.requested,
+			budget: 12,
 		});
 	}
 

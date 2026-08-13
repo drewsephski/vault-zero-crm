@@ -7,7 +7,7 @@ import { createCompany, writeError } from "../lib/record-writes";
 
 export default defineTool({
 	description:
-		"Create a company in the CRM when a rep explicitly asks. Search first so the same company is not created twice. A domain starts brand and company-profile work automatically.",
+		"Create a company in the CRM when a rep explicitly asks. Search first so the same company is not created twice. A domain starts brand and structured company-detail work automatically.",
 	inputSchema: z.object({
 		name: z.string().trim().min(1),
 		domain: z.string().trim().optional(),
