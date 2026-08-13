@@ -9,7 +9,7 @@ import {
 	sessionPreamble,
 	workspacePreamble,
 } from "../agent/lib/preamble";
-import { identity } from "../agent/lib/workspace";
+import { acquisitionContext, identity } from "../agent/lib/workspace";
 
 const suffix = process.env.TEST_RUN_ID ?? "preamble-spec";
 const domain = `fernhill-${suffix}.test`;
@@ -216,7 +216,10 @@ describe("sessionPreamble", () => {
 
 describe("every session is told who we are", () => {
 	it("ends each preamble with the same account of us", async () => {
-		const expected = await composeClosing(await identity());
+		const expected = await composeClosing(
+			await identity(),
+			await acquisitionContext(),
+		);
 
 		for (const { markdown } of [
 			await contactPreamble(paulaId, rep),
