@@ -12,13 +12,18 @@ import { WorkspaceSectionHeading } from "@/components/workspace-section-heading"
 import { requireSession } from "@/lib/session";
 import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
+import { workspaceLabels } from "@/lib/workspace-mode";
 import { companiesSearchParams } from "./companies-search-params";
 import { CompaniesTable } from "./companies-table";
 import { CreateCompanySheet } from "./create-company-sheet";
 
-export const metadata: Metadata = {
-	title: "Companies",
-};
+export async function generateMetadata(): Promise<Metadata> {
+	await requireSession();
+	const workspace = await getServerQueryClient().fetchQuery(
+		getServerTrpc().workspace.get.queryOptions(),
+	);
+	return { title: workspaceLabels(workspace.mode).companies };
+}
 
 export default function CompaniesPage({
 	searchParams,

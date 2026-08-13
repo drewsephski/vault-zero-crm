@@ -15,7 +15,9 @@ export function WorkspaceSectionHeading({
 			<>
 				<PageShellTitle>{labels.companies}</PageShellTitle>
 				<PageShellDescription>
-					Every {labels.companyLower} being tracked and researched.
+					{labels.acquisition
+						? "Every acquisition target under active review or in your decision history."
+						: "Every company being tracked and researched."}
 				</PageShellDescription>
 			</>
 		);

@@ -1,0 +1,158 @@
+import type { AcquisitionCriterionAssessment } from "@crm/db/acquisition";
+import type { StatusTone } from "@crm/ui/components/status-indicator";
+
+type CompanyTargetState =
+	| { acquisitionTarget?: unknown | null }
+	| null
+	| undefined;
+
+export function defaultCompanyTab(
+	company: CompanyTargetState,
+	acquisitionMode: boolean,
+): "overview" | "acquisition" {
+	return acquisitionMode && company?.acquisitionTarget
+		? "acquisition"
+		: "overview";
+}
+
+export function criterionGroups<T extends AcquisitionCriterionAssessment>(
+	criteria: readonly T[],
+): { blockers: T[]; assessments: T[]; unknowns: T[] } {
+	const blockers: T[] = [];
+	const assessments: T[] = [];
+	const unknowns: T[] = [];
+
+	for (const criterion of criteria) {
+		if (criterion.blocksQualification) {
+			blockers.push(criterion);
+		} else if (criterion.result === "UNKNOWN") {
+			unknowns.push(criterion);
+		} else {
+			assessments.push(criterion);
+		}
+	}
+
+	return { blockers, assessments, unknowns };
+}
+
+type TargetResearchState =
+	| {
+			status: "idle" | "queued" | "running" | "retrying";
+			error?: string | null;
+	  }
+	| {
+			status: "failed";
+			error?: string | null;
+			blocker?: "queue-unavailable";
+	  }
+	| {
+			status: "blocked";
+			blocker: "missing-domain" | "missing-buy-box";
+	  };
+
+export type TargetResearchAction = {
+	kind: "domain" | "buy-box" | "retry";
+	label: string;
+};
+
+export type TargetResearchPresentation = {
+	label: string;
+	description: string;
+	tone: StatusTone;
+	busy: boolean;
+	pulse: boolean;
+	action: TargetResearchAction | null;
+	feedback: { kind: "success" | "error"; message: string } | null;
+};
+
+export function targetResearchCopy(
+	state: TargetResearchState,
+): TargetResearchPresentation {
+	if (state.status === "queued") {
+		return {
+			label: "Research queued",
+			description: "Waiting for Eve to start. This dossier stays available.",
+			tone: "neutral",
+			busy: false,
+			pulse: true,
+			action: null,
+			feedback: { kind: "success", message: "Target added. Research queued." },
+		};
+	}
+
+	if (state.status === "running") {
+		return {
+			label: "Research in progress",
+			description:
+				"Eve is refreshing the dossier. This dossier stays available while she works.",
+			tone: "info",
+			busy: true,
+			pulse: false,
+			action: null,
+			feedback: null,
+		};
+	}
+
+	if (state.status === "retrying") {
+		return {
+			label: "Research retrying",
+			description:
+				"Eve will retry after a temporary failure. This dossier stays available.",
+			tone: "warning",
+			busy: true,
+			pulse: false,
+			action: null,
+			feedback: null,
+		};
+	}
+
+	if (state.status === "failed") {
+		return {
+			label: "Research failed",
+			description:
+				"Unable to complete this research pass. This dossier stays available for review.",
+			tone: "error",
+			busy: false,
+			pulse: false,
+			action: { kind: "retry", label: "Retry research" },
+			feedback: state.blocker
+				? {
+						kind: "error",
+						message: "Target added. Unable to queue research. Try again.",
+					}
+				: null,
+		};
+	}
+
+	if (state.status === "blocked") {
+		const domain = state.blocker === "missing-domain";
+		return {
+			label: "Research blocked",
+			description: domain
+				? "Add a domain before starting acquisition research."
+				: "Complete the buy box before starting acquisition research.",
+			tone: "warning",
+			busy: false,
+			pulse: false,
+			action: domain
+				? { kind: "domain", label: "Add a domain" }
+				: { kind: "buy-box", label: "Complete the buy box" },
+			feedback: {
+				kind: "error",
+				message: domain
+					? "Target added. Add a domain to start research."
+					: "Target added. Complete the buy box to start research.",
+			},
+		};
+	}
+
+	return {
+		label: "No research in progress",
+		description: "No acquisition research is queued or running.",
+		tone: "neutral",
+		busy: false,
+		pulse: false,
+		action: null,
+		feedback: null,
+	};
+}

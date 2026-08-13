@@ -1,0 +1,466 @@
+"use client";
+
+import Partnership from "@carbon/icons-react/es/Partnership";
+import type { AcquisitionCriterionAssessment } from "@crm/db/acquisition";
+import type { AcquisitionStage } from "@crm/db/enums";
+import {
+	Alert,
+	AlertAction,
+	AlertDescription,
+	AlertTitle,
+} from "@crm/ui/components/alert";
+import { Button } from "@crm/ui/components/button";
+import { EmptyCellValue } from "@crm/ui/components/empty-cell";
+import { Link as TextLink } from "@crm/ui/components/link";
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@crm/ui/components/select";
+import { StatusIndicator } from "@crm/ui/components/status-indicator";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@crm/ui/components/tooltip";
+import { relativeTimeFromIso } from "@crm/ui/lib/format";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { toast } from "sonner";
+import {
+	ACQUISITION_STAGES,
+	AcquisitionFitIndicator,
+	acquisitionStageLabel,
+} from "@/components/crm/acquisition-status";
+import {
+	DetailSheetBody,
+	DetailSheetEmpty,
+	DetailSheetMain,
+	DetailSheetProperties,
+	DetailSheetProperty,
+	DetailSheetProse,
+	DetailSheetRail,
+	DetailSheetSection,
+	DetailSheetSplit,
+} from "@/components/detail-sheet";
+import { criterionGroups, targetResearchCopy } from "@/lib/acquisition";
+import { useCrmCache } from "@/lib/trpc/cache";
+import { useTRPC } from "@/lib/trpc/client";
+import type { RouterOutputs } from "@/lib/trpc/types";
+import { useWorkspaceUrl } from "@/lib/use-workspace-url";
+
+type Company = RouterOutputs["companies"]["byId"];
+type Target = NonNullable<Company["acquisitionTarget"]>;
+type Finding = Target["strengths"][number];
+
+const CRITERION_LABELS: Record<AcquisitionCriterionAssessment["id"], string> = {
+	industry: "Industry",
+	geography: "Geography",
+	"excluded-categories": "Excluded categories",
+	revenue: "Revenue",
+	ebitda: "EBITDA",
+	"purchase-price": "Purchase price",
+	"owner-involvement": "Owner involvement",
+	"recurring-revenue": "Recurring revenue",
+	"customer-concentration": "Customer concentration",
+	"asset-profile": "Asset profile",
+	financing: "Financing",
+};
+
+const CRITERION_PRESENTATION = {
+	MATCH: { label: "Matches", tone: "success" as const },
+	PARTIAL: { label: "Partial", tone: "info" as const },
+	CONCERN: { label: "Concern", tone: "warning" as const },
+	UNKNOWN: { label: "Unknown", tone: "neutral" as const },
+};
+
+export function AcquisitionDossier({
+	company,
+	onAddDomain,
+}: {
+	company: Company;
+	onAddDomain: () => void;
+}) {
+	const trpc = useTRPC();
+	const cache = useCrmCache();
+	const workspaceUrl = useWorkspaceUrl();
+	const target = company.acquisitionTarget;
+	const acquisitionProfile = useQuery(
+		trpc.workspace.acquisitionProfile.queryOptions(),
+	);
+
+	const updateStage = useMutation(
+		trpc.acquisition.updateTarget.mutationOptions({
+			onSuccess: () => cache.acquisition(company.id, { settle: "record" }),
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+	const research = useMutation(
+		trpc.companies.research.mutationOptions({
+			onSuccess: async () => {
+				await cache.acquisition(company.id);
+				toast.success("Acquisition research queued.");
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+
+	if (!target) return null;
+
+	const buyBoxReady = acquisitionProfile.data
+		? acquisitionProfile.data.preferredIndustries.length > 0 ||
+			acquisitionProfile.data.geographies.length > 0
+		: null;
+	const readinessState = !company.domain
+		? ({ status: "blocked", blocker: "missing-domain" } as const)
+		: buyBoxReady === false
+			? ({ status: "blocked", blocker: "missing-buy-box" } as const)
+			: null;
+	const researchCopy = targetResearchCopy(company.acquisitionResearch);
+	const readinessCopy = readinessState
+		? targetResearchCopy(readinessState)
+		: null;
+	const groups = criterionGroups(target.criteria);
+
+	return (
+		<DetailSheetBody>
+			<DetailSheetSplit>
+				<DetailSheetMain>
+					<DetailSheetSection title="Criteria matrix">
+						{target.criteria.length > 0 ? (
+							<DetailSheetProperties columns={1}>
+								{target.criteria.map((criterion) => (
+									<DetailSheetProperty
+										key={criterion.id}
+										label={CRITERION_LABELS[criterion.id]}
+									>
+										<CriterionResult criterion={criterion} />
+									</DetailSheetProperty>
+								))}
+							</DetailSheetProperties>
+						) : (
+							<DetailSheetProse>
+								No criterion assessment has completed yet.
+							</DetailSheetProse>
+						)}
+					</DetailSheetSection>
+				</DetailSheetMain>
+
+				<DetailSheetRail>
+					<DetailSheetSection title="Fit against the buy box">
+						<AcquisitionFitIndicator fit={target.fit} />
+					</DetailSheetSection>
+				</DetailSheetRail>
+			</DetailSheetSplit>
+
+			<DetailSheetSection title="Research">
+				<DetailSheetProperties columns={2}>
+					<DetailSheetProperty label="Last successful research">
+						{target.researchedAt ? (
+							<span suppressHydrationWarning>
+								{relativeTimeFromIso(target.researchedAt)}
+							</span>
+						) : (
+							<EmptyCellValue />
+						)}
+					</DetailSheetProperty>
+					<DetailSheetProperty label="Current task">
+						<StatusIndicator
+							tone={researchCopy.tone}
+							busy={researchCopy.busy}
+							pulse={researchCopy.pulse}
+							label={researchCopy.label}
+						/>
+					</DetailSheetProperty>
+				</DetailSheetProperties>
+
+				{company.acquisitionResearch.status !== "idle" ? (
+					<Alert
+						variant={
+							company.acquisitionResearch.status === "failed"
+								? "destructive"
+								: "default"
+						}
+					>
+						<AlertTitle>{researchCopy.label}</AlertTitle>
+						<AlertDescription>{researchCopy.description}</AlertDescription>
+						{researchCopy.action ? (
+							<AlertAction>
+								<ResearchAction
+									action={researchCopy.action}
+									buyBoxHref={workspaceUrl("/settings/buy-box")}
+									pending={research.isPending}
+									onAddDomain={onAddDomain}
+									onRetry={() => research.mutate({ id: company.id })}
+								/>
+							</AlertAction>
+						) : null}
+					</Alert>
+				) : null}
+
+				{readinessCopy?.action ? (
+					<Alert>
+						<AlertTitle>{readinessCopy.label}</AlertTitle>
+						<AlertDescription>{readinessCopy.description}</AlertDescription>
+						<AlertAction>
+							<ResearchAction
+								action={readinessCopy.action}
+								buyBoxHref={workspaceUrl("/settings/buy-box")}
+								pending={research.isPending}
+								onAddDomain={onAddDomain}
+								onRetry={() => research.mutate({ id: company.id })}
+							/>
+						</AlertAction>
+					</Alert>
+				) : null}
+			</DetailSheetSection>
+
+			{groups.blockers.length > 0 ? (
+				<CriterionGroup
+					title="Qualification blockers"
+					criteria={groups.blockers}
+				/>
+			) : null}
+			{groups.assessments.length > 0 ? (
+				<CriterionGroup
+					title="Criterion findings"
+					criteria={groups.assessments}
+				/>
+			) : null}
+			{groups.unknowns.length > 0 ? (
+				<CriterionGroup title="Other unknowns" criteria={groups.unknowns} />
+			) : null}
+
+			{target.summary ? (
+				<>
+					<DetailSheetSection title="Assessment">
+						<DetailSheetProse>{target.summary}</DetailSheetProse>
+					</DetailSheetSection>
+
+					<AcquisitionFindings
+						title="Strengths"
+						findings={target.strengths}
+						empty="No supported strengths were found in this pass."
+					/>
+
+					<AcquisitionFindings
+						title="Concerns"
+						findings={target.concerns}
+						empty="No evidence-backed concern was identified in this pass."
+					/>
+
+					<DetailSheetSection title="Unknowns">
+						{target.missingInformation.length > 0 ? (
+							<ul className="flex flex-col gap-2 text-muted-foreground text-xs/5">
+								{target.missingInformation.map((item) => (
+									<li key={item}>{item}</li>
+								))}
+							</ul>
+						) : (
+							<DetailSheetProse>
+								No critical gap was identified in this pass.
+							</DetailSheetProse>
+						)}
+					</DetailSheetSection>
+				</>
+			) : (
+				<DetailSheetEmpty
+					icon={Partnership}
+					title="No acquisition assessment yet"
+					description="Research compares this target with the buy box, records supported findings, and names the next decision."
+					action={
+						company.acquisitionResearch.status === "idle" &&
+						readinessState === null &&
+						buyBoxReady === true ? (
+							<Button
+								size="sm"
+								disabled={research.isPending}
+								onClick={() => research.mutate({ id: company.id })}
+							>
+								Research target
+							</Button>
+						) : undefined
+					}
+				/>
+			)}
+
+			<DetailSheetSection title="Recommended next action">
+				<DetailSheetProse>
+					{target.recommendedAction ??
+						"Research this target before deciding what to do next."}
+				</DetailSheetProse>
+			</DetailSheetSection>
+
+			<DetailSheetSection title="Lifecycle">
+				<DetailSheetProperties columns={1}>
+					<DetailSheetProperty
+						label={
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<Button type="button" variant="ghost" size="xs">
+										Lifecycle
+									</Button>
+								</TooltipTrigger>
+								<TooltipContent>Manually controlled</TooltipContent>
+							</Tooltip>
+						}
+					>
+						<Select
+							value={target.stage}
+							disabled={updateStage.isPending}
+							onValueChange={(value) =>
+								updateStage.mutate({
+									companyId: company.id,
+									stage: value as AcquisitionStage,
+								})
+							}
+						>
+							<SelectTrigger size="sm">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectGroup>
+									{ACQUISITION_STAGES.map((stage) => (
+										<SelectItem key={stage} value={stage}>
+											{acquisitionStageLabel(stage)}
+										</SelectItem>
+									))}
+								</SelectGroup>
+							</SelectContent>
+						</Select>
+					</DetailSheetProperty>
+				</DetailSheetProperties>
+			</DetailSheetSection>
+		</DetailSheetBody>
+	);
+}
+
+function CriterionResult({
+	criterion,
+}: {
+	criterion: AcquisitionCriterionAssessment;
+}) {
+	const presentation = CRITERION_PRESENTATION[criterion.result];
+	return (
+		<StatusIndicator
+			tone={criterion.blocksQualification ? "warning" : presentation.tone}
+			label={presentation.label}
+		/>
+	);
+}
+
+function CriterionGroup({
+	title,
+	criteria,
+}: {
+	title: string;
+	criteria: AcquisitionCriterionAssessment[];
+}) {
+	return (
+		<DetailSheetSection title={title}>
+			<div className="flex flex-col gap-4">
+				{criteria.map((criterion) => (
+					<div key={criterion.id} className="flex flex-col gap-1.5">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<p className="font-medium text-xs">
+								{CRITERION_LABELS[criterion.id]}
+							</p>
+							<CriterionResult criterion={criterion} />
+						</div>
+						<DetailSheetProse>{criterion.explanation}</DetailSheetProse>
+						{criterion.evidence.length > 0 ? (
+							<div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground text-xs">
+								{criterion.evidence.map((evidence) => (
+									<TextLink
+										key={`${evidence.url}-${evidence.label}`}
+										variant="quiet"
+										href={evidence.url}
+										target="_blank"
+										rel="noreferrer noopener"
+									>
+										{evidence.label}
+									</TextLink>
+								))}
+							</div>
+						) : null}
+					</div>
+				))}
+			</div>
+		</DetailSheetSection>
+	);
+}
+
+function AcquisitionFindings({
+	title,
+	findings,
+	empty,
+}: {
+	title: string;
+	findings: Finding[];
+	empty: string;
+}) {
+	return (
+		<DetailSheetSection title={title}>
+			{findings.length === 0 ? (
+				<DetailSheetProse>{empty}</DetailSheetProse>
+			) : (
+				<ul className="flex flex-col gap-4">
+					{findings.map((finding) => (
+						<li key={finding.summary} className="flex flex-col gap-1.5">
+							<p className="text-pretty text-xs/5">{finding.summary}</p>
+							<div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground text-xs">
+								{finding.evidence.map((evidence) => (
+									<TextLink
+										key={`${evidence.url}-${evidence.label}`}
+										variant="quiet"
+										href={evidence.url}
+										target="_blank"
+										rel="noreferrer noopener"
+									>
+										{evidence.label}
+									</TextLink>
+								))}
+							</div>
+						</li>
+					))}
+				</ul>
+			)}
+		</DetailSheetSection>
+	);
+}
+
+function ResearchAction({
+	action,
+	buyBoxHref,
+	pending,
+	onAddDomain,
+	onRetry,
+}: {
+	action: NonNullable<ReturnType<typeof targetResearchCopy>["action"]>;
+	buyBoxHref: string;
+	pending: boolean;
+	onAddDomain: () => void;
+	onRetry: () => void;
+}) {
+	if (action.kind === "buy-box") {
+		return (
+			<Button asChild variant="outline" size="sm">
+				<Link href={buyBoxHref}>{action.label}</Link>
+			</Button>
+		);
+	}
+
+	return (
+		<Button
+			variant="outline"
+			size="sm"
+			disabled={pending}
+			onClick={action.kind === "domain" ? onAddDomain : onRetry}
+		>
+			{action.label}
+		</Button>
+	);
+}

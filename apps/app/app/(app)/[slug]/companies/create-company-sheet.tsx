@@ -13,6 +13,7 @@ import { Input } from "@crm/ui/components/input";
 import {
 	Select,
 	SelectContent,
+	SelectGroup,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
@@ -33,6 +34,7 @@ import { parseAsBoolean, useQueryState } from "nuqs";
 import { type ComponentProps, Suspense, useId, useState } from "react";
 import { toast } from "sonner";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
+import { targetResearchCopy } from "@/lib/acquisition";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
@@ -76,7 +78,7 @@ function CreateCompanyForm() {
 
 	const users = useQuery(trpc.users.list.queryOptions());
 
-	const create = useMutation(
+	const createCompany = useMutation(
 		trpc.companies.create.mutationOptions({
 			onSuccess: async (company) => {
 				await cache.company(company.id);
@@ -90,6 +92,26 @@ function CreateCompanyForm() {
 			onError: (error) => toast.error(error.message),
 		}),
 	);
+	const createTarget = useMutation(
+		trpc.acquisition.createTarget.mutationOptions({
+			onSuccess: async (result) => {
+				await cache.acquisition(result.companyId);
+				const feedback = targetResearchCopy(result.research).feedback;
+				if (feedback?.kind === "success") {
+					toast.success(feedback.message);
+				} else if (feedback) {
+					toast.error(feedback.message);
+				}
+				await setOpen(null);
+				setName("");
+				setDomain("");
+				setOwnerId(UNASSIGNED);
+				openRecord({ kind: "company", id: result.companyId });
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+	const pending = createCompany.isPending || createTarget.isPending;
 
 	return (
 		<Sheet open={open} onOpenChange={(next) => setOpen(next || null)}>
@@ -100,8 +122,9 @@ function CreateCompanyForm() {
 				<SheetHeader>
 					<SheetTitle>New {labels.companyLower}</SheetTitle>
 					<SheetDescription>
-						Give the {labels.companyLower} a name and domain. The agent fills in
-						the logo, description, industry, address and socials.
+						{labels.acquisition
+							? "Add a name and domain. Eve will compare the target with the buy box when both are ready."
+							: `Give the ${labels.companyLower} a name and domain. The agent fills in the logo, description, industry, address and socials.`}
 					</SheetDescription>
 				</SheetHeader>
 
@@ -110,11 +133,16 @@ function CreateCompanyForm() {
 					className="flex-1 overflow-y-auto px-4"
 					onSubmit={(event) => {
 						event.preventDefault();
-						create.mutate({
+						const input = {
 							name,
 							domain: domain || undefined,
 							ownerId: ownerId === UNASSIGNED ? null : ownerId,
-						});
+						};
+						if (labels.acquisition) {
+							createTarget.mutate(input);
+						} else {
+							createCompany.mutate(input);
+						}
 					}}
 				>
 					<FieldGroup>
@@ -153,12 +181,14 @@ function CreateCompanyForm() {
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-									{(users.data ?? []).map((user) => (
-										<SelectItem key={user.id} value={user.id}>
-											{user.name}
-										</SelectItem>
-									))}
+									<SelectGroup>
+										<SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+										{(users.data ?? []).map((user) => (
+											<SelectItem key={user.id} value={user.id}>
+												{user.name}
+											</SelectItem>
+										))}
+									</SelectGroup>
 								</SelectContent>
 							</Select>
 						</Field>
@@ -169,9 +199,9 @@ function CreateCompanyForm() {
 					<Button
 						type="submit"
 						form="create-company"
-						disabled={create.isPending || name.trim() === ""}
+						disabled={pending || name.trim() === ""}
 					>
-						{create.isPending ? <Spinner /> : null}
+						{pending ? <Spinner /> : null}
 						Add {labels.companyLower}
 					</Button>
 					<SheetClose asChild>

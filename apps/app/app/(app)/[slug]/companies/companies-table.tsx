@@ -1,5 +1,6 @@
 "use client";
 
+import type { AcquisitionTargetView } from "@crm/db/acquisition";
 import { AcquisitionFit, AcquisitionStage } from "@crm/db/enums";
 import {
 	DataTable,
@@ -162,12 +163,50 @@ const STAGE_COLUMN: DataTableColumn<CompanyRow> = {
 	id: "stage",
 	header: "Lifecycle",
 	width: "w-[12%]",
-	hideBelow: "md",
 	cell: (row) => (
 		<AcquisitionStageIndicator
 			stage={row.acquisitionTarget?.stage ?? AcquisitionStage.DISCOVERED}
 		/>
 	),
+};
+
+const NEXT_ACTION_COLUMN: DataTableColumn<CompanyRow> = {
+	id: "nextAction",
+	header: "Recommended next action",
+	width: "w-[24%]",
+	hideBelow: "md",
+	cell: (row) =>
+		row.acquisitionTarget?.recommendedAction ? (
+			<span className="line-clamp-2">
+				{row.acquisitionTarget.recommendedAction}
+			</span>
+		) : (
+			<EmptyCellValue />
+		),
+};
+
+const RESEARCH_COLUMN: DataTableColumn<CompanyRow> = {
+	id: "researchedAt",
+	header: "Last successful research",
+	width: "w-[16%]",
+	hideBelow: "lg",
+	cell: (row) =>
+		row.acquisitionTarget?.researchedAt ? (
+			<span className="text-muted-foreground" suppressHydrationWarning>
+				{relativeTimeFromIso(row.acquisitionTarget.researchedAt)}
+			</span>
+		) : (
+			<EmptyCellValue />
+		),
+};
+
+const ACQUISITION_OWNER_COLUMN: DataTableColumn<CompanyRow> = {
+	id: "owner",
+	header: "Owner",
+	sortable: true,
+	width: "w-[16%]",
+	hideBelow: "sm",
+	cell: (row) => <OwnerCell owner={row.owner} />,
 };
 
 export function CompaniesTable() {
@@ -176,6 +215,10 @@ export function CompaniesTable() {
 	const labels = useWorkspaceLabels();
 	const prefetchRecord = usePrefetchRecord();
 	const { query, input } = useTableQuery(companiesSearchParams);
+	const listInput = {
+		...input,
+		targetView: input.targetView as AcquisitionTargetView,
+	};
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 	const selected = useMemo(() => [...selectedIds], [selectedIds]);
 	const columns = useMemo(() => {
@@ -187,18 +230,24 @@ export function CompaniesTable() {
 					: column,
 		);
 
-		return labels.acquisition
-			? [
-					base[0] as DataTableColumn<CompanyRow>,
-					FIT_COLUMN,
-					STAGE_COLUMN,
-					...base.slice(1),
-				]
-			: base;
+		if (!labels.acquisition) return base;
+
+		return [
+			{
+				...(base[0] as DataTableColumn<CompanyRow>),
+				header: "Target",
+				width: "w-[26%]",
+			},
+			FIT_COLUMN,
+			STAGE_COLUMN,
+			NEXT_ACTION_COLUMN,
+			RESEARCH_COLUMN,
+			ACQUISITION_OWNER_COLUMN,
+		];
 	}, [labels]);
 
 	const companies = useQuery({
-		...trpc.companies.list.queryOptions(input),
+		...trpc.companies.list.queryOptions(listInput),
 		placeholderData: (previous) => previous,
 		refetchInterval: (query) =>
 			query.state.data?.rows.some((row) =>
@@ -252,6 +301,19 @@ export function CompaniesTable() {
 			total={companies.data?.total ?? 0}
 			facetCounts={facetCounts}
 			facets={facets}
+			tabs={
+				labels.acquisition
+					? {
+							id: "targetView",
+							allLabel: "Active",
+							options: [
+								{ value: "rejected", label: "Rejected" },
+								{ value: "acquired", label: "Acquired" },
+								{ value: "history", label: "History" },
+							],
+						}
+					: undefined
+			}
 			selection={{
 				selectedIds,
 				onSelectedIdsChange: setSelectedIds,
