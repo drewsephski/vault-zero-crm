@@ -5,6 +5,8 @@ import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import {
 	acquisitionCandidateIdInput,
+	addAcquisitionTargetInput,
+	createAcquisitionTargetInput,
 	updateAcquisitionTargetInput,
 } from "./acquisition.contracts";
 import { AcquisitionService } from "./acquisition.service";
@@ -16,6 +18,22 @@ export class AcquisitionRouter {
 		@Inject(AcquisitionService)
 		private readonly acquisition: AcquisitionService,
 	) {}
+
+	@Mutation({ input: createAcquisitionTargetInput })
+	async createTarget(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof createAcquisitionTargetInput>,
+	) {
+		return this.acquisition.createTarget(input, ctx.user.id);
+	}
+
+	@Mutation({ input: addAcquisitionTargetInput })
+	async addTarget(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input("companyId") companyId: string,
+	) {
+		return this.acquisition.addTarget(companyId, ctx.user.id);
+	}
 
 	@Mutation({ input: acquisitionCandidateIdInput })
 	async approveCandidate(

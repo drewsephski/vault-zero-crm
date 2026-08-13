@@ -334,6 +334,7 @@ export class CompaniesService {
 	async create(
 		input: CompanyCreateInput,
 		source: RecordSource = RecordSource.MANUAL,
+		acquisitionTarget?: Prisma.AcquisitionTargetCreateWithoutCompanyInput,
 	) {
 		const domain = normalizeDomain(input.domain);
 
@@ -349,16 +350,24 @@ export class CompaniesService {
 			}
 		}
 
-		const company = await this.db.company.create({
-			data: {
-				name: input.name.trim(),
-				domain,
-				website: domain ? `https://${domain}` : null,
-				ownerId: input.ownerId ?? null,
-				source,
-			},
-			select: { id: true, name: true, domain: true },
-		});
+		let company: { id: string; name: string; domain: string | null };
+		try {
+			company = await this.db.company.create({
+				data: {
+					name: input.name.trim(),
+					domain,
+					website: domain ? `https://${domain}` : null,
+					ownerId: input.ownerId ?? null,
+					source,
+					acquisitionTarget: acquisitionTarget
+						? { create: acquisitionTarget }
+						: undefined,
+				},
+				select: { id: true, name: true, domain: true },
+			});
+		} catch (error) {
+			throw this.translate(error, "new company");
+		}
 
 		this.logger.log({
 			message: "Company created",

@@ -13,7 +13,7 @@ import { z } from "zod";
 
 const t = initTRPC.create();
 const publicProcedure = t.procedure;
-import { acquisitionCandidateIdInput, updateAcquisitionTargetInput } from "../acquisition/acquisition.contracts";
+import { createAcquisitionTargetInput, addAcquisitionTargetInput, acquisitionCandidateIdInput, updateAcquisitionTargetInput } from "../acquisition/acquisition.contracts";
 import { timelineInput, timelineCountsInput, myTasksInput, taskCountsInput, activityCreateInput, completeInput } from "../activities/activities.contracts";
 import { companyListInput, companyIdInput, companyOptionsInput, companyCreateInput, companyUpdateArgs, companyBulkDeleteInput, companyBulkUpdateArgs, setPrimaryContactInput } from "../companies/companies.contracts";
 import { contactListInput, contactIdInput, contactCreateInput, contactUpdateArgs, contactBulkDeleteInput, contactBulkUpdateArgs, factDecisionInput } from "../contacts/contacts.contracts";
@@ -44,6 +44,12 @@ import type { WorkspaceRouter } from "../workspace/workspace.router";
 
 const appRouter = t.router({
   acquisition: t.router({
+    createTarget: publicProcedure
+      .input(createAcquisitionTargetInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["createTarget"]>>),
+    addTarget: publicProcedure
+      .input(addAcquisitionTargetInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["addTarget"]>>),
     approveCandidate: publicProcedure
       .input(acquisitionCandidateIdInput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["approveCandidate"]>>),
