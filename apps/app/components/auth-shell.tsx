@@ -21,21 +21,13 @@ export function AuthShell({ children }: { children: ReactNode }) {
 							Vault Zero CRM
 						</p>
 						<h1 className="max-w-[14ch] text-5xl/14 font-semibold text-balance">
-							Every customer, one place.
+							Find the businesses worth buying.
 						</h1>
 					</div>
 				</div>
 
-				<p className="relative font-mono text-xs/4 text-muted-foreground">
-					Made with love by{" "}
-					<a
-						href="https://www.vaultzero.dev"
-						target="_blank"
-						rel="noreferrer"
-						className="underline underline-offset-4 hover:text-foreground"
-					>
-						Vault Zero
-					</a>
+				<p className="relative max-w-sm font-mono text-xs/4 text-muted-foreground">
+					Discover, research and qualify acquisition targets with Eve.
 				</p>
 			</section>
 

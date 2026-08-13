@@ -61,7 +61,11 @@ import {
 	ConversationPicker,
 	useConversations,
 } from "@/components/crm/agent-conversations";
-import { followUpContext, readFollowUpPrompts } from "@/lib/agent-follow-up";
+import {
+	type FollowUpPrompt,
+	followUpContext,
+	readFollowUpPrompts,
+} from "@/lib/agent-follow-up";
 import {
 	type AgentRecord,
 	type AgentScope,
@@ -251,7 +255,7 @@ function Thread({
 			: { initialEvents: eventsOf(thread) }),
 	});
 	const [draft, setDraft] = useState("");
-	const [followUps, setFollowUps] = useState<string[]>([]);
+	const [followUps, setFollowUps] = useState<FollowUpPrompt[]>([]);
 	const followUpContextRef = useRef<ReturnType<typeof followUpContext>>([]);
 
 	const opening = useRef<string | null>(conversation?.title ?? null);
@@ -467,7 +471,7 @@ function FollowUpPrompts({
 	disabled,
 	onAsk,
 }: {
-	prompts: readonly string[];
+	prompts: readonly FollowUpPrompt[];
 	disabled: boolean;
 	onAsk: (prompt: string) => void;
 }) {
@@ -476,15 +480,15 @@ function FollowUpPrompts({
 			<div className="space-y-2 pt-2">
 				<p className="text-muted-foreground text-[11px]">Continue with</p>
 				<div className="flex flex-wrap gap-2">
-					{prompts.map((prompt) => (
+					{prompts.map((item) => (
 						<Button
 							disabled={disabled}
-							key={prompt}
+							key={item.prompt}
 							variant="outline"
 							size="sm"
-							onClick={() => onAsk(prompt)}
+							onClick={() => onAsk(item.prompt)}
 						>
-							{prompt}
+							{item.label}
 						</Button>
 					))}
 				</div>

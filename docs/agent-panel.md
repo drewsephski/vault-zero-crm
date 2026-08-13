@@ -51,6 +51,10 @@ are scoped to the rep and have all three record foreign keys set to null.
   tab, aborting the stream mid-answer.
 - **`autoScroll` and nothing else**; `scrollAnchor` stops it following the bottom.
 - **One `MessageScrollerItem` per message, not per part**; ids prefer `toolCallId`.
+- **Follow-up actions have a label and a prompt.** The label is a short verb-first
+  button; the prompt keeps the specific request sent to eve. The app still accepts
+  legacy string-only responses and shortens their display without changing what is
+  sent.
 - **Scoped to the rep and one context** — a session id in a body decides which row,
   never whose, and an existing session cannot move between workspace and record scopes.
 

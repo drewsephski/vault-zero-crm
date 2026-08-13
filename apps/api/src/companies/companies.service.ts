@@ -35,6 +35,7 @@ import {
 	paginate,
 	resolveOrderBy,
 } from "../trpc/list-input";
+import { hasDiscoveryFocus } from "../workspace/workspace.service";
 import type {
 	CompanyBulkUpdateInput,
 	CompanyCreateInput,
@@ -567,7 +568,11 @@ export class CompaniesService {
 			}),
 			this.db.acquisitionProfile.findUnique({
 				where: { id: WORKSPACE_ID },
-				select: { mode: true },
+				select: {
+					mode: true,
+					preferredIndustries: true,
+					geographies: true,
+				},
 			}),
 		]);
 
@@ -582,21 +587,23 @@ export class CompaniesService {
 		}
 
 		if (profile?.mode === WorkspaceMode.ACQUISITION) {
+			if (!hasDiscoveryFocus(profile)) {
+				throw new BadRequestException(
+					"Add at least one preferred industry or geography to the buy box before analyzing fit.",
+				);
+			}
 			return this.analyzeAcquisition(id, actingUserId);
-		} else {
-			await this.agent.companyResearchRequested(
-				id,
-				`Company briefing requested by a rep (${actingUserId})`,
-			);
 		}
+
+		await this.agent.companyResearchRequested(
+			id,
+			`Company briefing requested by a rep (${actingUserId})`,
+		);
 
 		return {
 			ok: true as const,
 			queued: true as const,
-			kind:
-				profile?.mode === WorkspaceMode.ACQUISITION
-					? ("acquisition" as const)
-					: ("brief" as const),
+			kind: "brief" as const,
 		};
 	}
 

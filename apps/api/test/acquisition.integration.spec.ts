@@ -5,6 +5,7 @@ import {
 	AcquisitionStage,
 	db,
 	RecordSource,
+	WorkspaceMode,
 } from "@crm/db";
 import { AcquisitionService } from "../src/acquisition/acquisition.service";
 import { AgentQueueService } from "../src/agent/agent-queue.service";
@@ -209,5 +210,40 @@ describe("acquisition candidate review", () => {
 				select: { kind: true },
 			}),
 		).toEqual([{ kind: "acquisition-refresh" }]);
+	});
+
+	it("requires a focused buy box before a manual fit analysis", async () => {
+		let requested = false;
+		const companies = new CompaniesService(
+			{
+				company: {
+					findUnique: async () => ({
+						id: "unfocused-target",
+						domain: "target.test",
+					}),
+				},
+				acquisitionProfile: {
+					findUnique: async () => ({
+						mode: WorkspaceMode.ACQUISITION,
+						preferredIndustries: [],
+						geographies: [],
+					}),
+				},
+			} as never,
+			{
+				acquisitionTargetRequested: async () => {
+					requested = true;
+				},
+			} as never,
+			{} as never,
+			{} as never,
+			{} as never,
+			{} as never,
+		);
+
+		await expect(
+			companies.research("unfocused-target", "reviewer-1"),
+		).rejects.toThrow("Add at least one preferred industry or geography");
+		expect(requested).toBe(false);
 	});
 });

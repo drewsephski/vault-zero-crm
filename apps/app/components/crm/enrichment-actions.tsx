@@ -10,10 +10,12 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@crm/ui/components/tooltip";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
+import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 import type { EnrichmentActivity } from "./enrichment-status";
 
 export function EnrichmentActions({
@@ -31,6 +33,11 @@ export function EnrichmentActions({
 }) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
+	const workspaceUrl = useWorkspaceUrl();
+	const acquisitionProfile = useQuery({
+		...trpc.workspace.acquisitionProfile.queryOptions(),
+		enabled: acquisition,
+	});
 
 	const enrich = useMutation(
 		trpc.companies.enrich.mutationOptions({
@@ -64,6 +71,11 @@ export function EnrichmentActions({
 	);
 	const researchKind = acquisition ? "acquisition-refresh" : "company-profile";
 	const researchBusy = queuedKinds.includes(researchKind);
+	const buyBoxReady = acquisitionProfile.data
+		? acquisitionProfile.data.preferredIndustries.length > 0 ||
+			acquisitionProfile.data.geographies.length > 0
+		: null;
+	const researchBlocked = acquisition && buyBoxReady === false;
 	const researchLabel = acquisition ? "Analyze fit" : "Research brief";
 	const researchDescription = acquisition
 		? "Compare this company with the buy box and write an evidence-backed acquisition dossier."
@@ -100,31 +112,51 @@ export function EnrichmentActions({
 				</TooltipContent>
 			</Tooltip>
 
-			<Tooltip>
-				<TooltipTrigger asChild>
-					<Button
-						size="sm"
-						aria-label={researchLabel}
-						disabled={
-							!hasDomain ||
-							research.isPending ||
-							enrich.isPending ||
-							activity !== null
-						}
-						onClick={() => research.mutate({ id: companyId })}
-					>
-						{research.isPending || researchBusy ? (
-							<Spinner />
-						) : (
-							<Icon icon={MagicWand} data-icon="inline-start" />
-						)}
-						<span className="hidden sm:inline">
-							{researchBusy ? "Working" : researchLabel}
-						</span>
-					</Button>
-				</TooltipTrigger>
-				<TooltipContent>{researchDescription}</TooltipContent>
-			</Tooltip>
+			{researchBlocked ? (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button size="sm" asChild>
+							<Link
+								href={workspaceUrl("/settings/buy-box")}
+								aria-label="Set buy box before analyzing fit"
+							>
+								<Icon icon={MagicWand} data-icon="inline-start" />
+								<span className="hidden sm:inline">Set buy box</span>
+							</Link>
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent>
+						Add an industry or geography before Eve analyzes acquisition fit.
+					</TooltipContent>
+				</Tooltip>
+			) : (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							size="sm"
+							aria-label={researchLabel}
+							disabled={
+								!hasDomain ||
+								(acquisition && buyBoxReady === null) ||
+								research.isPending ||
+								enrich.isPending ||
+								activity !== null
+							}
+							onClick={() => research.mutate({ id: companyId })}
+						>
+							{research.isPending || researchBusy ? (
+								<Spinner />
+							) : (
+								<Icon icon={MagicWand} data-icon="inline-start" />
+							)}
+							<span className="hidden sm:inline">
+								{researchBusy ? "Working" : researchLabel}
+							</span>
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent>{researchDescription}</TooltipContent>
+				</Tooltip>
+			)}
 		</>
 	);
 }

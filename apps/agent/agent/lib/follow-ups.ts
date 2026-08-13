@@ -17,8 +17,16 @@ export const followUpRequestSchema = z.object({
 
 export type FollowUpRequest = z.infer<typeof followUpRequestSchema>;
 
-const FOLLOW_UP_OUTPUT = z.object({
-	prompts: z.array(z.string().trim().min(1).max(180)).min(1).max(3),
+export const followUpResponseSchema = z.object({
+	prompts: z
+		.array(
+			z.object({
+				label: z.string().trim().min(1).max(60),
+				prompt: z.string().trim().min(1).max(180),
+			}),
+		)
+		.min(1)
+		.max(3),
 });
 
 const SCOPE_LABELS: Record<FollowUpRequest["scope"], string> = {
@@ -28,11 +36,15 @@ const SCOPE_LABELS: Record<FollowUpRequest["scope"], string> = {
 	deal: "one deal",
 };
 
-const SYSTEM = `You write suggested follow-up messages for a CRM research agent.
+const SYSTEM = `You write suggested follow-up actions for a CRM research agent.
 
-Return three short, distinct prompts that the rep could send next. Make them genuinely useful continuations of the conversation, grounded in the evidence and open questions in the transcript. Prefer concrete next actions, missing verification, decisions, risks, or useful summaries that follow from what was just discussed.
+Return three distinct options that the rep could send next. Each option has a short label for a button and a complete prompt for the agent.
 
-Do not answer the conversation. Do not mention that you are generating suggestions. Do not invent facts, names, goals, or actions that are not supported by the transcript. Avoid generic prompts such as "Tell me more" or "What else can you do?". Each prompt must stand on its own, be plain text, and be no longer than 140 characters.`;
+The label must be a verb-first action of 2 to 6 words and no more than 48 characters. Write "Check recent company news", not "Should I research recent company press releases?". Never start a label with "Should I", "Would you like me to", "Do you want me to", or similar framing.
+
+The prompt must preserve the useful specifics and stand on its own when sent. Make every option a genuinely useful continuation grounded in the evidence and open questions in the transcript. Prefer concrete next actions, missing verification, decisions, risks, or useful summaries that follow from what was just discussed.
+
+Do not answer the conversation. Do not mention that you are generating suggestions. Do not invent facts, names, goals, or actions that are not supported by the transcript. Avoid generic prompts such as "Tell me more" or "What else can you do?". Labels and prompts must be plain text. Each prompt must be no longer than 140 characters.`;
 
 export function followUpPrompt(input: FollowUpRequest): string {
 	const transcript = input.messages
@@ -50,22 +62,30 @@ ${transcript}`;
 
 export async function generateFollowUps(
 	input: FollowUpRequest,
-): Promise<{ prompts: string[] }> {
+): Promise<z.infer<typeof followUpResponseSchema>> {
 	const { model } = await activeModel();
 	const result = await generateText({
 		model,
 		system: SYSTEM,
 		prompt: followUpPrompt(input),
-		output: Output.object({ schema: FOLLOW_UP_OUTPUT }),
+		output: Output.object({ schema: followUpResponseSchema }),
 		maxOutputTokens: 400,
 		maxRetries: 1,
 		temperature: 0.4,
 		timeout: { totalMs: 15_000 },
 	});
 
-	const prompts = [...new Set(result.output?.prompts ?? [])]
-		.map((prompt) => prompt.trim())
-		.filter(Boolean)
+	const seen = new Set<string>();
+	const prompts = (result.output?.prompts ?? [])
+		.map(({ label, prompt }) => ({
+			label: label.trim(),
+			prompt: prompt.trim(),
+		}))
+		.filter(({ label, prompt }) => {
+			if (!label || !prompt || seen.has(prompt)) return false;
+			seen.add(prompt);
+			return true;
+		})
 		.slice(0, 3);
 
 	return { prompts };

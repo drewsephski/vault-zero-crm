@@ -27,8 +27,8 @@ export default async function OnboardingPage() {
 	return (
 		<AuthShell>
 			<AuthHeading
-				title="Tell us about your company"
-				description="Two things, once. The name is what the CRM calls you; the website is how the agent learns what you sell."
+				title="Set up your acquisition workspace"
+				description="Tell Eve who is running the search. You will define the businesses you want to acquire next."
 			/>
 
 			<OnboardingForm placeholder={DEFAULT_WORKSPACE_NAME} />

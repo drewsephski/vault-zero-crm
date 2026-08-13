@@ -85,7 +85,8 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 						/>
 					</InputGroup>
 					<FieldDescription>
-						Eve uses this to understand who is running the acquisition search.
+						Eve uses this context when researching and comparing acquisition
+						targets.
 					</FieldDescription>
 				</Field>
 			</FieldGroup>

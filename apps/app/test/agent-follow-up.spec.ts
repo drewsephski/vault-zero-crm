@@ -31,10 +31,34 @@ describe("follow-up context", () => {
 	it("validates model output without inventing a fallback", () => {
 		expect(
 			readFollowUpPrompts({
-				prompts: ["  Ask about the missing decision maker. ", "", 3],
+				prompts: [
+					{
+						label: "Check the decision maker",
+						prompt: "Ask about the missing decision maker.",
+					},
+					"",
+					3,
+				],
 			}),
-		).toEqual(["Ask about the missing decision maker."]);
+		).toEqual([
+			{
+				label: "Check the decision maker",
+				prompt: "Ask about the missing decision maker.",
+			},
+		]);
 		expect(readFollowUpPrompts({ prompts: [] })).toEqual([]);
+	});
+
+	it("shortens legacy question-shaped labels without losing the prompt", () => {
+		const prompt =
+			"Should I research recent Occidental Petroleum press releases to identify potential pain points for a Production Engineer?";
+
+		expect(readFollowUpPrompts({ prompts: [prompt] })).toEqual([
+			{
+				label: "Research recent Occidental Petroleum press",
+				prompt,
+			},
+		]);
 	});
 
 	it("limits context to the recent conversation", () => {

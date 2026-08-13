@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { followUpPrompt, followUpRequestSchema } from "../agent/lib/follow-ups";
+import {
+	followUpPrompt,
+	followUpRequestSchema,
+	followUpResponseSchema,
+} from "../agent/lib/follow-ups";
 
 describe("follow-up generation", () => {
 	it("builds a scoped prompt from the recent transcript", () => {
@@ -28,5 +32,27 @@ describe("follow-up generation", () => {
 		});
 
 		expect(result.success).toBe(false);
+	});
+
+	it("keeps button labels separate from the message sent", () => {
+		expect(
+			followUpResponseSchema.parse({
+				prompts: [
+					{
+						label: "Check recent company news",
+						prompt:
+							"Research recent company news for changes that matter before the call.",
+					},
+				],
+			}),
+		).toEqual({
+			prompts: [
+				{
+					label: "Check recent company news",
+					prompt:
+						"Research recent company news for changes that matter before the call.",
+				},
+			],
+		});
 	});
 });

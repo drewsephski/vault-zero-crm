@@ -21,6 +21,7 @@
 <p align="center">
   <a href="#the-agent"><strong>The agent</strong></a> ·
   <a href="#the-stack"><strong>Stack</strong></a> ·
+  <a href="./docs/coding-agent-prompt.md"><strong>Coding agent prompt</strong></a> ·
   <a href="#quick-start"><strong>Quick start</strong></a> ·
   <a href="#configuration"><strong>Configuration</strong></a> ·
   <a href="#deploying"><strong>Deploying</strong></a> ·

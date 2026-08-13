@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { DealStage, db, RateSource } from "@crm/db";
+import { DealStage, db, RateSource, WorkspaceMode } from "@crm/db";
 import { normalizeCurrency } from "@crm/db/currency";
 import { SETTINGS_ID, writeReportingCurrency } from "@crm/db/settings";
+import { WORKSPACE_ID } from "@crm/db/workspace";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { DashboardService } from "../src/dashboard/dashboard.service";
@@ -17,6 +18,7 @@ const dashboard = new DashboardService(db, conversion);
 
 let companyId: string;
 let previousReportingCurrency: string | null = null;
+let previousWorkspaceMode: WorkspaceMode | null = null;
 
 const MILLION = 100_000_000;
 const HALF_MILLION = 50_000_000;
@@ -61,8 +63,27 @@ beforeAll(async () => {
 		select: { reportingCurrency: true },
 	});
 	previousReportingCurrency = existing?.reportingCurrency ?? null;
+	previousWorkspaceMode =
+		(
+			await db.acquisitionProfile.findUnique({
+				where: { id: WORKSPACE_ID },
+				select: { mode: true },
+			})
+		)?.mode ?? null;
 
 	await writeReportingCurrency(db, "USD");
+	await db.acquisitionProfile.upsert({
+		where: { id: WORKSPACE_ID },
+		create: {
+			id: WORKSPACE_ID,
+			mode: WorkspaceMode.SALES,
+			preferredIndustries: [],
+			geographies: [],
+			excludedCategories: [],
+			currency: "USD",
+		},
+		update: { mode: WorkspaceMode.SALES },
+	});
 	await clearRates();
 
 	await db.user.upsert({
@@ -97,6 +118,14 @@ afterAll(async () => {
 		await writeReportingCurrency(db, previousReportingCurrency);
 	} else {
 		await db.appSetting.updateMany({ data: { reportingCurrency: null } });
+	}
+	if (previousWorkspaceMode) {
+		await db.acquisitionProfile.update({
+			where: { id: WORKSPACE_ID },
+			data: { mode: previousWorkspaceMode },
+		});
+	} else {
+		await db.acquisitionProfile.delete({ where: { id: WORKSPACE_ID } });
 	}
 
 	await conversion.rerateAll();
