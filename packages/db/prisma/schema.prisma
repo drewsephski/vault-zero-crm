@@ -358,6 +358,7 @@ model AcquisitionTarget {
   summary            String?
   strengths          Json
   concerns           Json
+  criteria           Json              @default("[]")
   missingInformation String[]
   recommendedAction  String?
   recommendedStage   AcquisitionStage?
@@ -509,6 +510,7 @@ model AgentTask {
   startedAt  DateTime?
   finishedAt DateTime?
   outcome    String?
+  lastError  String?
 
   createdAt DateTime @default(now())
 
