@@ -1,4 +1,5 @@
 import type { Db } from "@crm/db";
+import { agentTaskState } from "@crm/db/agent-tasks";
 import { Injectable } from "@nestjs/common";
 import { InjectDatabase } from "../database/database.constants";
 
@@ -36,6 +37,23 @@ export class AgentQueueService {
 		});
 
 		return rows.map((row) => row.kind).sort();
+	}
+
+	async acquisitionResearchState(companyId: string) {
+		const now = new Date();
+		const task = await this.db.agentTask.findFirst({
+			where: { companyId, kind: "acquisition-refresh" },
+			orderBy: { createdAt: "desc" },
+			select: {
+				dueAt: true,
+				startedAt: true,
+				finishedAt: true,
+				outcome: true,
+				lastError: true,
+			},
+		});
+
+		return agentTaskState(task, now);
 	}
 
 	private async queued(

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@crm/db";
+import { AgentQueueService } from "../src/agent/agent-queue.service";
 import {
 	AgentTriggerService,
 	keepAgentDispatchAlive,
@@ -73,6 +74,7 @@ describe("keepAgentDispatchAlive", () => {
 describe("AgentTriggerService", () => {
 	const companyId = `agent-trigger-${crypto.randomUUID()}`;
 	const service = new AgentTriggerService(db);
+	const queue = new AgentQueueService(db);
 
 	async function clear() {
 		await db.agentTask.deleteMany({ where: { companyId } });
@@ -155,5 +157,65 @@ describe("AgentTriggerService", () => {
 		expect(row?.dueAt).toEqual(dueAt);
 		expect(row?.priority).toBe(30);
 		expect(row?.budget).toBe(4);
+	});
+
+	it("treats a future acquisition recurrence as idle until explicitly requested", async () => {
+		const task = await db.agentTask.create({
+			data: {
+				companyId,
+				kind: "acquisition-refresh",
+				reason: "Scheduled recurrence",
+				dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+			},
+			select: { id: true },
+		});
+
+		expect(await queue.acquisitionResearchState(companyId)).toEqual({
+			status: "idle",
+			error: null,
+		});
+
+		await service.acquisitionTargetRequested(
+			companyId,
+			"Manual acquisition refresh",
+		);
+
+		expect(await queue.acquisitionResearchState(companyId)).toEqual({
+			status: "queued",
+			error: null,
+		});
+		expect(
+			await db.agentTask.findUnique({ where: { id: task.id } }),
+		).toMatchObject({ id: task.id, reason: "Manual acquisition refresh" });
+	});
+
+	it("uses the latest persisted acquisition task", async () => {
+		const now = Date.now();
+		await db.agentTask.createMany({
+			data: [
+				{
+					companyId,
+					kind: "acquisition-refresh",
+					reason: "Prior failed refresh",
+					dueAt: new Date("2026-07-01T12:00:00.000Z"),
+					startedAt: new Date("2026-07-01T12:00:00.000Z"),
+					finishedAt: new Date("2026-07-01T12:01:00.000Z"),
+					lastError: "prior failure",
+					createdAt: new Date(now - 60_000),
+				},
+				{
+					companyId,
+					kind: "acquisition-refresh",
+					reason: "Future recurrence",
+					dueAt: new Date(now + 30 * 24 * 60 * 60 * 1000),
+					createdAt: new Date(now),
+				},
+			],
+		});
+
+		expect(await queue.acquisitionResearchState(companyId)).toEqual({
+			status: "idle",
+			error: null,
+		});
 	});
 });

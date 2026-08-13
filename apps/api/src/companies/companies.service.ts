@@ -8,6 +8,11 @@ import {
 	RecordSource,
 	WorkspaceMode,
 } from "@crm/db";
+import {
+	ACQUISITION_CRITERION_IDS,
+	ACQUISITION_CRITERION_RESULTS,
+	type AcquisitionCriterionAssessment,
+} from "@crm/db/acquisition";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
 	BadRequestException,
@@ -290,12 +295,18 @@ export class CompaniesService {
 			...rest
 		} = company;
 
-		const queuedKinds = await this.queue.pendingKinds({ companyId: id });
+		const [queuedKinds, acquisitionResearch, reportingCurrency] =
+			await Promise.all([
+				this.queue.pendingKinds({ companyId: id }),
+				this.queue.acquisitionResearchState(id),
+				this.conversion.reportingCurrency(),
+			]);
 
 		return {
 			...rest,
 			queued: queuedKinds.length > 0,
 			queuedKinds,
+			acquisitionResearch,
 			createdAt: createdAt.toISOString(),
 			enrichedAt: enrichedAt?.toISOString() ?? null,
 			acquisitionTarget: acquisitionTarget
@@ -303,6 +314,7 @@ export class CompaniesService {
 						...acquisitionTarget,
 						strengths: parseDossierFindings(acquisitionTarget.strengths),
 						concerns: parseDossierFindings(acquisitionTarget.concerns),
+						criteria: parseDossierCriteria(acquisitionTarget.criteria),
 						researchedAt: acquisitionTarget.researchedAt?.toISOString() ?? null,
 						createdAt: acquisitionTarget.createdAt.toISOString(),
 						updatedAt: acquisitionTarget.updatedAt.toISOString(),
@@ -310,7 +322,7 @@ export class CompaniesService {
 				: null,
 			primaryContactId: primaryContact?.id ?? null,
 			primaryContact,
-			reportingCurrency: await this.conversion.reportingCurrency(),
+			reportingCurrency,
 			deals: deals.map((deal) => ({
 				...deal,
 				amount: undefined,
@@ -785,4 +797,66 @@ function parseDossierFindings(value: Prisma.JsonValue): DossierFinding[] {
 			: [];
 		return [{ summary, evidence }];
 	});
+}
+
+function parseDossierCriteria(
+	value: Prisma.JsonValue,
+): AcquisitionCriterionAssessment[] {
+	if (!Array.isArray(value)) return [];
+
+	const criteria: AcquisitionCriterionAssessment[] = [];
+	for (const item of value) {
+		if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+		if (
+			typeof item.id !== "string" ||
+			!ACQUISITION_CRITERION_IDS.includes(
+				item.id as AcquisitionCriterionAssessment["id"],
+			) ||
+			typeof item.result !== "string" ||
+			!ACQUISITION_CRITERION_RESULTS.includes(
+				item.result as AcquisitionCriterionAssessment["result"],
+			) ||
+			typeof item.explanation !== "string" ||
+			!item.explanation.trim() ||
+			typeof item.blocksQualification !== "boolean" ||
+			!Array.isArray(item.evidence)
+		) {
+			return [];
+		}
+
+		const evidence: DossierEvidence[] = [];
+		for (const source of item.evidence) {
+			if (
+				!source ||
+				typeof source !== "object" ||
+				Array.isArray(source) ||
+				typeof source.label !== "string" ||
+				!source.label.trim() ||
+				typeof source.url !== "string" ||
+				!isWebUrl(source.url)
+			) {
+				return [];
+			}
+			evidence.push({ label: source.label, url: source.url });
+		}
+
+		criteria.push({
+			id: item.id as AcquisitionCriterionAssessment["id"],
+			result: item.result as AcquisitionCriterionAssessment["result"],
+			explanation: item.explanation,
+			blocksQualification: item.blocksQualification,
+			evidence,
+		});
+	}
+
+	return criteria;
+}
+
+function isWebUrl(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return url.protocol === "https:" || url.protocol === "http:";
+	} catch {
+		return false;
+	}
 }

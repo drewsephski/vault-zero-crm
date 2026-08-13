@@ -16,6 +16,7 @@ import {
 	RecordSource,
 	WorkspaceMode,
 } from "@crm/db";
+import type { AcquisitionCriterionAssessment } from "@crm/db/acquisition";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import { AcquisitionService } from "../src/acquisition/acquisition.service";
 import { AgentQueueService } from "../src/agent/agent-queue.service";
@@ -101,13 +102,211 @@ function companyService() {
 		new AgentQueueService(db),
 		{ backfill: async () => null } as never,
 		{} as never,
-		{} as never,
+		{ reportingCurrency: async () => "USD" } as never,
 	);
 }
 
 function service(agent = new AgentTriggerService(db)) {
 	return new AcquisitionService(db, companyService(), agent);
 }
+
+const dossierACriteria: AcquisitionCriterionAssessment[] = [
+	{
+		id: "industry",
+		result: "MATCH",
+		explanation: "The company operates in the preferred industry.",
+		blocksQualification: false,
+		evidence: [
+			{
+				label: "Company services",
+				url: "https://dossier.example.test/services",
+			},
+		],
+	},
+	{
+		id: "revenue",
+		result: "UNKNOWN",
+		explanation: "No reliable source states annual company revenue.",
+		blocksQualification: true,
+		evidence: [],
+	},
+];
+
+describe("acquisition dossier read model", () => {
+	it("reports acquisition task state without replacing the persisted dossier", async () => {
+		const domain = `dossier-state-${crypto.randomUUID()}.test`;
+		const timestampA = new Date("2026-08-01T12:00:00.000Z");
+		domains.push(domain);
+		const company = await db.company.create({
+			data: {
+				name: "Dossier State Target",
+				domain,
+				enrichmentStatus: EnrichmentStatus.COMPLETE,
+				acquisitionTarget: {
+					create: {
+						fit: AcquisitionFit.POTENTIAL,
+						summary: "Dossier A remains authoritative during later work.",
+						strengths: [
+							{
+								summary: "The prior research found a supported strength.",
+								evidence: [
+									{
+										label: "Prior strength source",
+										url: "https://dossier.example.test/strength",
+									},
+								],
+							},
+						],
+						concerns: [],
+						criteria: dossierACriteria,
+						missingInformation: ["Verified annual revenue"],
+						recommendedAction: "Request normalized financial statements.",
+						sourceUrls: ["https://dossier.example.test/strength"],
+						researchedAt: timestampA,
+					},
+				},
+			},
+			select: { id: true },
+		});
+		companyIds.push(company.id);
+		const companies = companyService();
+		const dossierA = (await companies.byId(company.id)).acquisitionTarget;
+		const now = new Date();
+		const states = [
+			{
+				name: "queued",
+				data: {
+					dueAt: new Date(now.getTime() - 60_000),
+					leasedUntil: new Date(now.getTime() + 60_000),
+				},
+				expected: { status: "queued", error: null },
+			},
+			{
+				name: "running",
+				data: {
+					dueAt: new Date(now.getTime() - 60_000),
+					startedAt: now,
+				},
+				expected: { status: "running", error: null },
+			},
+			{
+				name: "retrying",
+				data: {
+					dueAt: new Date(now.getTime() - 60_000),
+					startedAt: now,
+					outcome: "retrying: provider timeout",
+					lastError: "provider timeout",
+				},
+				expected: { status: "retrying", error: "provider timeout" },
+			},
+			{
+				name: "failed",
+				data: {
+					dueAt: new Date(now.getTime() - 60_000),
+					startedAt: now,
+					finishedAt: now,
+					outcome: "provider timeout",
+					lastError: "provider timeout",
+				},
+				expected: { status: "failed", error: "provider timeout" },
+			},
+		] as const;
+
+		for (const state of states) {
+			await db.agentTask.deleteMany({ where: { companyId: company.id } });
+			await db.agentTask.create({
+				data: {
+					companyId: company.id,
+					kind: "acquisition-refresh",
+					reason: `${state.name} acquisition research`,
+					...state.data,
+				},
+			});
+
+			const record = await companies.byId(company.id);
+
+			expect(record.acquisitionResearch).toEqual(state.expected);
+			expect(record.acquisitionTarget).toEqual(dossierA);
+			expect(record.acquisitionTarget?.researchedAt).toBe(
+				timestampA.toISOString(),
+			);
+			expect(record.enrichmentStatus).toBe(EnrichmentStatus.COMPLETE);
+			expect(record.queuedKinds).toEqual(
+				state.name === "failed" ? [] : ["acquisition-refresh"],
+			);
+		}
+
+		await db.agentTask.deleteMany({ where: { companyId: company.id } });
+		await db.agentTask.create({
+			data: {
+				companyId: company.id,
+				kind: "acquisition-refresh",
+				reason: "Successful acquisition research",
+				dueAt: new Date(now.getTime() - 60_000),
+				startedAt: now,
+				finishedAt: now,
+				outcome: "completed",
+			},
+		});
+
+		const completed = await companies.byId(company.id);
+		expect(completed.acquisitionResearch).toEqual({
+			status: "idle",
+			error: null,
+		});
+		expect(completed.acquisitionTarget).toEqual(dossierA);
+	});
+
+	it("parses valid criteria and reduces malformed legacy criteria to an empty list", async () => {
+		const domain = `dossier-criteria-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const company = await db.company.create({
+			data: {
+				name: "Dossier Criteria Target",
+				domain,
+				acquisitionTarget: {
+					create: {
+						strengths: [],
+						concerns: [],
+						criteria: dossierACriteria,
+						missingInformation: [],
+						sourceUrls: [],
+					},
+				},
+			},
+			select: { id: true },
+		});
+		companyIds.push(company.id);
+		const companies = companyService();
+
+		expect(
+			(await companies.byId(company.id)).acquisitionTarget?.criteria,
+		).toEqual(dossierACriteria);
+
+		for (const criteria of [
+			[{ ...dossierACriteria[0], id: "invented-criterion" }],
+			[{ ...dossierACriteria[0], result: "LIKELY" }],
+			[{ ...dossierACriteria[0], explanation: " " }],
+			[{ ...dossierACriteria[0], blocksQualification: "false" }],
+			[
+				{
+					...dossierACriteria[0],
+					evidence: [{ label: "Source", url: "not a URL" }],
+				},
+			],
+			{ legacy: true },
+		]) {
+			await db.acquisitionTarget.update({
+				where: { companyId: company.id },
+				data: { criteria },
+			});
+
+			expect(
+				(await companies.byId(company.id)).acquisitionTarget?.criteria,
+			).toEqual([]);
+		}
+	});
+});
 
 describe("acquisition target mutations", () => {
 	it("creates a manual company and acquisition target atomically", async () => {
