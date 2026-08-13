@@ -89,15 +89,13 @@ Gemini 2.5 Flash-Lite, so the OpenRouter account needs credits. Without a key or
 credits the CRM and direct research lanes run, while model-backed agent sessions
 cannot produce a response.
 
-### The Context key is asked for, not configured
+### The Context key is optional and workspace-managed
 
 **`CONTEXT_DEV_API_KEY` is not a variable here and must not become one.** The key lives
-in `AppSetting`, is asked for at `/onboarding/research`, and changes on Settings →
-General — an admin who cannot redeploy cannot set a variable.
+in `AppSetting` and changes on Settings → General, so an admin who cannot redeploy can
+still add or rotate it. It is not required during onboarding.
 
-- **An install that had the variable is asked again**: no migration, no fallback, and
-  **the gate cannot be dismissed**.
-- **Nothing is lost while waiting.** A keyless `brand` task settles `SKIPPED` *before*
+- **Nothing is lost without it.** A keyless `brand` task settles `SKIPPED` *before*
   anything marks the row `RUNNING`, and `settle` only overwrites `RUNNING` — so the
   company stays `PENDING`, which the sweep re-queues
   (`test/keyless-brand.integration.spec.ts`).

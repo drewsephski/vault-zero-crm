@@ -1,0 +1,191 @@
+import {
+	AcquisitionFit,
+	AcquisitionStage,
+	ActivityType,
+	db,
+	WorkspaceMode,
+} from "@crm/db";
+import { PRIORITY } from "@crm/db/agent-tasks";
+import { WORKSPACE_ID } from "@crm/db/workspace";
+import { defineTool } from "eve/tools";
+import { z } from "zod";
+import { scheduleTask } from "../lib/tasks";
+
+const evidence = z.object({
+	label: z.string().trim().min(5).max(300),
+	url: z.url(),
+});
+
+const finding = z.object({
+	summary: z.string().trim().min(5).max(400),
+	evidence: z.array(evidence).min(1).max(5),
+});
+
+export default defineTool({
+	description:
+		"Write the structured acquisition dossier for a CRM company after research. Every strength and concern needs source evidence. Fit is a plain-language decision category, never a made-up confidence percentage. Missing information stays explicit, and the human-owned lifecycle stage is never changed.",
+	inputSchema: z.object({
+		companyId: z.string().min(1),
+		fit: z.enum([
+			AcquisitionFit.UNKNOWN,
+			AcquisitionFit.STRONG,
+			AcquisitionFit.POTENTIAL,
+			AcquisitionFit.WEAK,
+			AcquisitionFit.DISQUALIFIED,
+		]),
+		summary: z.string().trim().min(20).max(1200),
+		strengths: z.array(finding).max(8),
+		concerns: z.array(finding).max(8),
+		missingInformation: z.array(z.string().trim().min(3).max(240)).max(12),
+		recommendedAction: z.string().trim().min(5).max(500),
+		recommendedStage: z
+			.enum([
+				AcquisitionStage.DISCOVERED,
+				AcquisitionStage.RESEARCHING,
+				AcquisitionStage.QUALIFIED,
+				AcquisitionStage.WATCHLIST,
+				AcquisitionStage.CONTACTED,
+				AcquisitionStage.INTERESTED,
+				AcquisitionStage.OPPORTUNITY,
+				AcquisitionStage.DILIGENCE,
+				AcquisitionStage.REJECTED,
+				AcquisitionStage.ACQUIRED,
+			])
+			.nullable(),
+	}),
+	async execute(input, ctx) {
+		const [company, profile] = await Promise.all([
+			db.company.findUnique({
+				where: { id: input.companyId },
+				select: {
+					id: true,
+					name: true,
+					ownerId: true,
+					acquisitionTarget: { select: { fit: true } },
+				},
+			}),
+			db.acquisitionProfile.findUnique({
+				where: { id: WORKSPACE_ID },
+				select: { mode: true },
+			}),
+		]);
+
+		if (!company)
+			return { written: false as const, reason: "No such company." };
+		if (profile?.mode !== WorkspaceMode.ACQUISITION) {
+			return {
+				written: false as const,
+				reason: "Acquisition mode is not enabled for this workspace.",
+			};
+		}
+
+		const sourceUrls = [
+			...new Set(
+				[...input.strengths, ...input.concerns].flatMap((item) =>
+					item.evidence.map((itemEvidence) => itemEvidence.url),
+				),
+			),
+		];
+		const researchedAt = new Date();
+		const authorId =
+			company.ownerId ??
+			(
+				await db.user.findFirst({
+					orderBy: { createdAt: "asc" },
+					select: { id: true },
+				})
+			)?.id ??
+			null;
+
+		await db.$transaction(async (tx) => {
+			await tx.acquisitionTarget.upsert({
+				where: { companyId: company.id },
+				create: {
+					companyId: company.id,
+					stage: AcquisitionStage.RESEARCHING,
+					fit: input.fit,
+					summary: input.summary,
+					strengths: input.strengths,
+					concerns: input.concerns,
+					missingInformation: input.missingInformation,
+					recommendedAction: input.recommendedAction,
+					recommendedStage: input.recommendedStage,
+					sourceUrls,
+					researchedAt,
+					sourceSessionId: ctx.session.id,
+				},
+				update: {
+					fit: input.fit,
+					summary: input.summary,
+					strengths: input.strengths,
+					concerns: input.concerns,
+					missingInformation: input.missingInformation,
+					recommendedAction: input.recommendedAction,
+					recommendedStage: input.recommendedStage,
+					sourceUrls,
+					researchedAt,
+					sourceSessionId: ctx.session.id,
+				},
+			});
+
+			if (authorId) {
+				await tx.activity.create({
+					data: {
+						type: ActivityType.ENRICHMENT,
+						subject: `Acquisition dossier updated — ${company.name}`,
+						body: dossierActivity(input),
+						occurredAt: researchedAt,
+						companyId: company.id,
+						createdById: authorId,
+						meta: {
+							fit: input.fit,
+							previousFit: company.acquisitionTarget?.fit ?? null,
+							sourceUrls,
+							agent: "acquisition-research",
+						},
+					},
+				});
+			}
+
+			await tx.company.update({
+				where: { id: company.id },
+				data: { lastActivityAt: researchedAt },
+			});
+		});
+
+		await scheduleTask({
+			companyId: company.id,
+			kind: "acquisition-refresh",
+			reason: "Refresh the acquisition dossier and report material changes",
+			dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+			priority: PRIORITY.acquisitionRefresh,
+		});
+
+		return {
+			written: true as const,
+			fit: input.fit,
+			sources: sourceUrls.length,
+			missing: input.missingInformation.length,
+			nextRefreshInDays: 30,
+		};
+	},
+});
+
+function dossierActivity(input: {
+	fit: AcquisitionFit;
+	summary: string;
+	missingInformation: string[];
+	recommendedAction: string;
+}): string {
+	const missing =
+		input.missingInformation.length > 0
+			? `Still missing: ${input.missingInformation.join("; ")}`
+			: "No critical information gap was identified in this pass.";
+
+	return [
+		`Fit: ${input.fit.toLowerCase()}`,
+		input.summary,
+		missing,
+		`Recommended next action: ${input.recommendedAction}`,
+	].join("\n\n");
+}

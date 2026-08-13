@@ -192,10 +192,12 @@ export async function scheduleTask(input: {
 	dueAt: Date;
 	priority?: number;
 }): Promise<{ id: string }> {
+	const now = new Date();
 	const existing = await db.agentTask.findFirst({
 		where: {
 			kind: input.kind,
 			finishedAt: null,
+			OR: [{ leasedUntil: null }, { leasedUntil: { lt: now } }],
 			contactId: input.contactId ?? undefined,
 			companyId: input.companyId ?? undefined,
 		},

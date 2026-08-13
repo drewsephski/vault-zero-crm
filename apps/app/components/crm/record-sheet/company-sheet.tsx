@@ -5,6 +5,7 @@ import Partnership from "@carbon/icons-react/es/Partnership";
 import Star from "@carbon/icons-react/es/Star";
 import StarFilled from "@carbon/icons-react/es/StarFilled";
 import UserMultiple from "@carbon/icons-react/es/UserMultiple";
+import { AcquisitionFit, AcquisitionStage } from "@crm/db/enums";
 import { Button } from "@crm/ui/components/button";
 import { EmptyCellValue } from "@crm/ui/components/empty-cell";
 import {
@@ -12,7 +13,16 @@ import {
 	type EntityLogoTone,
 } from "@crm/ui/components/entity-logo";
 import { Icon } from "@crm/ui/components/icon";
+import { Link } from "@crm/ui/components/link";
 import { PersonAvatar } from "@crm/ui/components/person-avatar";
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@crm/ui/components/select";
 import { SimpleTable, SimpleTableRow } from "@crm/ui/components/simple-table";
 import { TableCell } from "@crm/ui/components/table";
 import {
@@ -20,9 +30,15 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@crm/ui/components/tooltip";
-import { formatMoney } from "@crm/ui/lib/format";
+import { formatMoney, relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import {
+	ACQUISITION_STAGES,
+	AcquisitionFitIndicator,
+	AcquisitionStageIndicator,
+	acquisitionStageLabel,
+} from "@/components/crm/acquisition-status";
 import { AgentPanel } from "@/components/crm/agent-panel";
 import { OPEN_STAGES } from "@/components/crm/deal-stage";
 import { EnrichmentActions } from "@/components/crm/enrichment-actions";
@@ -47,6 +63,7 @@ import {
 	DetailSheetMain,
 	DetailSheetPending,
 	DetailSheetProperties,
+	DetailSheetProperty,
 	DetailSheetProse,
 	DetailSheetRail,
 	DetailSheetResearchStatus,
@@ -59,6 +76,7 @@ import {
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
+import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
 import { QuickAddContact, QuickAddDeal } from "./quick-add";
 import { RecordActions } from "./record-actions";
 import {
@@ -162,6 +180,7 @@ function AddRow({
 
 export function CompanySheet({ companyId }: { companyId: string }) {
 	const trpc = useTRPC();
+	const labels = useWorkspaceLabels();
 	const {
 		tab,
 		setTab,
@@ -216,6 +235,17 @@ export function CompanySheet({ companyId }: { companyId: string }) {
 						/>
 					),
 				},
+				...(labels.acquisition
+					? ([
+							{
+								value: "acquisition",
+								label: "Acquisition",
+								count:
+									company.acquisitionTarget?.missingInformation.length ?? 0,
+								content: <AcquisitionDossier company={company} />,
+							},
+						] satisfies DetailSheetTab[])
+					: []),
 				{
 					value: "contacts",
 					label: "Contacts",
@@ -309,30 +339,68 @@ export function CompanySheet({ companyId }: { companyId: string }) {
 			stats={
 				company ? (
 					<DetailSheetStats>
-						<DetailSheetStat label="Open pipeline">
-							<span className="tabular-nums">
-								{formatMoney(openValueCents, company.reportingCurrency)}
-							</span>
-							{openUncounted > 0 ? (
-								<span className="text-muted-foreground">
-									{" "}
-									+{openUncounted} unconverted
-								</span>
-							) : null}
-						</DetailSheetStat>
-						<DetailSheetStat label="Open deals">
-							<span className="tabular-nums">{openDeals.length}</span>
-						</DetailSheetStat>
-						<DetailSheetStat label="Next close">
-							{closing ? (
-								shortDateFormat.format(new Date(closing))
-							) : (
-								<EmptyCellValue />
-							)}
-						</DetailSheetStat>
-						<DetailSheetStat label="Owner">
-							<OwnerCell owner={company.owner} />
-						</DetailSheetStat>
+						{labels.acquisition ? (
+							<>
+								<DetailSheetStat label="Acquisition fit">
+									<AcquisitionFitIndicator
+										fit={
+											company.acquisitionTarget?.fit ?? AcquisitionFit.UNKNOWN
+										}
+									/>
+								</DetailSheetStat>
+								<DetailSheetStat label="Lifecycle">
+									<AcquisitionStageIndicator
+										stage={
+											company.acquisitionTarget?.stage ??
+											AcquisitionStage.DISCOVERED
+										}
+									/>
+								</DetailSheetStat>
+								<DetailSheetStat label="Research freshness">
+									{company.acquisitionTarget?.researchedAt ? (
+										<span suppressHydrationWarning>
+											{relativeTimeFromIso(
+												company.acquisitionTarget.researchedAt,
+											)}
+										</span>
+									) : (
+										<EmptyCellValue />
+									)}
+								</DetailSheetStat>
+								<DetailSheetStat label="Missing information">
+									<span className="tabular-nums">
+										{company.acquisitionTarget?.missingInformation.length ?? 0}
+									</span>
+								</DetailSheetStat>
+							</>
+						) : (
+							<>
+								<DetailSheetStat label="Open pipeline">
+									<span className="tabular-nums">
+										{formatMoney(openValueCents, company.reportingCurrency)}
+									</span>
+									{openUncounted > 0 ? (
+										<span className="text-muted-foreground">
+											{" "}
+											+{openUncounted} unconverted
+										</span>
+									) : null}
+								</DetailSheetStat>
+								<DetailSheetStat label="Open deals">
+									<span className="tabular-nums">{openDeals.length}</span>
+								</DetailSheetStat>
+								<DetailSheetStat label="Next close">
+									{closing ? (
+										shortDateFormat.format(new Date(closing))
+									) : (
+										<EmptyCellValue />
+									)}
+								</DetailSheetStat>
+								<DetailSheetStat label="Owner">
+									<OwnerCell owner={company.owner} />
+								</DetailSheetStat>
+							</>
+						)}
 					</DetailSheetStats>
 				) : null
 			}
@@ -479,6 +547,203 @@ function CompanyOverview({
 			</DetailSheetSplit>
 		</DetailSheetBody>
 	);
+}
+
+function AcquisitionDossier({ company }: { company: Company }) {
+	const trpc = useTRPC();
+	const cache = useCrmCache();
+	const target = company.acquisitionTarget;
+	const stage = target?.stage ?? AcquisitionStage.DISCOVERED;
+
+	const updateStage = useMutation(
+		trpc.acquisition.updateTarget.mutationOptions({
+			onSuccess: () => cache.company(company.id, { settle: "record" }),
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+	const research = useMutation(
+		trpc.companies.research.mutationOptions({
+			onSuccess: async () => {
+				await cache.company(company.id);
+				toast.success("Acquisition research queued.");
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+
+	return (
+		<DetailSheetBody>
+			<DetailSheetSplit>
+				<DetailSheetMain>
+					{target?.summary ? (
+						<>
+							<DetailSheetSection title="Assessment">
+								<DetailSheetProse>{target.summary}</DetailSheetProse>
+							</DetailSheetSection>
+
+							<AcquisitionFindings
+								title="Why it might fit"
+								findings={target.strengths}
+								empty="No supported strengths were found in this pass."
+							/>
+
+							<AcquisitionFindings
+								title="Reasons for caution"
+								findings={target.concerns}
+								empty="No evidence-backed concern was identified in this pass."
+							/>
+
+							<DetailSheetSection title="Missing information">
+								{target.missingInformation.length > 0 ? (
+									<ul className="flex flex-col gap-2 text-muted-foreground text-xs/5">
+										{target.missingInformation.map((item) => (
+											<li key={item}>• {item}</li>
+										))}
+									</ul>
+								) : (
+									<DetailSheetProse>
+										No critical gap was identified in this pass.
+									</DetailSheetProse>
+								)}
+							</DetailSheetSection>
+						</>
+					) : (
+						<DetailSheetEmpty
+							icon={Partnership}
+							title="No acquisition dossier yet"
+							description="Ask Eve to compare this target with the buy box, collect evidence, identify gaps, and recommend what to do next."
+							action={
+								<Button
+									size="sm"
+									disabled={!company.domain || research.isPending}
+									onClick={() => research.mutate({ id: company.id })}
+								>
+									{research.isPending ? "Queueing…" : "Research target"}
+								</Button>
+							}
+						/>
+					)}
+				</DetailSheetMain>
+
+				<DetailSheetRail>
+					<DetailSheetSection title="Decision">
+						<DetailSheetProperties columns={1}>
+							<DetailSheetProperty label="Lifecycle">
+								<Select
+									value={stage}
+									disabled={updateStage.isPending}
+									onValueChange={(value) =>
+										updateStage.mutate({
+											companyId: company.id,
+											stage: value as AcquisitionStage,
+										})
+									}
+								>
+									<SelectTrigger size="sm">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectGroup>
+											{ACQUISITION_STAGES.map((value) => (
+												<SelectItem key={value} value={value}>
+													{acquisitionStageLabel(value)}
+												</SelectItem>
+											))}
+										</SelectGroup>
+									</SelectContent>
+								</Select>
+							</DetailSheetProperty>
+							<DetailSheetProperty label="Fit">
+								<AcquisitionFitIndicator
+									fit={target?.fit ?? AcquisitionFit.UNKNOWN}
+								/>
+							</DetailSheetProperty>
+							<DetailSheetProperty label="Eve suggests">
+								{target?.recommendedStage ? (
+									<AcquisitionStageIndicator stage={target.recommendedStage} />
+								) : (
+									<EmptyCellValue />
+								)}
+							</DetailSheetProperty>
+						</DetailSheetProperties>
+					</DetailSheetSection>
+
+					<DetailSheetSection title="Recommended next action">
+						<DetailSheetProse>
+							{target?.recommendedAction ??
+								"Research this target before deciding what to do next."}
+						</DetailSheetProse>
+					</DetailSheetSection>
+
+					{target && target.sourceUrls.length > 0 ? (
+						<DetailSheetSection title="Sources">
+							<ul className="flex flex-col gap-2 text-muted-foreground text-xs/5">
+								{target.sourceUrls.map((url) => (
+									<li key={url} className="truncate">
+										<Link
+											variant="quiet"
+											href={url}
+											target="_blank"
+											rel="noreferrer noopener"
+										>
+											{sourceLabel(url)}
+										</Link>
+									</li>
+								))}
+							</ul>
+						</DetailSheetSection>
+					) : null}
+				</DetailSheetRail>
+			</DetailSheetSplit>
+		</DetailSheetBody>
+	);
+}
+
+function AcquisitionFindings({
+	title,
+	findings,
+	empty,
+}: {
+	title: string;
+	findings: NonNullable<Company["acquisitionTarget"]>["strengths"];
+	empty: string;
+}) {
+	return (
+		<DetailSheetSection title={title}>
+			{findings.length === 0 ? (
+				<DetailSheetProse>{empty}</DetailSheetProse>
+			) : (
+				<ul className="flex flex-col gap-4">
+					{findings.map((finding) => (
+						<li key={finding.summary} className="flex flex-col gap-1.5">
+							<p className="text-pretty text-xs/5">{finding.summary}</p>
+							<div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground text-xs">
+								{finding.evidence.map((item) => (
+									<Link
+										key={`${item.url}-${item.label}`}
+										variant="quiet"
+										href={item.url}
+										target="_blank"
+										rel="noreferrer noopener"
+									>
+										{item.label}
+									</Link>
+								))}
+							</div>
+						</li>
+					))}
+				</ul>
+			)}
+		</DetailSheetSection>
+	);
+}
+
+function sourceLabel(url: string): string {
+	try {
+		return new URL(url).hostname.replace(/^www\./, "");
+	} catch {
+		return "Source";
+	}
 }
 
 function CompanyContacts({

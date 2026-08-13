@@ -31,6 +31,7 @@ if (env.google) {
 
 export const auth = betterAuth({
 	appName: "Vault Zero CRM",
+	baseURL: env.baseUrl,
 
 	database: prismaAdapter(db, {
 		provider: "postgresql",

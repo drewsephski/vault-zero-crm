@@ -11,22 +11,23 @@ import { CompanyMark } from "./company-mark";
 
 const TABS = [
 	{ label: "Overview" },
+	{ label: "Acquisition" },
 	{ label: "Contacts", count: "1" },
-	{ label: "Deals" },
+	{ label: "Opportunities" },
 	{ label: "Activity" },
-	{ label: "Agent", active: true },
+	{ label: "Eve", active: true },
 ];
 
 const STATS = [
-	{ label: "Open pipeline", value: "$0" },
-	{ label: "Open deals", value: "0" },
-	{ label: "Next close", value: "—", muted: true },
+	{ label: "Acquisition fit", value: "Strong" },
+	{ label: "Lifecycle", value: "Qualified" },
+	{ label: "Research freshness", value: "2d ago" },
 ];
 
 const QUESTIONS = [
-	"What do they do?",
-	"Who do we know here?",
-	"What has changed recently?",
+	"Why does it fit?",
+	"What is missing?",
+	"What should we do next?",
 ];
 
 /**
@@ -54,14 +55,18 @@ export function SheetHeader({ compact }: { compact?: boolean }) {
 			)}
 		>
 			<div className="flex items-start gap-3">
-				<CompanyMark company={{ name: "Vault Zero" }} size={32} glyph={18} />
+				<CompanyMark
+					company={{ name: "Tristar Fulfillment" }}
+					size={32}
+					glyph={18}
+				/>
 
 				<div className="min-w-0 grow pt-0.5">
 					<p className="mb-0.5 font-medium text-lg/[125%] tracking-[-0.45px]">
-						Vault Zero
+						Tristar Fulfillment
 					</p>
 					<p className="text-muted-foreground text-xs/[162.5%]">
-						vaultzero.dev · Compliance
+						tristarfulfillment.com · Logistics
 					</p>
 				</div>
 
@@ -97,8 +102,8 @@ export function SheetStats({ compact }: { compact?: boolean }) {
 	if (compact) {
 		return (
 			<div className="grid shrink-0 grid-cols-2 border-border border-b bg-muted/40">
-				<Stat label="Open pipeline" value="$0" className="border-r" />
-				<Stat label="Open deals" value="0" />
+				<Stat label="Fit" value="Strong" className="border-r" />
+				<Stat label="Lifecycle" value="Qualified" />
 			</div>
 		);
 	}
@@ -110,7 +115,6 @@ export function SheetStats({ compact }: { compact?: boolean }) {
 					key={stat.label}
 					label={stat.label}
 					value={stat.value}
-					muted={stat.muted}
 					className="grow basis-0 border-r px-5"
 				/>
 			))}
@@ -207,12 +211,11 @@ export function AgentEmptyState({ compact }: { compact?: boolean }) {
 					</span>
 				</span>
 				<p className="text-center font-medium text-sm/5">
-					Ask about this company
+					Ask Eve about this target
 				</p>
 				{compact ? null : (
 					<p className="text-center text-muted-foreground text-xs/[19px]">
-						It reads their site and our own history with them, and shows its
-						working.
+						It reads the buy box, the record, and the evidence before answering.
 					</p>
 				)}
 			</div>
@@ -241,7 +244,7 @@ export function SheetComposer({ compact }: { compact?: boolean }) {
 		>
 			<div className="flex h-8 min-w-0 grow items-center rounded-md border border-border px-3">
 				<span className="text-muted-foreground text-xs">
-					What do they sell?
+					Ask Eve about this target
 				</span>
 			</div>
 			<span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-muted">

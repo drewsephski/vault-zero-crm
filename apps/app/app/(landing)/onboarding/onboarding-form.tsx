@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { useId } from "react";
 import { toast } from "sonner";
 import { useTRPC } from "@/lib/trpc/client";
+import { workspaceUrl } from "@/lib/workspace-url";
 
 export function OnboardingForm({ placeholder }: { placeholder: string }) {
 	const trpc = useTRPC();
@@ -30,9 +31,9 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 
 	const save = useMutation(
 		trpc.workspace.update.mutationOptions({
-			onSuccess: () => {
+			onSuccess: (workspace) => {
 				router.refresh();
-				router.replace("/onboarding/research");
+				router.replace(workspaceUrl(workspace.slug));
 			},
 			onError: (error) => toast.error(error.message),
 		}),
@@ -54,7 +55,7 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 		>
 			<FieldGroup>
 				<Field>
-					<FieldLabel htmlFor={nameId}>Company name</FieldLabel>
+					<FieldLabel htmlFor={nameId}>Workspace name</FieldLabel>
 					<Input
 						id={nameId}
 						name="name"
@@ -66,7 +67,7 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 				</Field>
 
 				<Field>
-					<FieldLabel htmlFor={websiteId}>Website</FieldLabel>
+					<FieldLabel htmlFor={websiteId}>Your company website</FieldLabel>
 					<InputGroup>
 						<InputGroupAddon>
 							<InputGroupText>https://</InputGroupText>
@@ -84,7 +85,7 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 						/>
 					</InputGroup>
 					<FieldDescription>
-						Read once, so every answer afterwards knows what you sell.
+						Eve uses this to understand who is running the acquisition search.
 					</FieldDescription>
 				</Field>
 			</FieldGroup>

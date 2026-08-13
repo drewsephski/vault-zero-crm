@@ -171,6 +171,15 @@ export async function companyPreamble(
 			domain: true,
 			industry: true,
 			description: true,
+			acquisitionTarget: {
+				select: {
+					stage: true,
+					fit: true,
+					researchedAt: true,
+					missingInformation: true,
+					recommendedAction: true,
+				},
+			},
 			contacts: {
 				orderBy: [{ lastActivityAt: "desc" }, { createdAt: "asc" }],
 				take: 12,
@@ -227,6 +236,9 @@ export async function companyPreamble(
 		company.description
 			? "There is already a description on the record."
 			: "There is no description on the record yet.",
+		company.acquisitionTarget
+			? `Acquisition dossier: ${company.acquisitionTarget.fit.toLowerCase()} fit, ${company.acquisitionTarget.stage.toLowerCase()} stage${company.acquisitionTarget.researchedAt ? `, researched ${company.acquisitionTarget.researchedAt.toDateString()}` : ""}. ${company.acquisitionTarget.missingInformation.length} information gap(s) remain.${company.acquisitionTarget.recommendedAction ? ` Current recommendation: ${company.acquisitionTarget.recommendedAction}` : ""}`
+			: "There is no acquisition dossier on this company yet.",
 		"",
 		"Start with `read_company_history` on this company id — it returns the people, the deals, the correspondence and the notes in one free call.",
 		"",

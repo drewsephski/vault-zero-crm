@@ -67,20 +67,19 @@ here, what do we sell.
 
 ### Gates in `proxy.ts`
 
-Onboarding, then `/onboarding/research` for the Context key. Asked server-side every
-request.
+Workspace onboarding is the only product gate. Optional research credentials live in
+Settings and never prevent a signed-in user from entering the workspace.
 
 - **`getSessionCookie()` decides signed-in**; pages still resolve the real session via
   `requireGoogleAccess()`.
-- **Nothing is cached in a cookie** — both facts revert on a database reset while a
-  year-long marker insists the gate passed. Cache in the API if cost ever matters.
-- **Both reads run concurrently**, but order decides which is *asked* — the research
-  read is never made while onboarding is open.
+- **Nothing is cached in a cookie** — onboarding state reverts on a database reset
+  rather than leaving a year-long marker that insists the gate passed. Cache in the
+  API if cost ever matters.
 - **An unreachable API fails open** (`unknown` lets the request through).
 - **`/sign-in`, `/grant-access`, `/eve` are ungated.** `/sign-in` is the only path a
   stranger may read; `/` joins it only when `IS_MARKETING` is set.
-- **There is no way past the key gate but to answer** — Skip stranded installs, every
-  later company sitting `PENDING` with nothing saying so.
+- **Research capability is not an onboarding concern.** A missing optional provider
+  removes that source while Eve continues with the sources that are available.
 
 ### The name is also the URL
 

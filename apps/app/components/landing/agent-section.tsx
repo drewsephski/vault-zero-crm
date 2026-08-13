@@ -5,9 +5,7 @@ import Attachment from "@carbon/icons-react/es/Attachment";
 import ChevronDown from "@carbon/icons-react/es/ChevronDown";
 import Renew from "@carbon/icons-react/es/Renew";
 import Time from "@carbon/icons-react/es/Time";
-import SlackLogo from "@crm/ui/components/brand-logos/slack";
 import { cn } from "@crm/ui/lib/utils";
-import Image from "next/image";
 import type * as React from "react";
 import { Chip } from "./chip";
 import { SectionHeading } from "./section-heading";
@@ -17,13 +15,13 @@ export function AgentSection() {
 		<section className="relative flex w-full shrink-0 flex-col items-center px-6 pt-20 md:pt-30">
 			<div className="flex w-full max-w-6xl flex-col gap-12">
 				<SectionHeading
-					title="Agents that automate your CRM."
-					lede="Describe how your CRM should act. Create agents to automate every process."
+					title="An acquisition analyst that keeps working."
+					lede="Give Eve a sourcing objective. The durable task continues even after you close the browser."
 				/>
 
 				<div className="flex w-full flex-col items-center gap-7 rounded-xl border border-border bg-background px-6 py-12 md:px-12 md:py-[88px]">
 					<p className="text-balance text-center font-medium text-2xl/8 tracking-[-0.01em] md:text-[32px]/10">
-						What should we get done, Lewis?
+						What should we investigate next?
 					</p>
 
 					<Composer />
@@ -38,20 +36,12 @@ function Composer() {
 	return (
 		<div className="flex min-h-24 w-3xl max-w-full shrink-0 select-none flex-col justify-between rounded-lg border border-[#3D3D3D] bg-muted p-[11px]">
 			<p className="flex flex-wrap items-center gap-1 p-1 text-[13px]/6">
-				<span className="text-[#00805E]">/Create agent</span>
-				<span className="text-white">Send a new message to</span>
-				<Chip className="gap-1 text-white">
-					<SlackLogo className="size-[15px] shrink-0" />
-					Slack
-				</Chip>
-				<span className="text-white">and ping</span>
-				<Chip className="gap-1 text-white">
-					<DanAvatar />
-					Dan
-				</Chip>
-				<span className="text-white">
-					when a company misses their invoice deadline
-				</span>
+				<span className="text-[#00805E]">/Research</span>
+				<span className="text-white">Find 20</span>
+				<Chip className="text-white">HVAC businesses</Chip>
+				<span className="text-white">in</span>
+				<Chip className="text-white">Northern Illinois</Chip>
+				<span className="text-white">and rank the five worth contacting.</span>
 			</p>
 
 			<div className="flex items-center">
@@ -78,40 +68,27 @@ function SuggestedActions() {
 			</div>
 
 			<SuggestedAction>
-				<span className="shrink-0">Create a</span>
-				<Chip>
-					<SlackLogo className="size-[14px] shrink-0" />
-					Slack
-				</Chip>
-				<span className="shrink-0">
-					channel and invite the owner when a deal hits
-				</span>
-				<Chip className="gap-1.5 px-2">
-					<span className="size-1.5 shrink-0 rounded-full bg-success" />
-					Closed won
-				</Chip>
+				<span className="shrink-0">Research every target missing</span>
+				<Chip>owner information</Chip>
 			</SuggestedAction>
 
 			<SuggestedAction className="gap-3">
-				<span className="shrink-0">Ping</span>
-				<Chip>
-					<DanAvatar />
-					Dan
-				</Chip>
 				<span className="min-w-0 grow">
-					when a contract has been out five days unsigned
+					Compare our three strongest targets
 				</span>
+				<Chip>by fit and risk</Chip>
 			</SuggestedAction>
 
 			<SuggestedAction>
 				<span className="shrink-0">Every Monday,</span>
 				<Chip className="px-2">
 					<Renew size={13} className="shrink-0" />
-					re-enrich contacts
+					refresh targets
 				</Chip>
-				<span className="shrink-0">that haven't been contacted in</span>
+				<span className="shrink-0">whose research is older than</span>
 				<Chip className="px-2">
-					<Time size={13} className="shrink-0 text-muted-foreground" />4 weeks
+					<Time size={13} className="shrink-0 text-muted-foreground" />
+					30 days
 				</Chip>
 			</SuggestedAction>
 		</div>
@@ -137,17 +114,5 @@ function SuggestedAction({
 			</span>
 			<ArrowRight size={16} className="shrink-0 text-muted-foreground" />
 		</div>
-	);
-}
-
-function DanAvatar() {
-	return (
-		<Image
-			src="/landing/avatar-dan.png"
-			alt=""
-			width={64}
-			height={64}
-			className="size-[15px] shrink-0 rounded-full object-cover"
-		/>
 	);
 }

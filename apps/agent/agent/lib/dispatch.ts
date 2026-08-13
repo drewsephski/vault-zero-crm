@@ -154,7 +154,11 @@ function work(kind: string, reason: string): string {
 		case "meeting-prep":
 			return "There is a meeting with this person soon. Make sure whoever is taking it opens the record knowing who they are dealing with.";
 		case "company-profile":
-			return "This company's brand, industry, location and links are filled in separately and may already be there. Read the account, fill anything still missing, and write a brief if there is something worth saying.";
+			return "This company's brand, industry, location and links are filled in separately and may already be there. Read the account, fill anything still missing, and write a brief if there is something worth saying. In acquisition mode, also research its fit against the buy box and write an evidence-backed acquisition dossier.";
+		case "acquisition-discovery":
+			return "Use the saved buy box to discover a small set of real acquisition candidates. Search broadly, verify each company's website, deduplicate against the CRM, and save at most ten candidates for human review. Do not create company records.";
+		case "acquisition-refresh":
+			return "Refresh this acquisition target's dossier. Read the CRM first, verify what changed from current public sources, preserve unknowns, and write a new evidence-backed fit assessment and recommended next action.";
 		case "workspace-profile":
 			return "Write the profile of the company you work for, so that every other session knows who we are. Read our own site and keep it short.";
 		default:

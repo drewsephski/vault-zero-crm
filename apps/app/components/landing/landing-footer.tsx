@@ -1,36 +1,18 @@
 import { Link } from "@crm/ui/components/link";
 import Logo from "@crm/ui/components/logo";
-import { REPO_LINKS } from "./links";
 import { Wordmark } from "./wordmark";
 
 export function LandingFooter() {
 	return (
 		<footer className="relative flex w-full shrink-0 flex-col items-center border-border border-t">
-			<div className="flex w-full max-w-6xl flex-col items-start justify-between gap-12 px-6 py-16 sm:flex-row sm:gap-16">
+			<div className="flex w-full max-w-6xl flex-col items-start px-6 py-16">
 				<div className="flex w-[280px] max-w-full shrink-0 flex-col gap-[14px]">
 					<Wordmark />
 					<p className="text-[13px]/[21px] text-muted-foreground">
-						The open source CRM for agent-assisted teams.
+						An AI-native acquisition CRM for finding and advancing businesses
+						worth buying.
 					</p>
 				</div>
-
-				<nav className="flex w-[180px] shrink-0 flex-col items-start gap-[14px]">
-					<p className="font-mono text-[11px]/4 text-muted-foreground tracking-widest">
-						PROJECT
-					</p>
-					{REPO_LINKS.map((link) => (
-						<Link
-							key={link.label}
-							variant="quiet"
-							href={link.href}
-							target="_blank"
-							rel="noreferrer"
-							className="text-[13px]/6"
-						>
-							{link.label}
-						</Link>
-					))}
-				</nav>
 			</div>
 
 			<div className="flex w-full justify-center border-border border-t">

@@ -51,6 +51,8 @@ const VERBS: Record<string, string> = {
 	create_company: "Created a company",
 	create_contact: "Added the person to the CRM",
 	update_crm_record: "Updated the CRM record",
+	propose_acquisition_candidates: "Prepared acquisition candidates for review",
+	write_acquisition_dossier: "Updated the acquisition dossier",
 
 	load_skill: "Read its instructions for this",
 	web_search: "Searched the web",

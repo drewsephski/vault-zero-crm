@@ -3,9 +3,14 @@ import {
 	AcquisitionAssetPreference,
 	AcquisitionOwnerInvolvement,
 	AcquisitionRevenuePreference,
+	AcquisitionStage,
 	type Prisma,
 	WorkspaceMode,
 } from "@crm/db";
+import {
+	acquisitionCandidateIdInput,
+	updateAcquisitionTargetInput,
+} from "../src/acquisition/acquisition.contracts";
 import {
 	myTasksInput,
 	taskCountsInput,
@@ -71,6 +76,34 @@ describe("acquisition profile contracts", () => {
 			updateAcquisitionProfileInput.safeParse({
 				...validProfile,
 				currency: "ZZZ",
+			}).success,
+		).toBe(false);
+	});
+});
+
+describe("acquisition operating contracts", () => {
+	it("accepts a candidate review decision", () => {
+		expect(acquisitionCandidateIdInput.parse({ id: "candidate-1" })).toEqual({
+			id: "candidate-1",
+		});
+	});
+
+	it("accepts every acquisition lifecycle stage", () => {
+		for (const stage of Object.values(AcquisitionStage)) {
+			expect(
+				updateAcquisitionTargetInput.safeParse({
+					companyId: "company-1",
+					stage,
+				}).success,
+			).toBe(true);
+		}
+	});
+
+	it("rejects an invented lifecycle stage", () => {
+		expect(
+			updateAcquisitionTargetInput.safeParse({
+				companyId: "company-1",
+				stage: "AUTO_QUALIFIED",
 			}).success,
 		).toBe(false);
 	});

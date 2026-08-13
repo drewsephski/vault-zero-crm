@@ -1,4 +1,3 @@
-
 datasource db {
   provider = "postgresql"
 }
@@ -30,7 +29,7 @@ model User {
   mailboxSyncs   MailboxSync[]
   factDecisions  ContactFact[]       @relation("FactDecider")
   conversations  AgentConversation[] @relation("ConversationOwner")
-  outreachLeads   OutreachLead[]
+  outreachLeads  OutreachLead[]
 
   members     Member[]
   invitations Invitation[]
@@ -135,6 +134,7 @@ enum RecordSource {
   EMAIL
   CALENDAR
   VAULT_ZERO
+  DISCOVERY
 }
 
 enum OutreachStatus {
@@ -172,9 +172,37 @@ enum AcquisitionAssetPreference {
   ASSET_HEAVY
 }
 
+enum AcquisitionStage {
+  DISCOVERED
+  RESEARCHING
+  QUALIFIED
+  WATCHLIST
+  CONTACTED
+  INTERESTED
+  OPPORTUNITY
+  DILIGENCE
+  REJECTED
+  ACQUIRED
+}
+
+enum AcquisitionFit {
+  UNKNOWN
+  STRONG
+  POTENTIAL
+  WEAK
+  DISQUALIFIED
+}
+
+enum AcquisitionCandidateStatus {
+  PROPOSED
+  APPROVED
+  DISMISSED
+  DUPLICATE
+}
+
 model AcquisitionProfile {
   id   String        @id
-  mode WorkspaceMode @default(SALES)
+  mode WorkspaceMode @default(ACQUISITION)
 
   preferredIndustries String[]
   geographies         String[]
@@ -199,6 +227,28 @@ model AcquisitionProfile {
   updatedAt DateTime @updatedAt
 
   @@map("acquisitionProfile")
+}
+
+model AcquisitionCandidate {
+  id          String                     @id @default(cuid())
+  name        String
+  domain      String                     @unique
+  website     String
+  rationale   String
+  evidence    String
+  sourceUrl   String
+  sourceTitle String?
+  status      AcquisitionCandidateStatus @default(PROPOSED)
+
+  companyId String?  @unique
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  sourceSessionId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@map("acquisitionCandidate")
 }
 
 model OutreachLead {
@@ -272,10 +322,12 @@ model Company {
   primaryContactId String?  @unique
   primaryContact   Contact? @relation("PrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
 
-  enrichmentStatus EnrichmentStatus   @default(PENDING)
-  enrichedAt       DateTime?
-  enrichmentError  String?
-  enrichment       CompanyEnrichment?
+  enrichmentStatus   EnrichmentStatus      @default(PENDING)
+  enrichedAt         DateTime?
+  enrichmentError    String?
+  enrichment         CompanyEnrichment?
+  acquisitionTarget  AcquisitionTarget?
+  discoveryCandidate AcquisitionCandidate?
 
   source RecordSource @default(MANUAL)
 
@@ -295,6 +347,30 @@ model Company {
   @@index([name])
   @@index([lastActivityAt])
   @@map("company")
+}
+
+model AcquisitionTarget {
+  companyId String  @id
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  stage              AcquisitionStage  @default(DISCOVERED)
+  fit                AcquisitionFit    @default(UNKNOWN)
+  summary            String?
+  strengths          Json
+  concerns           Json
+  missingInformation String[]
+  recommendedAction  String?
+  recommendedStage   AcquisitionStage?
+  sourceUrls         String[]
+  researchedAt       DateTime?
+  sourceSessionId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stage, fit])
+  @@index([researchedAt])
+  @@map("acquisitionTarget")
 }
 
 model CompanyEnrichment {
@@ -474,16 +550,16 @@ model VaultZeroLead {
 }
 
 model VaultZeroProposal {
-  id              String   @id @default(cuid())
-  proposalId      String   @unique
+  id               String   @id @default(cuid())
+  proposalId       String   @unique
   leadSubmissionId String?
-  status          String
-  payload         Json
-  companyId       String?
-  contactId       String?
-  dealId          String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  status           String
+  payload          Json
+  companyId        String?
+  contactId        String?
+  dealId           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([leadSubmissionId])
   @@index([companyId])
@@ -493,20 +569,20 @@ model VaultZeroProposal {
 }
 
 model VaultZeroEvent {
-  id           String               @id @default(cuid())
-  externalId   String               @unique
-  eventType    String
-  occurredAt   DateTime
-  status       VaultZeroEventStatus @default(PROCESSING)
-  payload      Json
-  vapiCallId   String?              @unique
-  companyId    String?
-  contactId    String?
-  dealId       String?
-  attempts     Int                  @default(0)
-  lastError    String?
-  receivedAt   DateTime             @default(now())
-  processedAt  DateTime?
+  id          String               @id @default(cuid())
+  externalId  String               @unique
+  eventType   String
+  occurredAt  DateTime
+  status      VaultZeroEventStatus @default(PROCESSING)
+  payload     Json
+  vapiCallId  String?              @unique
+  companyId   String?
+  contactId   String?
+  dealId      String?
+  attempts    Int                  @default(0)
+  lastError   String?
+  receivedAt  DateTime             @default(now())
+  processedAt DateTime?
 
   @@index([eventType, receivedAt])
   @@index([status, receivedAt])

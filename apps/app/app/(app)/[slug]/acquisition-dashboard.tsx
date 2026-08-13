@@ -19,6 +19,7 @@ import {
 import { Checkbox } from "@crm/ui/components/checkbox";
 import { StatGroup } from "@crm/ui/components/dashboard";
 import { EmptyCellValue } from "@crm/ui/components/empty-cell";
+import { Link as TextLink } from "@crm/ui/components/link";
 import {
 	SimpleTable,
 	type SimpleTableColumn,
@@ -31,6 +32,10 @@ import { formatCount, relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
+import {
+	AcquisitionFitIndicator,
+	AcquisitionStageIndicator,
+} from "@/components/crm/acquisition-status";
 import { RecordLink } from "@/components/crm/record-sheet/record-link";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
@@ -55,6 +60,18 @@ const OPPORTUNITY_COLUMNS: SimpleTableColumn[] = [
 	{ header: "Next action", width: "w-28", align: "right" },
 ];
 
+const TARGET_COLUMNS: SimpleTableColumn[] = [
+	{ header: "Target" },
+	{ header: "Fit", width: "w-28" },
+	{ header: "Research", width: "w-24", align: "right" },
+];
+
+const DISCOVERY_COLUMNS: SimpleTableColumn[] = [
+	{ header: "Candidate" },
+	{ header: "Evidence", width: "w-[42%]" },
+	{ srLabel: "Actions", width: "w-36", align: "right" },
+];
+
 export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
@@ -70,11 +87,29 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 			onError: (error) => toast.error(error.message),
 		}),
 	);
+	const approveCandidate = useMutation(
+		trpc.acquisition.approveCandidate.mutationOptions({
+			onSuccess: async () => {
+				await cache.everything();
+				toast.success("Target added and research queued.");
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+	const dismissCandidate = useMutation(
+		trpc.acquisition.dismissCandidate.mutationOptions({
+			onSuccess: async () => {
+				await cache.everything();
+				toast.success("Candidate dismissed.");
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
 
 	const fitDescription =
 		acquisition.visibleMatches === null
 			? "Add industry or geography criteria to compare targets"
-			: `${formatCount(acquisition.visibleMatches, "target")} of ${acquisition.totalTargets} match the industry and geography evidence on file`;
+			: `${formatCount(acquisition.visibleMatches, "target")} have an evidence-backed strong or potential fit`;
 
 	return (
 		<div className="order-last flex min-w-0 flex-col gap-6 @5xl/page-content:order-first">
@@ -87,7 +122,11 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 				<StatCard
 					label="Needs research"
 					value={acquisition.needsResearch}
-					description="Targets without a completed research pass"
+					description={
+						acquisition.activeAgentWork > 0
+							? `${formatCount(acquisition.activeAgentWork, "Eve task")} queued or running`
+							: "Targets without a completed research pass"
+					}
 				/>
 				<StatCard
 					label="Next actions"
@@ -101,7 +140,7 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 				<StatCard
 					label="Stale targets"
 					value={acquisition.staleTargets}
-					description={`No activity for ${acquisition.staleAfterDays} days`}
+					description={`Dossier not refreshed for ${acquisition.staleAfterDays} days`}
 				/>
 			</StatGroup>
 
@@ -119,6 +158,153 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 					</AlertAction>
 				</Alert>
 			) : null}
+
+			<div className="grid gap-6 @3xl/page-content:grid-cols-2">
+				<Card className="min-w-0">
+					<CardHeader>
+						<CardTitle>Targets worth attention</CardTitle>
+						<CardDescription>
+							The strongest current fit assessments, with Eve's next move
+						</CardDescription>
+						<CardAction>
+							<Button asChild variant="contrast" size="sm">
+								<Link href={workspaceUrl("/companies")}>All targets</Link>
+							</Button>
+						</CardAction>
+					</CardHeader>
+					<CardPanel>
+						{acquisition.priorityTargets.length === 0 ? (
+							<CardPanelEmpty>
+								No evidence-backed priority target yet. Approve a candidate or
+								queue research on an existing target.
+							</CardPanelEmpty>
+						) : (
+							<SimpleTable
+								variant="panel"
+								surface="page"
+								columns={TARGET_COLUMNS}
+							>
+								{acquisition.priorityTargets.map((target) => (
+									<SimpleTableRow key={target.company.id}>
+										<TableCell className={CELL}>
+											<span className="flex min-w-0 flex-col">
+												<RecordLink kind="company" id={target.company.id}>
+													{target.company.name}
+												</RecordLink>
+												<span className="truncate text-muted-foreground">
+													{target.recommendedAction ?? target.summary}
+												</span>
+											</span>
+										</TableCell>
+										<TableCell className={CELL}>
+											<span className="flex flex-col gap-1">
+												<AcquisitionFitIndicator fit={target.fit} />
+												<AcquisitionStageIndicator stage={target.stage} />
+											</span>
+										</TableCell>
+										<TableCell
+											className={`${CELL} text-right text-muted-foreground`}
+										>
+											{target.researchedAt ? (
+												<span suppressHydrationWarning>
+													{relativeTimeFromIso(target.researchedAt)}
+												</span>
+											) : (
+												<EmptyCellValue />
+											)}
+										</TableCell>
+									</SimpleTableRow>
+								))}
+							</SimpleTable>
+						)}
+					</CardPanel>
+				</Card>
+
+				<Card className="min-w-0">
+					<CardHeader>
+						<CardTitle>Discovery review</CardTitle>
+						<CardDescription>
+							{acquisition.discovery.count === 0
+								? "Eve saves credible companies here before they enter the CRM"
+								: `${formatCount(acquisition.discovery.count, "candidate")} waiting for a decision`}
+						</CardDescription>
+					</CardHeader>
+					<CardPanel>
+						{acquisition.discovery.items.length === 0 ? (
+							<CardPanelEmpty>
+								Ask Eve to find companies matching the buy box. Nothing becomes
+								a target until you approve it.
+							</CardPanelEmpty>
+						) : (
+							<SimpleTable
+								variant="panel"
+								surface="page"
+								columns={DISCOVERY_COLUMNS}
+							>
+								{acquisition.discovery.items.map((candidate) => {
+									const busy =
+										(approveCandidate.isPending &&
+											approveCandidate.variables?.id === candidate.id) ||
+										(dismissCandidate.isPending &&
+											dismissCandidate.variables?.id === candidate.id);
+									return (
+										<SimpleTableRow key={candidate.id}>
+											<TableCell className={CELL}>
+												<span className="flex min-w-0 flex-col">
+													<span className="truncate font-medium">
+														{candidate.name}
+													</span>
+													<span className="truncate text-muted-foreground">
+														{candidate.rationale}
+													</span>
+												</span>
+											</TableCell>
+											<TableCell className={CELL}>
+												<span className="flex min-w-0 flex-col">
+													<span className="line-clamp-2">
+														{candidate.evidence}
+													</span>
+													<TextLink
+														variant="quiet"
+														href={candidate.sourceUrl}
+														target="_blank"
+														rel="noreferrer noopener"
+													>
+														{candidate.sourceTitle ?? candidate.domain}
+													</TextLink>
+												</span>
+											</TableCell>
+											<TableCell className={`${CELL} text-right`}>
+												<span className="inline-flex gap-1">
+													<Button
+														variant="ghost"
+														size="sm"
+														disabled={busy}
+														onClick={() =>
+															dismissCandidate.mutate({ id: candidate.id })
+														}
+													>
+														Dismiss
+													</Button>
+													<Button
+														size="sm"
+														disabled={busy}
+														onClick={() =>
+															approveCandidate.mutate({ id: candidate.id })
+														}
+													>
+														Add target
+													</Button>
+												</span>
+											</TableCell>
+										</SimpleTableRow>
+									);
+								})}
+							</SimpleTable>
+						)}
+					</CardPanel>
+				</Card>
+			</div>
 
 			<div className="grid gap-6 @3xl/page-content:grid-cols-2">
 				<Card className="min-w-0">

@@ -6,12 +6,12 @@ import { BentoCard, CardHeading } from "./bento-card";
 import { SendArrow } from "./send-arrow";
 
 const QUESTIONS = [
-	"What do they do?",
-	"Who do we know here?",
-	"What has changed recently?",
+	"Why does this fit our buy box?",
+	"What important facts are missing?",
+	"What should we do next?",
 ];
 
-const PLACEHOLDER = "What do they sell?";
+const PLACEHOLDER = "Ask Eve about this target";
 
 /**
  * The one card a reader can actually drive: picking a question loads it into
@@ -24,8 +24,8 @@ export function AskCard() {
 	return (
 		<BentoCard className="grow gap-6">
 			<CardHeading
-				title="Ask any record a question"
-				body="It reads their site and our own history with them, and shows its working."
+				title="Ask any target a question"
+				body="Eve reads the record, the evidence, and your buy box before answering."
 			/>
 
 			<div className="flex grow flex-col justify-end gap-2.5">

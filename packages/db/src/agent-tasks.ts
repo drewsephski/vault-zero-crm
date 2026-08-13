@@ -6,6 +6,8 @@ export const TASK_KINDS = [
 	"profile",
 	"recheck",
 	"company-profile",
+	"acquisition-discovery",
+	"acquisition-refresh",
 	"workspace-profile",
 ] as const;
 
@@ -32,5 +34,7 @@ export const PRIORITY = {
 	identify: 100,
 	sweep: 50,
 	companyProfile: 40,
+	acquisitionDiscovery: 250,
+	acquisitionRefresh: 30,
 	recheck: 0,
 } as const;

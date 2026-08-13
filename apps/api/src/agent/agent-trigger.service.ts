@@ -91,6 +91,15 @@ export class AgentTriggerService {
 		});
 	}
 
+	async acquisitionProfileChanged(reason: string): Promise<void> {
+		await this.enqueue({
+			kind: "acquisition-discovery",
+			reason,
+			priority: PRIORITY.acquisitionDiscovery,
+			budget: 12,
+		});
+	}
+
 	async contactCreated(contactId: string, reason: string): Promise<void> {
 		await this.enqueue({
 			contactId,

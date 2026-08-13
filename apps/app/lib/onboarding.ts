@@ -3,8 +3,6 @@ import { API_URL } from "@/lib/env";
 
 export const ONBOARDING_PATH = "/onboarding";
 
-export const RESEARCH_PATH = "/onboarding/research";
-
 const GATE_TIMEOUT_MS = 2_000;
 
 export type Gate = "settled" | "required" | "unknown";
@@ -55,15 +53,4 @@ export async function readWorkspaceGate(
 		gate: workspace.onboarded || !workspace.canRename ? "settled" : "required",
 		slug,
 	};
-}
-
-export async function readResearchGate(request: NextRequest): Promise<Gate> {
-	const key = await read<{ configured?: boolean }>(
-		request,
-		"settings.researchKey",
-	);
-
-	if (typeof key?.configured !== "boolean") return "unknown";
-
-	return key.configured ? "settled" : "required";
 }

@@ -209,6 +209,12 @@ export class WorkspaceService {
 			update: { mode: input.mode },
 		});
 
+		if (input.mode === WorkspaceMode.ACQUISITION) {
+			await this.agent.acquisitionProfileChanged(
+				"Acquisition mode was enabled; find a small first set of candidates",
+			);
+		}
+
 		this.logger.log({
 			message: "Workspace mode changed",
 			userId,
@@ -244,9 +250,13 @@ export class WorkspaceService {
 
 		await this.db.acquisitionProfile.upsert({
 			where: { id: WORKSPACE_ID },
-			create: { id: WORKSPACE_ID, mode: WorkspaceMode.SALES, ...fields },
+			create: { id: WORKSPACE_ID, mode: WorkspaceMode.ACQUISITION, ...fields },
 			update: fields,
 		});
+
+		await this.agent.acquisitionProfileChanged(
+			"The buy box changed; refresh the discovery strategy",
+		);
 
 		this.logger.log({ message: "Acquisition profile updated", userId });
 
@@ -278,15 +288,28 @@ export class WorkspaceService {
 			);
 		}
 
-		await this.db.organization.update({
-			where: { id: WORKSPACE_ID },
-			data: {
-				name: input.name,
-				slug: workspaceSlug(input.name),
-				website,
-				metadata: markOnboarded(before?.metadata ?? null, new Date()),
-			},
-		});
+		await this.db.$transaction([
+			this.db.organization.update({
+				where: { id: WORKSPACE_ID },
+				data: {
+					name: input.name,
+					slug: workspaceSlug(input.name),
+					website,
+					metadata: markOnboarded(before?.metadata ?? null, new Date()),
+				},
+			}),
+			this.db.acquisitionProfile.upsert({
+				where: { id: WORKSPACE_ID },
+				create: {
+					id: WORKSPACE_ID,
+					mode: WorkspaceMode.ACQUISITION,
+					preferredIndustries: [],
+					geographies: [],
+					excludedCategories: [],
+				},
+				update: {},
+			}),
+		]);
 
 		this.logger.log({ message: "Workspace updated", userId });
 
@@ -296,6 +319,11 @@ export class WorkspaceService {
 				before?.website
 					? "The company using this CRM changed its website"
 					: "The company using this CRM said what its website is",
+			);
+		}
+		if (!isOnboarded(before?.metadata ?? null)) {
+			await this.agent.acquisitionProfileChanged(
+				"The workspace is ready; begin a bounded buy-box discovery pass",
 			);
 		}
 

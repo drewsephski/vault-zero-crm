@@ -52,10 +52,10 @@ export function ResearchKey() {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Company research</CardTitle>
+				<CardTitle>Optional website extraction</CardTitle>
 				<CardDescription>
-					Enter your Context API key so our agents can research every company in
-					the CRM.
+					Context can add structured first-party website research. Eve keeps
+					working from CRM history and other configured sources without it.
 				</CardDescription>
 
 				<CardAction>
@@ -101,7 +101,8 @@ export function ResearchKey() {
 								disabled={save.isPending}
 							/>
 							<FieldDescription>
-								Don't have a Context API key?{" "}
+								This is optional and can be configured by a workspace
+								administrator.{" "}
 								<a
 									href={CONTEXT_DEV_SIGNUP_URL}
 									target="_blank"

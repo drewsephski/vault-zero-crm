@@ -1,9 +1,11 @@
 import {
+	type AcquisitionFit,
+	type AcquisitionStage,
 	type Db,
 	type EnrichmentStatus,
 	type Prisma,
 	Prisma as PrismaNamespace,
-	type RecordSource,
+	RecordSource,
 } from "@crm/db";
 import {
 	BadRequestException,
@@ -70,7 +72,16 @@ export type CompanyRow = {
 	openDealCount: number;
 	lastActivityAt: string | null;
 	createdAt: string;
+	acquisitionTarget: {
+		stage: AcquisitionStage;
+		fit: AcquisitionFit;
+		researchedAt: string | null;
+		recommendedAction: string | null;
+	} | null;
 };
+
+type DossierEvidence = { label: string; url: string };
+type DossierFinding = { summary: string; evidence: DossierEvidence[] };
 
 const SORTABLE: Record<
 	string,
@@ -132,6 +143,14 @@ export class CompaniesService {
 					},
 					lastActivityAt: true,
 					createdAt: true,
+					acquisitionTarget: {
+						select: {
+							stage: true,
+							fit: true,
+							researchedAt: true,
+							recommendedAction: true,
+						},
+					},
 				},
 			}),
 			this.db.company.count({ where }),
@@ -159,6 +178,13 @@ export class CompaniesService {
 				openDealCount: row._count.deals,
 				lastActivityAt: row.lastActivityAt?.toISOString() ?? null,
 				createdAt: row.createdAt.toISOString(),
+				acquisitionTarget: row.acquisitionTarget
+					? {
+							...row.acquisitionTarget,
+							researchedAt:
+								row.acquisitionTarget.researchedAt?.toISOString() ?? null,
+						}
+					: null,
 			})),
 			total,
 			facetCounts,
@@ -198,6 +224,7 @@ export class CompaniesService {
 				enrichmentError: true,
 				source: true,
 				createdAt: true,
+				acquisitionTarget: true,
 				owner: { select: OWNER_SELECT },
 				primaryContact: {
 					select: {
@@ -241,13 +268,30 @@ export class CompaniesService {
 			throw new NotFoundException(`No company with id ${id}.`);
 		}
 
-		const { deals, primaryContact, enrichedAt, createdAt, ...rest } = company;
+		const {
+			deals,
+			primaryContact,
+			enrichedAt,
+			createdAt,
+			acquisitionTarget,
+			...rest
+		} = company;
 
 		return {
 			...rest,
 			queued: await this.queue.isQueued({ companyId: id }),
 			createdAt: createdAt.toISOString(),
 			enrichedAt: enrichedAt?.toISOString() ?? null,
+			acquisitionTarget: acquisitionTarget
+				? {
+						...acquisitionTarget,
+						strengths: parseDossierFindings(acquisitionTarget.strengths),
+						concerns: parseDossierFindings(acquisitionTarget.concerns),
+						researchedAt: acquisitionTarget.researchedAt?.toISOString() ?? null,
+						createdAt: acquisitionTarget.createdAt.toISOString(),
+						updatedAt: acquisitionTarget.updatedAt.toISOString(),
+					}
+				: null,
 			primaryContactId: primaryContact?.id ?? null,
 			primaryContact,
 			reportingCurrency: await this.conversion.reportingCurrency(),
@@ -271,7 +315,10 @@ export class CompaniesService {
 		});
 	}
 
-	async create(input: CompanyCreateInput) {
+	async create(
+		input: CompanyCreateInput,
+		source: RecordSource = RecordSource.MANUAL,
+	) {
 		const domain = normalizeDomain(input.domain);
 
 		if (domain) {
@@ -292,6 +339,7 @@ export class CompaniesService {
 				domain,
 				website: domain ? `https://${domain}` : null,
 				ownerId: input.ownerId ?? null,
+				source,
 			},
 			select: { id: true, name: true, domain: true },
 		});
@@ -634,4 +682,26 @@ export class CompaniesService {
 		}
 		return error;
 	}
+}
+
+function parseDossierFindings(value: Prisma.JsonValue): DossierFinding[] {
+	if (!Array.isArray(value)) return [];
+
+	return value.flatMap((item) => {
+		if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+		const summary = item.summary;
+		if (typeof summary !== "string" || !summary.trim()) return [];
+		const evidence = Array.isArray(item.evidence)
+			? item.evidence.flatMap((source) => {
+					if (!source || typeof source !== "object" || Array.isArray(source)) {
+						return [];
+					}
+					return typeof source.label === "string" &&
+						typeof source.url === "string"
+						? [{ label: source.label, url: source.url }]
+						: [];
+				})
+			: [];
+		return [{ summary, evidence }];
+	});
 }

@@ -244,4 +244,22 @@ describe("scheduleTask", () => {
 		expect(second.id).toBe(first.id);
 		expect(await db.agentTask.count({ where: { kind } })).toBe(1);
 	});
+
+	it("books a successor when the current task is leased", async () => {
+		const first = await scheduleTask({
+			kind,
+			reason: "current",
+			dueAt: new Date(Date.now() - 1000),
+		});
+		await claimDue(10, RESEARCH);
+
+		const successor = await scheduleTask({
+			kind,
+			reason: "refresh later",
+			dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+		});
+
+		expect(successor.id).not.toBe(first.id);
+		expect(await db.agentTask.count({ where: { kind } })).toBe(2);
+	});
 });

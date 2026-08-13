@@ -13,6 +13,7 @@ import { z } from "zod";
 
 const t = initTRPC.create();
 const publicProcedure = t.procedure;
+import { acquisitionCandidateIdInput, updateAcquisitionTargetInput } from "../acquisition/acquisition.contracts";
 import { timelineInput, timelineCountsInput, myTasksInput, taskCountsInput, activityCreateInput, completeInput } from "../activities/activities.contracts";
 import { companyListInput, companyIdInput, companyOptionsInput, companyCreateInput, companyUpdateArgs, companyBulkDeleteInput, companyBulkUpdateArgs, setPrimaryContactInput } from "../companies/companies.contracts";
 import { contactListInput, contactIdInput, contactCreateInput, contactUpdateArgs, contactBulkDeleteInput, contactBulkUpdateArgs, factDecisionInput } from "../contacts/contacts.contracts";
@@ -25,6 +26,7 @@ import { outreachListInput, outreachStatusInput } from "../outreach/outreach.con
 import { setAgentModelInput, setResearchKeyInput } from "../settings/settings.contracts";
 import { ssoProviderListInput, registerSsoProviderInput, deleteSsoProviderInput } from "../sso/sso.contracts";
 import { memberListInput, updateWorkspaceInput, setWorkspaceModeInput, updateAcquisitionProfileInput, setMemberRoleInput } from "../workspace/workspace.contracts";
+import type { AcquisitionRouter } from "../acquisition/acquisition.router";
 import type { ActivitiesRouter } from "../activities/activities.router";
 import type { CompaniesRouter } from "../companies/companies.router";
 import type { ContactsRouter } from "../contacts/contacts.router";
@@ -41,6 +43,17 @@ import type { UsersRouter } from "../users/users.router";
 import type { WorkspaceRouter } from "../workspace/workspace.router";
 
 const appRouter = t.router({
+  acquisition: t.router({
+    approveCandidate: publicProcedure
+      .input(acquisitionCandidateIdInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["approveCandidate"]>>),
+    dismissCandidate: publicProcedure
+      .input(acquisitionCandidateIdInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["dismissCandidate"]>>),
+    updateTarget: publicProcedure
+      .input(updateAcquisitionTargetInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["updateTarget"]>>)
+    }),
   activities: t.router({
     timeline: publicProcedure
       .input(timelineInput)

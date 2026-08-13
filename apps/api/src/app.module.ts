@@ -2,6 +2,7 @@ import { auth } from "@crm/auth";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule as BetterAuthModule } from "@thallesp/nestjs-better-auth";
+import { AcquisitionModule } from "./acquisition/acquisition.module";
 import { ActivitiesModule } from "./activities/activities.module";
 import { AuthModule } from "./auth/auth.module";
 import { BackfillModule } from "./backfill/backfill.module";
@@ -46,6 +47,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
 		TrpcModule,
 		UsersModule,
 		VaultZeroModule,
+		AcquisitionModule,
 		CompaniesModule,
 		ContactsModule,
 		ConversationsModule,

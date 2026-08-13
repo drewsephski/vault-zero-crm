@@ -1,5 +1,6 @@
 "use client";
 
+import { AcquisitionFit, AcquisitionStage } from "@crm/db/enums";
 import {
 	DataTable,
 	type DataTableColumn,
@@ -13,6 +14,10 @@ import {
 import { relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import {
+	AcquisitionFitIndicator,
+	AcquisitionStageIndicator,
+} from "@/components/crm/acquisition-status";
 import { BulkRecordActions } from "@/components/crm/bulk-record-actions";
 import {
 	ENRICHMENT_FACET_OPTIONS,
@@ -142,6 +147,29 @@ const COLUMNS: DataTableColumn<CompanyRow>[] = [
 	},
 ];
 
+const FIT_COLUMN: DataTableColumn<CompanyRow> = {
+	id: "fit",
+	header: "Fit",
+	width: "w-[12%]",
+	cell: (row) => (
+		<AcquisitionFitIndicator
+			fit={row.acquisitionTarget?.fit ?? AcquisitionFit.UNKNOWN}
+		/>
+	),
+};
+
+const STAGE_COLUMN: DataTableColumn<CompanyRow> = {
+	id: "stage",
+	header: "Lifecycle",
+	width: "w-[12%]",
+	hideBelow: "md",
+	cell: (row) => (
+		<AcquisitionStageIndicator
+			stage={row.acquisitionTarget?.stage ?? AcquisitionStage.DISCOVERED}
+		/>
+	),
+};
+
 export function CompaniesTable() {
 	const openRecord = useOpenRecord();
 	const trpc = useTRPC();
@@ -150,17 +178,24 @@ export function CompaniesTable() {
 	const { query, input } = useTableQuery(companiesSearchParams);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 	const selected = useMemo(() => [...selectedIds], [selectedIds]);
-	const columns = useMemo(
-		() =>
-			COLUMNS.map((column) =>
-				column.id === "name"
-					? { ...column, header: labels.company }
-					: column.id === "deals"
-						? { ...column, header: `Open ${labels.dealsLower}` }
-						: column,
-			),
-		[labels],
-	);
+	const columns = useMemo(() => {
+		const base = COLUMNS.map((column) =>
+			column.id === "name"
+				? { ...column, header: labels.company }
+				: column.id === "deals"
+					? { ...column, header: `Open ${labels.dealsLower}` }
+					: column,
+		);
+
+		return labels.acquisition
+			? [
+					base[0] as DataTableColumn<CompanyRow>,
+					FIT_COLUMN,
+					STAGE_COLUMN,
+					...base.slice(1),
+				]
+			: base;
+	}, [labels]);
 
 	const companies = useQuery({
 		...trpc.companies.list.queryOptions(input),
