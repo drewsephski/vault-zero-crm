@@ -24,6 +24,39 @@ export function isDirectKind(kind: string): kind is DirectKind {
 
 export const MAX_ATTEMPTS = 3;
 
+export const RETRYING_OUTCOME_PREFIX = "retrying:";
+
+type AgentTaskStateInput = {
+	dueAt: Date;
+	startedAt: Date | null;
+	finishedAt: Date | null;
+	outcome: string | null;
+	lastError: string | null;
+};
+
+export function agentTaskState(
+	task: AgentTaskStateInput | null,
+	now = new Date(),
+): {
+	status: "idle" | "queued" | "running" | "retrying" | "failed";
+	error: string | null;
+} {
+	if (!task) return { status: "idle", error: null };
+	if (task.finishedAt) {
+		return task.lastError
+			? { status: "failed", error: task.lastError }
+			: { status: "idle", error: null };
+	}
+	if (task.outcome?.startsWith(RETRYING_OUTCOME_PREFIX)) {
+		return { status: "retrying", error: task.lastError };
+	}
+	if (task.startedAt) return { status: "running", error: null };
+	if (task.dueAt.getTime() > now.getTime()) {
+		return { status: "idle", error: null };
+	}
+	return { status: "queued", error: null };
+}
+
 export const RETIRED_OUTCOME = `Gave up after ${MAX_ATTEMPTS} attempts: the session never reported back.`;
 
 export const PRIORITY = {

@@ -1,4 +1,4 @@
-import type { Db } from "@crm/db";
+import { type Db, Prisma } from "@crm/db";
 import { PRIORITY } from "@crm/db/agent-tasks";
 import { Injectable, Logger } from "@nestjs/common";
 import { waitUntil } from "@vercel/functions";
@@ -8,6 +8,8 @@ import { type Bridge, bridge } from "./bridge";
 const POKE_TIMEOUT_MS = 15_000;
 
 type Defer = (promise: Promise<unknown>) => void;
+
+type EnqueueResult = { taskId: string; created: boolean };
 
 export async function requestAgentDispatch(
 	agent: Bridge,
@@ -88,8 +90,8 @@ export class AgentTriggerService {
 	async companyResearchRequested(
 		companyId: string,
 		reason: string,
-	): Promise<void> {
-		await this.enqueue({
+	): Promise<EnqueueResult> {
+		return this.enqueue({
 			companyId,
 			kind: "company-profile",
 			reason,
@@ -101,8 +103,8 @@ export class AgentTriggerService {
 	async acquisitionTargetRequested(
 		companyId: string,
 		reason: string,
-	): Promise<void> {
-		await this.enqueue({
+	): Promise<EnqueueResult> {
+		return this.enqueue({
 			companyId,
 			kind: "acquisition-refresh",
 			reason,
@@ -111,8 +113,11 @@ export class AgentTriggerService {
 		});
 	}
 
-	async workspaceChanged(website: string, reason: string): Promise<void> {
-		await this.enqueue({
+	async workspaceChanged(
+		website: string,
+		reason: string,
+	): Promise<EnqueueResult> {
+		return this.enqueue({
 			kind: "workspace-profile",
 			reason: `${reason} (${website})`,
 			priority: PRIORITY.workspace,
@@ -120,8 +125,8 @@ export class AgentTriggerService {
 		});
 	}
 
-	async acquisitionProfileChanged(reason: string): Promise<void> {
-		await this.enqueue({
+	async acquisitionProfileChanged(reason: string): Promise<EnqueueResult> {
+		return this.enqueue({
 			kind: "acquisition-discovery",
 			reason,
 			priority: PRIORITY.acquisitionDiscovery,
@@ -129,8 +134,11 @@ export class AgentTriggerService {
 		});
 	}
 
-	async contactCreated(contactId: string, reason: string): Promise<void> {
-		await this.enqueue({
+	async contactCreated(
+		contactId: string,
+		reason: string,
+	): Promise<EnqueueResult> {
+		return this.enqueue({
 			contactId,
 			kind: "identify",
 			reason,
@@ -139,8 +147,8 @@ export class AgentTriggerService {
 		});
 	}
 
-	async meetingSoon(contactId: string, when: Date): Promise<void> {
-		await this.enqueue({
+	async meetingSoon(contactId: string, when: Date): Promise<EnqueueResult> {
+		return this.enqueue({
 			contactId,
 			kind: "meeting-prep",
 			reason: `Meeting on ${when.toDateString()} with someone we know nothing about`,
@@ -219,30 +227,39 @@ export class AgentTriggerService {
 		reason: string;
 		priority: number;
 		budget: number;
-	}): Promise<void> {
+	}): Promise<EnqueueResult> {
+		const now = new Date();
+		const subject = {
+			contactId: task.contactId ?? null,
+			companyId: task.companyId ?? null,
+		};
+
 		try {
 			const pending = await this.db.agentTask.findFirst({
 				where: {
 					kind: task.kind,
 					finishedAt: null,
-					...(task.contactId ? { contactId: task.contactId } : {}),
-					...(task.companyId ? { companyId: task.companyId } : {}),
+					...subject,
 				},
-				select: { id: true },
+				select: { id: true, dueAt: true, startedAt: true },
 			});
 
-			if (pending) return;
+			if (pending) {
+				const broughtForward = await this.bringForward(pending, task, now);
+				if (broughtForward) this.poke();
+				return { taskId: pending.id, created: false };
+			}
 
-			await this.db.agentTask.create({
+			const created = await this.db.agentTask.create({
 				data: {
-					contactId: task.contactId ?? null,
-					companyId: task.companyId ?? null,
+					...subject,
 					kind: task.kind,
 					reason: task.reason,
 					priority: task.priority,
 					budget: task.budget,
-					dueAt: new Date(),
+					dueAt: now,
 				},
+				select: { id: true },
 			});
 
 			this.logger.log({
@@ -253,12 +270,57 @@ export class AgentTriggerService {
 			});
 
 			this.poke();
+			return { taskId: created.id, created: true };
 		} catch (error) {
+			if (isUniqueConflict(error)) {
+				const pending = await this.db.agentTask.findFirst({
+					where: { kind: task.kind, finishedAt: null, ...subject },
+					select: { id: true, dueAt: true, startedAt: true },
+				});
+				if (pending) {
+					const broughtForward = await this.bringForward(pending, task, now);
+					if (broughtForward) this.poke();
+					return { taskId: pending.id, created: false };
+				}
+			}
+
 			this.logger.error(
 				{ message: "Could not queue agent task", kind: task.kind },
 				error instanceof Error ? error.stack : String(error),
 			);
+			throw error;
 		}
+	}
+
+	private async bringForward(
+		pending: { id: string; dueAt: Date; startedAt: Date | null },
+		task: {
+			reason: string;
+			priority: number;
+			budget: number;
+		},
+		now: Date,
+	): Promise<boolean> {
+		if (pending.startedAt || pending.dueAt.getTime() <= now.getTime()) {
+			return false;
+		}
+
+		const { count } = await this.db.agentTask.updateMany({
+			where: {
+				id: pending.id,
+				finishedAt: null,
+				startedAt: null,
+				dueAt: { gt: now },
+			},
+			data: {
+				dueAt: now,
+				reason: task.reason,
+				priority: task.priority,
+				budget: task.budget,
+			},
+		});
+
+		return count === 1;
 	}
 
 	private poke(): void {
@@ -289,4 +351,13 @@ export class AgentTriggerService {
 			void dispatch;
 		}
 	}
+}
+
+function isUniqueConflict(
+	error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+	return (
+		error instanceof Prisma.PrismaClientKnownRequestError &&
+		error.code === "P2002"
+	);
 }

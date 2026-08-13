@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@crm/db";
-import { DIRECT_KINDS } from "@crm/db/agent-tasks";
+import { ACQUISITION_TASK_INTERVAL_MS } from "@crm/db/acquisition";
+import { DIRECT_KINDS, RETRYING_OUTCOME_PREFIX } from "@crm/db/agent-tasks";
 import {
 	claimDue,
 	completeTask,
@@ -11,11 +12,17 @@ import {
 } from "../agent/lib/tasks";
 
 const kind = "test-lease";
+const acquisitionKind = "acquisition-refresh";
+const acquisitionCompanyId = `task-test-${crypto.randomUUID()}`;
 
 const RESEARCH = { except: DIRECT_KINDS } as const;
 
 async function clear() {
-	await db.agentTask.deleteMany({ where: { kind } });
+	await db.agentTask.deleteMany({
+		where: {
+			OR: [{ kind }, { companyId: acquisitionCompanyId }],
+		},
+	});
 	await db.contact.deleteMany({ where: { email: { startsWith: "lease-" } } });
 }
 
@@ -32,7 +39,7 @@ async function queue(
 			dueAt: overrides.dueAt ?? new Date(Date.now() - 1000),
 			priority: overrides.priority ?? 0,
 			budget: 4,
-			contactId: overrides.contactId ?? null,
+			contactId: overrides.contactId ?? `lease-task-${crypto.randomUUID()}`,
 		},
 		select: { id: true },
 	});
@@ -161,6 +168,7 @@ describe("retireExhausted", () => {
 		const row = await db.agentTask.findUnique({ where: { id: task.id } });
 		expect(row?.finishedAt).not.toBeNull();
 		expect(row?.outcome).toContain("Gave up");
+		expect(row?.lastError).toBe(row?.outcome);
 	});
 
 	it("leaves a row that is still leased on its last attempt alone", async () => {
@@ -195,6 +203,37 @@ describe("completeTask", () => {
 		const row = await db.agentTask.findUnique({ where: { id: task.id } });
 		expect(row?.outcome).toBe("ran");
 	});
+
+	it("clears failure state and schedules the next acquisition refresh", async () => {
+		const dueAt = new Date(Date.now() - 1000);
+		const task = await db.agentTask.create({
+			data: {
+				companyId: acquisitionCompanyId,
+				kind: acquisitionKind,
+				reason: "Analyze acquisition fit",
+				dueAt,
+				lastError: "Historical provider timeout",
+			},
+			select: { id: true },
+		});
+		await claimDue(10, RESEARCH);
+
+		const completedAfter = new Date();
+		await completeTask(task.id, "Dossier refreshed");
+
+		const rows = await db.agentTask.findMany({
+			where: { companyId: acquisitionCompanyId, kind: acquisitionKind },
+			orderBy: { createdAt: "asc" },
+		});
+		expect(rows).toHaveLength(2);
+		expect(rows[0]?.finishedAt).not.toBeNull();
+		expect(rows[0]?.lastError).toBeNull();
+		expect(rows[1]?.finishedAt).toBeNull();
+		expect(rows[1]?.startedAt).toBeNull();
+		expect(rows[1]?.dueAt.getTime()).toBeGreaterThanOrEqual(
+			completedAfter.getTime() + ACQUISITION_TASK_INTERVAL_MS[acquisitionKind],
+		);
+	});
 });
 
 describe("failTask", () => {
@@ -209,7 +248,10 @@ describe("failTask", () => {
 		const waiting = await db.agentTask.findUnique({ where: { id: task.id } });
 		expect(waiting?.finishedAt).toBeNull();
 		expect(waiting?.leasedUntil).toBeNull();
-		expect(waiting?.outcome).toContain("retrying");
+		expect(waiting?.outcome).toBe(
+			`${RETRYING_OUTCOME_PREFIX} The provider was rate limited.`,
+		);
+		expect(waiting?.lastError).toBe("The provider was rate limited.");
 
 		await db.agentTask.update({
 			where: { id: task.id },
@@ -218,6 +260,33 @@ describe("failTask", () => {
 		expect((await claimDue(10, RESEARCH)).map((row) => row.id)).toContain(
 			task.id,
 		);
+		const running = await db.agentTask.findUnique({ where: { id: task.id } });
+		expect(running?.outcome).toBeNull();
+		expect(running?.lastError).toBe("The provider was rate limited.");
+	});
+
+	it("finishes a terminal acquisition failure without a recurrence", async () => {
+		const task = await db.agentTask.create({
+			data: {
+				companyId: acquisitionCompanyId,
+				kind: acquisitionKind,
+				reason: "Analyze acquisition fit",
+				dueAt: new Date(Date.now() - 1000),
+				attempts: MAX_ATTEMPTS,
+			},
+			select: { id: true },
+		});
+
+		const result = await failTask(task.id, "Provider access was revoked.");
+
+		expect(result?.retrying).toBe(false);
+		const rows = await db.agentTask.findMany({
+			where: { companyId: acquisitionCompanyId, kind: acquisitionKind },
+		});
+		expect(rows).toHaveLength(1);
+		expect(rows[0]?.finishedAt).not.toBeNull();
+		expect(rows[0]?.outcome).toBe("Provider access was revoked.");
+		expect(rows[0]?.lastError).toBe("Provider access was revoked.");
 	});
 });
 
@@ -234,7 +303,7 @@ describe("scheduleTask", () => {
 		expect(row?.reason).toContain("Acme");
 	});
 
-	it("moves the existing booking rather than queueing a second one", async () => {
+	it("keeps the earlier existing booking rather than queueing a second one", async () => {
 		const soon = new Date(Date.now() + 1000);
 		const later = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 
@@ -243,23 +312,88 @@ describe("scheduleTask", () => {
 
 		expect(second.id).toBe(first.id);
 		expect(await db.agentTask.count({ where: { kind } })).toBe(1);
+		const row = await db.agentTask.findUnique({ where: { id: first.id } });
+		expect(row?.dueAt).toEqual(soon);
+		expect(row?.reason).toBe("first");
 	});
 
-	it("books a successor when the current task is leased", async () => {
+	it("leaves a running task untouched", async () => {
+		const dueAt = new Date(Date.now() - 1000);
 		const first = await scheduleTask({
 			kind,
 			reason: "current",
-			dueAt: new Date(Date.now() - 1000),
+			dueAt,
 		});
 		await claimDue(10, RESEARCH);
 
-		const successor = await scheduleTask({
+		const existing = await scheduleTask({
 			kind,
 			reason: "refresh later",
 			dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
 		});
 
-		expect(successor.id).not.toBe(first.id);
-		expect(await db.agentTask.count({ where: { kind } })).toBe(2);
+		expect(existing.id).toBe(first.id);
+		expect(await db.agentTask.count({ where: { kind } })).toBe(1);
+		const row = await db.agentTask.findUnique({ where: { id: first.id } });
+		expect(row?.dueAt).toEqual(dueAt);
+		expect(row?.reason).toBe("current");
+	});
+
+	it("converges concurrent acquisition scheduling on one task", async () => {
+		const results = await Promise.all(
+			Array.from({ length: 10 }, () =>
+				scheduleTask({
+					companyId: acquisitionCompanyId,
+					kind: acquisitionKind,
+					reason: "Refresh acquisition fit",
+					dueAt: new Date(Date.now() + 60_000),
+					priority: 30,
+					budget: 8,
+				}),
+			),
+		);
+
+		expect(new Set(results.map((result) => result.id)).size).toBe(1);
+		expect(
+			await db.agentTask.count({
+				where: {
+					companyId: acquisitionCompanyId,
+					kind: acquisitionKind,
+					finishedAt: null,
+				},
+			}),
+		).toBe(1);
+	});
+
+	it("brings a future unstarted acquisition refresh due now", async () => {
+		const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+		const first = await scheduleTask({
+			companyId: acquisitionCompanyId,
+			kind: acquisitionKind,
+			reason: "Scheduled recurrence",
+			dueAt: future,
+			priority: 30,
+			budget: 4,
+		});
+		const now = new Date();
+
+		const requested = await scheduleTask({
+			companyId: acquisitionCompanyId,
+			kind: acquisitionKind,
+			reason: "Manual acquisition refresh",
+			dueAt: now,
+			priority: 300,
+			budget: 12,
+		});
+
+		expect(requested.id).toBe(first.id);
+		expect(
+			await db.agentTask.count({ where: { companyId: acquisitionCompanyId } }),
+		).toBe(1);
+		const row = await db.agentTask.findUnique({ where: { id: first.id } });
+		expect(row?.dueAt).toEqual(now);
+		expect(row?.reason).toBe("Manual acquisition refresh");
+		expect(row?.priority).toBe(300);
+		expect(row?.budget).toBe(12);
 	});
 });

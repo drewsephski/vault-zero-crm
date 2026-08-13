@@ -1,5 +1,13 @@
 import { db, Prisma } from "@crm/db";
-import { MAX_ATTEMPTS, RETIRED_OUTCOME } from "@crm/db/agent-tasks";
+import {
+	ACQUISITION_TASK_INTERVAL_MS,
+	ACQUISITION_TASK_KINDS,
+} from "@crm/db/acquisition";
+import {
+	MAX_ATTEMPTS,
+	RETIRED_OUTCOME,
+	RETRYING_OUTCOME_PREFIX,
+} from "@crm/db/agent-tasks";
 
 export type LeasedTask = {
 	id: string;
@@ -92,7 +100,8 @@ export async function retireExhausted(): Promise<TaskSubject[]> {
 	return db.$queryRaw<TaskSubject[]>`
 		UPDATE "agentTask" AS t
 		SET "finishedAt" = ${now},
-			"outcome" = ${RETIRED_OUTCOME}
+			"outcome" = ${RETIRED_OUTCOME},
+			"lastError" = ${RETIRED_OUTCOME}
 		WHERE t."finishedAt" IS NULL
 			AND t."attempts" >= ${MAX_ATTEMPTS}
 			AND (t."leasedUntil" IS NULL OR t."leasedUntil" < ${now})
@@ -105,20 +114,58 @@ export async function completeTask(
 	outcome: string,
 	sessionId?: string,
 ): Promise<TaskSubject | null> {
-	const { count } = await db.agentTask.updateMany({
-		where: { id: taskId, finishedAt: null, outcome: null },
-		data: {
-			finishedAt: new Date(),
-			outcome: outcome.slice(0, 500),
-			...(sessionId ? { sessionId } : {}),
-		},
-	});
+	const now = new Date();
 
-	if (count === 0) return null;
+	return db.$transaction(async (tx) => {
+		const { count } = await tx.agentTask.updateMany({
+			where: { id: taskId, finishedAt: null, outcome: null },
+			data: {
+				finishedAt: now,
+				outcome: outcome.slice(0, 500),
+				lastError: null,
+				...(sessionId ? { sessionId } : {}),
+			},
+		});
 
-	return db.agentTask.findUnique({
-		where: { id: taskId },
-		select: { id: true, contactId: true, companyId: true, kind: true },
+		if (count === 0) return null;
+
+		const task = await tx.agentTask.findUnique({
+			where: { id: taskId },
+			select: {
+				id: true,
+				contactId: true,
+				companyId: true,
+				kind: true,
+				reason: true,
+				priority: true,
+				budget: true,
+			},
+		});
+
+		if (!task) return null;
+
+		if (isAcquisitionTaskKind(task.kind)) {
+			await tx.agentTask.create({
+				data: {
+					contactId: task.contactId,
+					companyId: task.companyId,
+					kind: task.kind,
+					reason: task.reason,
+					priority: task.priority,
+					budget: task.budget,
+					dueAt: new Date(
+						now.getTime() + ACQUISITION_TASK_INTERVAL_MS[task.kind],
+					),
+				},
+			});
+		}
+
+		return {
+			id: task.id,
+			contactId: task.contactId,
+			companyId: task.companyId,
+			kind: task.kind,
+		};
 	});
 }
 
@@ -141,16 +188,41 @@ export async function failTask(
 	if (!task || task.finishedAt) return null;
 
 	if (task.attempts >= MAX_ATTEMPTS) {
-		const subject = await completeTask(taskId, reason);
-		return subject ? { subject, retrying: false } : null;
+		const now = new Date();
+		const failure = reason.slice(0, 500);
+		const { count } = await db.agentTask.updateMany({
+			where: { id: taskId, finishedAt: null },
+			data: {
+				finishedAt: now,
+				leasedUntil: null,
+				outcome: failure,
+				lastError: failure,
+			},
+		});
+
+		return count === 1
+			? {
+					subject: {
+						id: task.id,
+						contactId: task.contactId,
+						companyId: task.companyId,
+						kind: task.kind,
+					},
+					retrying: false,
+				}
+			: null;
 	}
 
+	const now = new Date();
+	const retryAt = new Date(now.getTime() + RETRY_DELAY_MS);
+	const failure = reason.slice(0, 500);
 	const { count } = await db.agentTask.updateMany({
 		where: { id: taskId, finishedAt: null, outcome: null },
 		data: {
-			dueAt: new Date(Date.now() + RETRY_DELAY_MS),
+			dueAt: retryAt,
 			leasedUntil: null,
-			outcome: `retrying: ${reason}`.slice(0, 500),
+			lastError: failure,
+			outcome: `${RETRYING_OUTCOME_PREFIX} ${reason}`.slice(0, 500),
 		},
 	});
 
@@ -191,38 +263,50 @@ export async function scheduleTask(input: {
 	reason: string;
 	dueAt: Date;
 	priority?: number;
+	budget?: number;
 }): Promise<{ id: string }> {
-	const now = new Date();
+	const subject = {
+		contactId: input.contactId ?? null,
+		companyId: input.companyId ?? null,
+	};
 	const existing = await db.agentTask.findFirst({
 		where: {
 			kind: input.kind,
 			finishedAt: null,
-			OR: [{ leasedUntil: null }, { leasedUntil: { lt: now } }],
-			contactId: input.contactId ?? undefined,
-			companyId: input.companyId ?? undefined,
+			...subject,
 		},
-		select: { id: true },
+		select: { id: true, dueAt: true, startedAt: true },
 	});
 
 	if (existing) {
-		await db.agentTask.update({
-			where: { id: existing.id },
-			data: { dueAt: input.dueAt, reason: input.reason },
-		});
+		await bringTaskForward(existing, input);
 		return existing;
 	}
 
-	return db.agentTask.create({
-		data: {
-			contactId: input.contactId ?? null,
-			companyId: input.companyId ?? null,
-			kind: input.kind,
-			reason: input.reason,
-			dueAt: input.dueAt,
-			priority: input.priority ?? 0,
-		},
-		select: { id: true },
-	});
+	try {
+		return await db.agentTask.create({
+			data: {
+				...subject,
+				kind: input.kind,
+				reason: input.reason,
+				dueAt: input.dueAt,
+				priority: input.priority ?? 0,
+				budget: input.budget ?? 4,
+			},
+			select: { id: true },
+		});
+	} catch (error) {
+		if (!isUniqueConflict(error)) throw error;
+
+		const winner = await db.agentTask.findFirst({
+			where: { kind: input.kind, finishedAt: null, ...subject },
+			select: { id: true, dueAt: true, startedAt: true },
+		});
+		if (!winner) throw error;
+
+		await bringTaskForward(winner, input);
+		return { id: winner.id };
+	}
 }
 
 export async function lastDecision(contactId: string) {
@@ -240,3 +324,47 @@ export async function lastDecision(contactId: string) {
 }
 
 export type { Prisma };
+
+function isAcquisitionTaskKind(
+	kind: string,
+): kind is keyof typeof ACQUISITION_TASK_INTERVAL_MS {
+	return (ACQUISITION_TASK_KINDS as readonly string[]).includes(kind);
+}
+
+function isUniqueConflict(
+	error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+	return (
+		error instanceof Prisma.PrismaClientKnownRequestError &&
+		error.code === "P2002"
+	);
+}
+
+async function bringTaskForward(
+	existing: { id: string; dueAt: Date; startedAt: Date | null },
+	input: {
+		reason: string;
+		dueAt: Date;
+		priority?: number;
+		budget?: number;
+	},
+): Promise<void> {
+	if (existing.startedAt || existing.dueAt.getTime() <= input.dueAt.getTime()) {
+		return;
+	}
+
+	await db.agentTask.updateMany({
+		where: {
+			id: existing.id,
+			finishedAt: null,
+			startedAt: null,
+			dueAt: { gt: input.dueAt },
+		},
+		data: {
+			dueAt: input.dueAt,
+			reason: input.reason,
+			priority: input.priority ?? 0,
+			budget: input.budget ?? 4,
+		},
+	});
+}

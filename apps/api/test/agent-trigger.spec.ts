@@ -1,5 +1,7 @@
-import { describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { db } from "@crm/db";
 import {
+	AgentTriggerService,
 	keepAgentDispatchAlive,
 	requestAgentDispatch,
 } from "../src/agent/agent-trigger.service";
@@ -65,5 +67,93 @@ describe("keepAgentDispatchAlive", () => {
 		});
 
 		expect(defer).not.toHaveBeenCalled();
+	});
+});
+
+describe("AgentTriggerService", () => {
+	const companyId = `agent-trigger-${crypto.randomUUID()}`;
+	const service = new AgentTriggerService(db);
+
+	async function clear() {
+		await db.agentTask.deleteMany({ where: { companyId } });
+	}
+
+	beforeEach(clear);
+	afterEach(clear);
+
+	it("converges concurrent acquisition requests on one task", async () => {
+		const results = await Promise.all(
+			Array.from({ length: 10 }, () =>
+				service.acquisitionTargetRequested(
+					companyId,
+					"Analyze acquisition fit",
+				),
+			),
+		);
+
+		expect(results.every((result) => Boolean(result?.taskId))).toBe(true);
+		expect(new Set(results.map((result) => result.taskId)).size).toBe(1);
+		expect(results.filter((result) => result.created)).toHaveLength(1);
+		expect(
+			await db.agentTask.count({
+				where: { companyId, kind: "acquisition-refresh", finishedAt: null },
+			}),
+		).toBe(1);
+	});
+
+	it("brings a future acquisition recurrence due now", async () => {
+		const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+		const task = await db.agentTask.create({
+			data: {
+				companyId,
+				kind: "acquisition-refresh",
+				reason: "Scheduled recurrence",
+				dueAt: future,
+				priority: 30,
+				budget: 4,
+			},
+			select: { id: true },
+		});
+
+		const result = await service.acquisitionTargetRequested(
+			companyId,
+			"Manual acquisition refresh",
+		);
+
+		expect(result).toEqual({ taskId: task.id, created: false });
+		const row = await db.agentTask.findUnique({ where: { id: task.id } });
+		expect(row?.dueAt.getTime()).toBeLessThan(future.getTime());
+		expect(row?.reason).toBe("Manual acquisition refresh");
+		expect(row?.priority).toBe(300);
+		expect(row?.budget).toBe(12);
+	});
+
+	it("leaves a running acquisition task untouched", async () => {
+		const dueAt = new Date(Date.now() - 1000);
+		const startedAt = new Date();
+		const task = await db.agentTask.create({
+			data: {
+				companyId,
+				kind: "acquisition-refresh",
+				reason: "Running acquisition refresh",
+				dueAt,
+				startedAt,
+				priority: 30,
+				budget: 4,
+			},
+			select: { id: true },
+		});
+
+		const result = await service.acquisitionTargetRequested(
+			companyId,
+			"Manual acquisition refresh",
+		);
+
+		expect(result).toEqual({ taskId: task.id, created: false });
+		const row = await db.agentTask.findUnique({ where: { id: task.id } });
+		expect(row?.reason).toBe("Running acquisition refresh");
+		expect(row?.dueAt).toEqual(dueAt);
+		expect(row?.priority).toBe(30);
+		expect(row?.budget).toBe(4);
 	});
 });
