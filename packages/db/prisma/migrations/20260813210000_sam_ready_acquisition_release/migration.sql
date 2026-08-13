@@ -5,7 +5,7 @@ ALTER TABLE "agentTask" ADD COLUMN "lastError" TEXT;
 WITH ranked AS (
   SELECT "id", ROW_NUMBER() OVER (
     PARTITION BY "kind", COALESCE("contactId", ''), COALESCE("companyId", '')
-    ORDER BY "priority" DESC, "dueAt" ASC, "createdAt" ASC
+    ORDER BY "priority" DESC, "dueAt" ASC, "createdAt" ASC, "id" ASC
   ) AS position
   FROM "agentTask"
   WHERE "finishedAt" IS NULL
