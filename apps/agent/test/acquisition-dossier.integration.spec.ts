@@ -304,7 +304,7 @@ async function seedDossierA(): Promise<void> {
 	});
 	await db.company.update({
 		where: { id: companyId },
-		data: { lastActivityAt: timestampA },
+		data: { ownerId: userId, lastActivityAt: timestampA },
 	});
 }
 
@@ -443,5 +443,78 @@ describe("write_acquisition_dossier", () => {
 		});
 		expect(activities[0]?.body).toContain(baseDossierB.summary);
 		expect(tasks).toHaveLength(0);
+	});
+
+	it("preserves dossier A when no activity author exists", async () => {
+		await db.company.update({
+			where: { id: companyId },
+			data: { ownerId: null },
+		});
+		const authorLookup = db.user.findFirst;
+		db.user.findFirst = (async () => null) as typeof db.user.findFirst;
+
+		const observed = await (async () => {
+			try {
+				const result = await writeAcquisitionDossier.execute(
+					{
+						...baseDossierB,
+						companyId,
+						criteria: validCriteria,
+					},
+					toolContext,
+				);
+				const [target, company, activityCount] = await Promise.all([
+					db.acquisitionTarget.findUnique({
+						where: { companyId },
+						select: {
+							stage: true,
+							fit: true,
+							summary: true,
+							strengths: true,
+							concerns: true,
+							criteria: true,
+							missingInformation: true,
+							recommendedAction: true,
+							recommendedStage: true,
+							sourceUrls: true,
+							researchedAt: true,
+							sourceSessionId: true,
+						},
+					}),
+					db.company.findUnique({
+						where: { id: companyId },
+						select: { lastActivityAt: true },
+					}),
+					db.activity.count({ where: { companyId } }),
+				]);
+
+				return { result, target, company, activityCount };
+			} finally {
+				db.user.findFirst = authorLookup;
+			}
+		})();
+
+		expect(observed).toEqual({
+			result: {
+				written: false,
+				reason: "No user to attribute to.",
+			},
+			target: {
+				stage: AcquisitionStage.QUALIFIED,
+				fit: AcquisitionFit.WEAK,
+				summary: "Dossier A remains the last complete acquisition assessment.",
+				strengths: dossierAStrengths,
+				concerns: dossierAConcerns,
+				criteria: dossierACriteria,
+				missingInformation: ["Prior revenue gap"],
+				recommendedAction: "Keep the prior dossier unchanged.",
+				recommendedStage: AcquisitionStage.WATCHLIST,
+				sourceUrls: ["https://prior.example.test/dossier"],
+				researchedAt: timestampA,
+				sourceSessionId: "dossier-a-session",
+			},
+			company: { lastActivityAt: timestampA },
+			activityCount: 0,
+		});
 	});
 });

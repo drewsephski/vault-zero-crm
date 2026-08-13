@@ -113,7 +113,6 @@ export default defineTool({
 				),
 			),
 		];
-		const researchedAt = new Date();
 		const authorId =
 			company.ownerId ??
 			(
@@ -123,6 +122,10 @@ export default defineTool({
 				})
 			)?.id ??
 			null;
+		if (!authorId) {
+			return { written: false as const, reason: "No user to attribute to." };
+		}
+		const researchedAt = new Date();
 
 		await db.$transaction(async (tx) => {
 			await tx.acquisitionTarget.upsert({
@@ -156,24 +159,22 @@ export default defineTool({
 				},
 			});
 
-			if (authorId) {
-				await tx.activity.create({
-					data: {
-						type: ActivityType.ENRICHMENT,
-						subject: `Acquisition dossier updated — ${company.name}`,
-						body: dossierActivity(input),
-						occurredAt: researchedAt,
-						companyId: company.id,
-						createdById: authorId,
-						meta: {
-							fit: input.fit,
-							previousFit: company.acquisitionTarget?.fit ?? null,
-							sourceUrls,
-							agent: "acquisition-research",
-						},
+			await tx.activity.create({
+				data: {
+					type: ActivityType.ENRICHMENT,
+					subject: `Acquisition dossier updated — ${company.name}`,
+					body: dossierActivity(input),
+					occurredAt: researchedAt,
+					companyId: company.id,
+					createdById: authorId,
+					meta: {
+						fit: input.fit,
+						previousFit: company.acquisitionTarget?.fit ?? null,
+						sourceUrls,
+						agent: "acquisition-research",
 					},
-				});
-			}
+				},
+			});
 
 			await tx.company.update({
 				where: { id: company.id },
