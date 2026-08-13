@@ -791,7 +791,8 @@ function parseDossierFindings(value: Prisma.JsonValue): DossierFinding[] {
 						return [];
 					}
 					return typeof source.label === "string" &&
-						typeof source.url === "string"
+						typeof source.url === "string" &&
+						isAcquisitionEvidenceUrl(source.url)
 						? [{ label: source.label, url: source.url }]
 						: [];
 				})

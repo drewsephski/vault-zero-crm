@@ -2,6 +2,7 @@
 
 import type { AcquisitionTargetView } from "@crm/db/acquisition";
 import { AcquisitionFit, AcquisitionStage } from "@crm/db/enums";
+import { Button } from "@crm/ui/components/button";
 import {
 	DataTable,
 	type DataTableColumn,
@@ -37,6 +38,41 @@ import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
 import { companiesSearchParams } from "./companies-search-params";
 
 type CompanyRow = RouterOutputs["companies"]["list"]["rows"][number];
+
+type AcquisitionTargetCellTarget = Pick<
+	CompanyRow,
+	"id" | "name" | "iconUrl" | "iconDarkUrl" | "iconTone" | "logoUrl"
+>;
+
+export function AcquisitionTargetCell({
+	target,
+	onOpen,
+}: {
+	target: AcquisitionTargetCellTarget;
+	onOpen: (companyId: string) => void;
+}) {
+	return (
+		<Button
+			type="button"
+			variant="link"
+			size="sm"
+			aria-label={`Open ${target.name} acquisition dossier`}
+			onClick={(event) => {
+				event.stopPropagation();
+				onOpen(target.id);
+			}}
+		>
+			<EntityLogo
+				src={target.iconUrl ?? target.logoUrl}
+				darkSrc={target.iconDarkUrl}
+				tone={target.iconTone as EntityLogoTone | null | undefined}
+				name={target.name}
+				size="sm"
+			/>
+			<span>{target.name}</span>
+		</Button>
+	);
+}
 
 const COLUMNS: DataTableColumn<CompanyRow>[] = [
 	{
@@ -237,6 +273,14 @@ export function CompaniesTable() {
 				...(base[0] as DataTableColumn<CompanyRow>),
 				header: "Target",
 				width: "w-[26%]",
+				cell: (row: CompanyRow) => (
+					<AcquisitionTargetCell
+						target={row}
+						onOpen={(companyId) =>
+							openRecord({ kind: "company", id: companyId })
+						}
+					/>
+				),
 			},
 			FIT_COLUMN,
 			STAGE_COLUMN,
@@ -244,7 +288,7 @@ export function CompaniesTable() {
 			RESEARCH_COLUMN,
 			ACQUISITION_OWNER_COLUMN,
 		];
-	}, [labels]);
+	}, [labels, openRecord]);
 
 	const companies = useQuery({
 		...trpc.companies.list.queryOptions(listInput),

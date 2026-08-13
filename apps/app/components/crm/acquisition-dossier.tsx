@@ -29,6 +29,7 @@ import {
 import { relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useId } from "react";
 import { toast } from "sonner";
 import {
 	ACQUISITION_STAGES,
@@ -46,7 +47,12 @@ import {
 	DetailSheetSection,
 	DetailSheetSplit,
 } from "@/components/detail-sheet";
-import { criterionGroups, targetResearchCopy } from "@/lib/acquisition";
+import {
+	acquisitionCriterionLabel,
+	criterionGroups,
+	safeAcquisitionEvidence,
+	targetResearchCopy,
+} from "@/lib/acquisition";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
@@ -55,20 +61,6 @@ import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 type Company = RouterOutputs["companies"]["byId"];
 type Target = NonNullable<Company["acquisitionTarget"]>;
 type Finding = Target["strengths"][number];
-
-const CRITERION_LABELS: Record<AcquisitionCriterionAssessment["id"], string> = {
-	industry: "Industry",
-	geography: "Geography",
-	"excluded-categories": "Excluded categories",
-	revenue: "Revenue",
-	ebitda: "EBITDA",
-	"purchase-price": "Purchase price",
-	"owner-involvement": "Owner involvement",
-	"recurring-revenue": "Recurring revenue",
-	"customer-concentration": "Customer concentration",
-	"asset-profile": "Asset profile",
-	financing: "Financing",
-};
 
 const CRITERION_PRESENTATION = {
 	MATCH: { label: "Matches", tone: "success" as const },
@@ -135,7 +127,7 @@ export function AcquisitionDossier({
 								{target.criteria.map((criterion) => (
 									<DetailSheetProperty
 										key={criterion.id}
-										label={CRITERION_LABELS[criterion.id]}
+										label={acquisitionCriterionLabel(criterion.id)}
 									>
 										<CriterionResult criterion={criterion} />
 									</DetailSheetProperty>
@@ -296,45 +288,78 @@ export function AcquisitionDossier({
 
 			<DetailSheetSection title="Lifecycle">
 				<DetailSheetProperties columns={1}>
-					<DetailSheetProperty
-						label={
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<Button type="button" variant="ghost" size="xs">
-										Lifecycle
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent>Manually controlled</TooltipContent>
-							</Tooltip>
+					<LifecycleControl
+						stage={target.stage}
+						pending={updateStage.isPending}
+						onStageChange={(stage) =>
+							updateStage.mutate({ companyId: company.id, stage })
 						}
-					>
-						<Select
-							value={target.stage}
-							disabled={updateStage.isPending}
-							onValueChange={(value) =>
-								updateStage.mutate({
-									companyId: company.id,
-									stage: value as AcquisitionStage,
-								})
-							}
-						>
-							<SelectTrigger size="sm">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectGroup>
-									{ACQUISITION_STAGES.map((stage) => (
-										<SelectItem key={stage} value={stage}>
-											{acquisitionStageLabel(stage)}
-										</SelectItem>
-									))}
-								</SelectGroup>
-							</SelectContent>
-						</Select>
-					</DetailSheetProperty>
+					/>
 				</DetailSheetProperties>
 			</DetailSheetSection>
 		</DetailSheetBody>
+	);
+}
+
+export function LifecycleControl({
+	stage,
+	pending,
+	onStageChange,
+}: {
+	stage: AcquisitionStage;
+	pending: boolean;
+	onStageChange: (stage: AcquisitionStage) => void;
+}) {
+	const labelId = useId();
+	const statusId = useId();
+
+	return (
+		<DetailSheetProperty
+			label={
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button id={labelId} type="button" variant="ghost" size="xs">
+							Lifecycle
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent>Manually controlled</TooltipContent>
+				</Tooltip>
+			}
+		>
+			<div className="flex flex-col items-start gap-1">
+				<Select
+					value={stage}
+					disabled={pending}
+					onValueChange={(value) => onStageChange(value as AcquisitionStage)}
+				>
+					<SelectTrigger
+						size="sm"
+						aria-labelledby={labelId}
+						aria-describedby={statusId}
+						aria-busy={pending}
+					>
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectGroup>
+							{ACQUISITION_STAGES.map((option) => (
+								<SelectItem key={option} value={option}>
+									{acquisitionStageLabel(option)}
+								</SelectItem>
+							))}
+						</SelectGroup>
+					</SelectContent>
+				</Select>
+				<span
+					id={statusId}
+					role="status"
+					aria-live="polite"
+					className="text-muted-foreground text-xs"
+				>
+					{pending ? "Saving lifecycle" : null}
+				</span>
+			</div>
+		</DetailSheetProperty>
 	);
 }
 
@@ -366,14 +391,14 @@ function CriterionGroup({
 					<div key={criterion.id} className="flex flex-col gap-1.5">
 						<div className="flex flex-wrap items-center justify-between gap-2">
 							<p className="font-medium text-xs">
-								{CRITERION_LABELS[criterion.id]}
+								{acquisitionCriterionLabel(criterion.id)}
 							</p>
 							<CriterionResult criterion={criterion} />
 						</div>
 						<DetailSheetProse>{criterion.explanation}</DetailSheetProse>
-						{criterion.evidence.length > 0 ? (
+						{safeAcquisitionEvidence(criterion.evidence).length > 0 ? (
 							<div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground text-xs">
-								{criterion.evidence.map((evidence) => (
+								{safeAcquisitionEvidence(criterion.evidence).map((evidence) => (
 									<TextLink
 										key={`${evidence.url}-${evidence.label}`}
 										variant="quiet"
@@ -412,7 +437,7 @@ function AcquisitionFindings({
 						<li key={finding.summary} className="flex flex-col gap-1.5">
 							<p className="text-pretty text-xs/5">{finding.summary}</p>
 							<div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground text-xs">
-								{finding.evidence.map((evidence) => (
+								{safeAcquisitionEvidence(finding.evidence).map((evidence) => (
 									<TextLink
 										key={`${evidence.url}-${evidence.label}`}
 										variant="quiet"

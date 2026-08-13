@@ -1,5 +1,37 @@
-import type { AcquisitionCriterionAssessment } from "@crm/db/acquisition";
+import {
+	type AcquisitionCriterionAssessment,
+	isAcquisitionEvidenceUrl,
+} from "@crm/db/acquisition";
 import type { StatusTone } from "@crm/ui/components/status-indicator";
+
+const ACQUISITION_CRITERION_LABELS: Record<
+	AcquisitionCriterionAssessment["id"],
+	string
+> = {
+	industry: "Industry",
+	geography: "Geography",
+	"excluded-categories": "Excluded categories",
+	revenue: "Annual revenue",
+	ebitda: "EBITDA or SDE",
+	"purchase-price": "Purchase price",
+	"owner-involvement": "Owner involvement",
+	"recurring-revenue": "Recurring revenue",
+	"customer-concentration": "Maximum customer concentration",
+	"asset-profile": "Asset profile",
+	financing: "Financing assumptions",
+};
+
+export function acquisitionCriterionLabel(
+	id: AcquisitionCriterionAssessment["id"],
+): string {
+	return ACQUISITION_CRITERION_LABELS[id];
+}
+
+export function safeAcquisitionEvidence<
+	TEvidence extends { label: string; url: string },
+>(evidence: readonly TEvidence[]): TEvidence[] {
+	return evidence.filter((source) => isAcquisitionEvidenceUrl(source.url));
+}
 
 type CompanyTargetState =
 	| { acquisitionTarget?: unknown | null }

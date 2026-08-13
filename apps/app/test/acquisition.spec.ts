@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { companiesSearchParams } from "../app/(app)/[slug]/companies/companies-search-params";
 import {
+	acquisitionCriterionLabel,
 	criterionGroups,
 	defaultCompanyTab,
+	safeAcquisitionEvidence,
 	targetResearchCopy,
 } from "../lib/acquisition";
 
@@ -15,6 +17,46 @@ describe("acquisition presentation", () => {
 				targetView: "all",
 			}),
 		).toMatchObject({ targetView: "active" });
+	});
+
+	it("keeps URL target views aligned with the visible control", async () => {
+		for (const [raw, control, api] of [
+			[undefined, "all", "active"],
+			["all", "all", "active"],
+			["rejected", "rejected", "rejected"],
+			["acquired", "acquired", "acquired"],
+			["history", "history", "history"],
+			["active", "all", "active"],
+			["invented", "all", "active"],
+		] as const) {
+			const values = await companiesSearchParams.load({ targetView: raw });
+
+			expect(values.targetView).toBe(control);
+			expect(companiesSearchParams.toInput(values).targetView).toBe(api);
+		}
+	});
+
+	it("uses the decision-ready buy-box labels", () => {
+		expect(acquisitionCriterionLabel("revenue")).toBe("Annual revenue");
+		expect(acquisitionCriterionLabel("ebitda")).toBe("EBITDA or SDE");
+		expect(acquisitionCriterionLabel("customer-concentration")).toBe(
+			"Maximum customer concentration",
+		);
+		expect(acquisitionCriterionLabel("financing")).toBe(
+			"Financing assumptions",
+		);
+	});
+
+	it("keeps unsafe evidence out of presentation links", () => {
+		expect(
+			safeAcquisitionEvidence([
+				{ label: "Company profile", url: "https://target.test/profile" },
+				{ label: "Unsafe", url: "javascript:alert(document.domain)" },
+				{ label: "Local file", url: "file:///etc/passwd" },
+			]),
+		).toEqual([
+			{ label: "Company profile", url: "https://target.test/profile" },
+		]);
 	});
 
 	it("defaults real targets to Acquisition without changing generic companies", () => {

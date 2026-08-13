@@ -319,6 +319,64 @@ describe("acquisition dossier read model", () => {
 			).toEqual([]);
 		}
 	});
+
+	it("removes unsafe finding evidence URLs from the read model", async () => {
+		const domain = `dossier-findings-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const company = await db.company.create({
+			data: {
+				name: "Dossier Finding Target",
+				domain,
+				acquisitionTarget: {
+					create: {
+						strengths: [
+							{
+								summary: "A supported operating strength.",
+								evidence: [
+									{
+										label: "Company profile",
+										url: `https://${domain}/profile`,
+									},
+									{
+										label: "Unsafe source",
+										url: "javascript:alert(document.domain)",
+									},
+								],
+							},
+						],
+						concerns: [
+							{
+								summary: "A concern with unsafe evidence.",
+								evidence: [{ label: "Local file", url: "file:///etc/passwd" }],
+							},
+						],
+						criteria: [],
+						missingInformation: [],
+						sourceUrls: [],
+					},
+				},
+			},
+			select: { id: true },
+		});
+		companyIds.push(company.id);
+
+		const target = (await companyService().byId(company.id)).acquisitionTarget;
+
+		expect(target?.strengths).toEqual([
+			{
+				summary: "A supported operating strength.",
+				evidence: [
+					{
+						label: "Company profile",
+						url: `https://${domain}/profile`,
+					},
+				],
+			},
+		]);
+		expect(target?.concerns).toEqual([
+			{ summary: "A concern with unsafe evidence.", evidence: [] },
+		]);
+	});
 });
 
 describe("acquisition target mutations", () => {

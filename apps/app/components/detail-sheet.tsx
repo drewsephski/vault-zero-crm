@@ -198,7 +198,11 @@ export function DetailSheetTabs({
 		>
 			<TabsList
 				variant="line"
-				className={cn("w-full shrink-0 justify-start gap-6 border-b", GUTTER)}
+				aria-label="Record sections"
+				className={cn(
+					"w-full shrink-0 justify-start gap-6 overflow-x-auto border-b",
+					GUTTER,
+				)}
 			>
 				{tabs.map((tab) => (
 					<TabsTrigger key={tab.value} value={tab.value}>
