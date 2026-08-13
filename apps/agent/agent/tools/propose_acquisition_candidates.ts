@@ -1,10 +1,8 @@
 import { AcquisitionCandidateStatus, db, WorkspaceMode } from "@crm/db";
-import { PRIORITY } from "@crm/db/agent-tasks";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { normalizeDomain } from "../lib/record-writes";
-import { scheduleTask } from "../lib/tasks";
 
 const candidate = z.object({
 	name: z.string().trim().min(1).max(160),
@@ -19,7 +17,7 @@ export default defineTool({
 	description:
 		"Save a bounded set of evidence-backed acquisition candidates for human review. Use only after web research confirms each company's real website. This does not create CRM companies, and dismissed or existing domains stay out.",
 	inputSchema: z.object({
-		candidates: z.array(candidate).min(1).max(20),
+		candidates: z.array(candidate).min(1).max(10),
 	}),
 	async execute({ candidates }, ctx) {
 		const profile = await db.acquisitionProfile.findUnique({
@@ -75,17 +73,9 @@ export default defineTool({
 			});
 		}
 
-		await scheduleTask({
-			kind: "acquisition-discovery",
-			reason: "Weekly buy-box discovery refresh",
-			dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-			priority: PRIORITY.acquisitionDiscovery,
-		});
-
 		return {
 			saved: fresh.length,
 			skipped: candidates.length - fresh.length,
-			nextRefreshInDays: 7,
 		};
 	},
 });

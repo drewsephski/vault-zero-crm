@@ -61,9 +61,95 @@ describe("agent tool contracts", () => {
 		).toBe(true);
 	});
 
+	it("accepts no more than ten discovery candidates", () => {
+		const candidate = {
+			name: "Example Mechanical",
+			domain: "example-mechanical.test",
+			rationale:
+				"Its service profile appears aligned with the current buy box.",
+			evidence: "The company website describes commercial HVAC maintenance.",
+			sourceUrl: "https://example-mechanical.test",
+			sourceTitle: "Company website",
+		};
+		const candidates = Array.from({ length: 10 }, (_, index) => ({
+			...candidate,
+			name: `${candidate.name} ${index}`,
+			domain: `example-mechanical-${index}.test`,
+			sourceUrl: `https://example-mechanical-${index}.test`,
+		}));
+
+		expect(
+			proposeAcquisitionCandidates.inputSchema.safeParse({ candidates })
+				.success,
+		).toBe(true);
+		expect(
+			proposeAcquisitionCandidates.inputSchema.safeParse({
+				candidates: [
+					...candidates,
+					{
+						...candidate,
+						name: `${candidate.name} 10`,
+						domain: "example-mechanical-10.test",
+						sourceUrl: "https://example-mechanical-10.test",
+					},
+				],
+			}).success,
+		).toBe(false);
+	});
+
+	it("enforces evidence and blocker rules for acquisition criteria", () => {
+		const dossier = {
+			companyId: "company-1",
+			fit: "POTENTIAL",
+			summary:
+				"The business is a plausible fit, pending confirmation of its economics.",
+			strengths: [],
+			concerns: [],
+			missingInformation: ["Revenue and owner transition preference"],
+			recommendedAction: "Confirm ownership and financial scale.",
+			recommendedStage: "QUALIFIED",
+		};
+		const assessment = {
+			id: "industry",
+			result: "MATCH",
+			explanation: "The company operates in a preferred service category.",
+			blocksQualification: false,
+			evidence: [],
+		};
+
+		for (const result of ["MATCH", "PARTIAL", "CONCERN"] as const) {
+			expect(
+				writeAcquisitionDossier.inputSchema.safeParse({
+					...dossier,
+					criteria: [{ ...assessment, result }],
+				}).success,
+			).toBe(false);
+		}
+
+		expect(
+			writeAcquisitionDossier.inputSchema.safeParse({
+				...dossier,
+				criteria: [
+					{
+						...assessment,
+						result: "UNKNOWN",
+						blocksQualification: true,
+					},
+				],
+			}).success,
+		).toBe(true);
+		expect(
+			writeAcquisitionDossier.inputSchema.safeParse({
+				...dossier,
+				criteria: [{ ...assessment, blocksQualification: true }],
+			}).success,
+		).toBe(false);
+	});
+
 	it("requires evidence for every acquisition conclusion", () => {
 		const dossier = {
 			companyId: "company-1",
+			criteria: [],
 			fit: "STRONG",
 			summary:
 				"The business is a plausible fit, pending confirmation of its economics.",

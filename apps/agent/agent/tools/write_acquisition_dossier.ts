@@ -5,11 +5,14 @@ import {
 	db,
 	WorkspaceMode,
 } from "@crm/db";
-import { PRIORITY } from "@crm/db/agent-tasks";
+import { expectedAcquisitionCriterionIds } from "@crm/db/acquisition";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { scheduleTask } from "../lib/tasks";
+import {
+	acquisitionCriteriaSchema,
+	validateCriterionAssessments,
+} from "../lib/acquisition-criteria";
 
 const evidence = z.object({
 	label: z.string().trim().min(5).max(300),
@@ -26,6 +29,7 @@ export default defineTool({
 		"Write the structured acquisition dossier for a CRM company after research. Every strength and concern needs source evidence. Fit is a plain-language decision category, never a made-up confidence percentage. Missing information stays explicit, and the human-owned lifecycle stage is never changed.",
 	inputSchema: z.object({
 		companyId: z.string().min(1),
+		criteria: acquisitionCriteriaSchema,
 		fit: z.enum([
 			AcquisitionFit.UNKNOWN,
 			AcquisitionFit.STRONG,
@@ -66,7 +70,23 @@ export default defineTool({
 			}),
 			db.acquisitionProfile.findUnique({
 				where: { id: WORKSPACE_ID },
-				select: { mode: true },
+				select: {
+					mode: true,
+					preferredIndustries: true,
+					geographies: true,
+					excludedCategories: true,
+					revenueMin: true,
+					revenueMax: true,
+					ebitdaMin: true,
+					ebitdaMax: true,
+					purchasePriceMin: true,
+					purchasePriceMax: true,
+					ownerInvolvement: true,
+					recurringRevenuePreference: true,
+					customerConcentrationMax: true,
+					assetPreference: true,
+					financingAssumptions: true,
+				},
 			}),
 		]);
 
@@ -78,11 +98,18 @@ export default defineTool({
 				reason: "Acquisition mode is not enabled for this workspace.",
 			};
 		}
+		const criterionValidation = validateCriterionAssessments(
+			expectedAcquisitionCriterionIds(profile),
+			input.criteria,
+		);
+		if (!criterionValidation.ok) {
+			return { written: false as const, reason: criterionValidation.reason };
+		}
 
 		const sourceUrls = [
 			...new Set(
-				[...input.strengths, ...input.concerns].flatMap((item) =>
-					item.evidence.map((itemEvidence) => itemEvidence.url),
+				[...input.strengths, ...input.concerns, ...input.criteria].flatMap(
+					(item) => item.evidence.map((itemEvidence) => itemEvidence.url),
 				),
 			),
 		];
@@ -102,11 +129,11 @@ export default defineTool({
 				where: { companyId: company.id },
 				create: {
 					companyId: company.id,
-					stage: AcquisitionStage.RESEARCHING,
 					fit: input.fit,
 					summary: input.summary,
 					strengths: input.strengths,
 					concerns: input.concerns,
+					criteria: input.criteria,
 					missingInformation: input.missingInformation,
 					recommendedAction: input.recommendedAction,
 					recommendedStage: input.recommendedStage,
@@ -119,6 +146,7 @@ export default defineTool({
 					summary: input.summary,
 					strengths: input.strengths,
 					concerns: input.concerns,
+					criteria: input.criteria,
 					missingInformation: input.missingInformation,
 					recommendedAction: input.recommendedAction,
 					recommendedStage: input.recommendedStage,
@@ -153,20 +181,11 @@ export default defineTool({
 			});
 		});
 
-		await scheduleTask({
-			companyId: company.id,
-			kind: "acquisition-refresh",
-			reason: "Refresh the acquisition dossier and report material changes",
-			dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-			priority: PRIORITY.acquisitionRefresh,
-		});
-
 		return {
 			written: true as const,
 			fit: input.fit,
 			sources: sourceUrls.length,
 			missing: input.missingInformation.length,
-			nextRefreshInDays: 30,
 		};
 	},
 });
