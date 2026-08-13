@@ -5,6 +5,8 @@ import {
 } from "@crm/db/acquisition";
 import {
 	MAX_ATTEMPTS,
+	type QueueAgentTaskInput,
+	queueAgentTask,
 	RETIRED_OUTCOME,
 	RETRYING_OUTCOME_PREFIX,
 } from "@crm/db/agent-tasks";
@@ -256,57 +258,11 @@ export async function noteSession(
 	});
 }
 
-export async function scheduleTask(input: {
-	contactId?: string | null;
-	companyId?: string | null;
-	kind: string;
-	reason: string;
-	dueAt: Date;
-	priority?: number;
-	budget?: number;
-}): Promise<{ id: string }> {
-	const subject = {
-		contactId: input.contactId ?? null,
-		companyId: input.companyId ?? null,
-	};
-	const existing = await db.agentTask.findFirst({
-		where: {
-			kind: input.kind,
-			finishedAt: null,
-			...subject,
-		},
-		select: { id: true, dueAt: true, startedAt: true },
-	});
-
-	if (existing) {
-		await bringTaskForward(existing, input);
-		return existing;
-	}
-
-	try {
-		return await db.agentTask.create({
-			data: {
-				...subject,
-				kind: input.kind,
-				reason: input.reason,
-				dueAt: input.dueAt,
-				priority: input.priority ?? 0,
-				budget: input.budget ?? 4,
-			},
-			select: { id: true },
-		});
-	} catch (error) {
-		if (!isUniqueConflict(error)) throw error;
-
-		const winner = await db.agentTask.findFirst({
-			where: { kind: input.kind, finishedAt: null, ...subject },
-			select: { id: true, dueAt: true, startedAt: true },
-		});
-		if (!winner) throw error;
-
-		await bringTaskForward(winner, input);
-		return { id: winner.id };
-	}
+export async function scheduleTask(
+	input: QueueAgentTaskInput,
+): Promise<{ id: string }> {
+	const { taskId } = await queueAgentTask(db, input);
+	return { id: taskId };
 }
 
 export async function lastDecision(contactId: string) {
@@ -329,42 +285,4 @@ function isAcquisitionTaskKind(
 	kind: string,
 ): kind is keyof typeof ACQUISITION_TASK_INTERVAL_MS {
 	return (ACQUISITION_TASK_KINDS as readonly string[]).includes(kind);
-}
-
-function isUniqueConflict(
-	error: unknown,
-): error is Prisma.PrismaClientKnownRequestError {
-	return (
-		error instanceof Prisma.PrismaClientKnownRequestError &&
-		error.code === "P2002"
-	);
-}
-
-async function bringTaskForward(
-	existing: { id: string; dueAt: Date; startedAt: Date | null },
-	input: {
-		reason: string;
-		dueAt: Date;
-		priority?: number;
-		budget?: number;
-	},
-): Promise<void> {
-	if (existing.startedAt || existing.dueAt.getTime() <= input.dueAt.getTime()) {
-		return;
-	}
-
-	await db.agentTask.updateMany({
-		where: {
-			id: existing.id,
-			finishedAt: null,
-			startedAt: null,
-			dueAt: { gt: input.dueAt },
-		},
-		data: {
-			dueAt: input.dueAt,
-			reason: input.reason,
-			priority: input.priority ?? 0,
-			budget: input.budget ?? 4,
-		},
-	});
 }

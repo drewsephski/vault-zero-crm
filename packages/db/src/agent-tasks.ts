@@ -1,3 +1,6 @@
+import type { Db } from "./client";
+import { Prisma } from "./generated/prisma/client";
+
 export const TASK_KINDS = [
 	"brand",
 	"portrait",
@@ -73,3 +76,100 @@ export const PRIORITY = {
 	acquisitionRefresh: 30,
 	recheck: 0,
 } as const;
+
+export type QueueAgentTaskInput = {
+	contactId?: string | null;
+	companyId?: string | null;
+	kind: string;
+	reason: string;
+	dueAt: Date;
+	priority?: number;
+	budget?: number;
+};
+
+export type QueueAgentTaskResult = {
+	taskId: string;
+	created: boolean;
+	advanced: boolean;
+};
+
+export async function queueAgentTask(
+	database: Db,
+	input: QueueAgentTaskInput,
+): Promise<QueueAgentTaskResult> {
+	const subject = {
+		contactId: input.contactId ?? null,
+		companyId: input.companyId ?? null,
+	};
+	const existing = await database.agentTask.findFirst({
+		where: { kind: input.kind, finishedAt: null, ...subject },
+		select: { id: true, dueAt: true, startedAt: true },
+	});
+
+	if (existing) {
+		const advanced = await advanceAgentTask(database, existing, input);
+		return { taskId: existing.id, created: false, advanced };
+	}
+
+	try {
+		const created = await database.agentTask.create({
+			data: {
+				...subject,
+				kind: input.kind,
+				reason: input.reason,
+				dueAt: input.dueAt,
+				priority: input.priority ?? 0,
+				budget: input.budget ?? 4,
+			},
+			select: { id: true },
+		});
+		return { taskId: created.id, created: true, advanced: false };
+	} catch (error) {
+		if (!isUniqueConflict(error)) throw error;
+
+		const winner = await database.agentTask.findFirst({
+			where: { kind: input.kind, finishedAt: null, ...subject },
+			select: { id: true, dueAt: true, startedAt: true },
+		});
+		if (!winner) throw error;
+
+		const advanced = await advanceAgentTask(database, winner, input);
+		return { taskId: winner.id, created: false, advanced };
+	}
+}
+
+async function advanceAgentTask(
+	database: Db,
+	existing: { id: string; dueAt: Date; startedAt: Date | null },
+	input: QueueAgentTaskInput,
+): Promise<boolean> {
+	if (existing.startedAt || existing.dueAt.getTime() <= input.dueAt.getTime()) {
+		return false;
+	}
+
+	const { count } = await database.agentTask.updateMany({
+		where: {
+			id: existing.id,
+			finishedAt: null,
+			startedAt: null,
+			dueAt: { gt: input.dueAt },
+		},
+		data: {
+			dueAt: input.dueAt,
+			reason: input.reason,
+			priority: input.priority ?? 0,
+			budget: input.budget ?? 4,
+		},
+	});
+
+	return count === 1;
+}
+
+function isUniqueConflict(
+	error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+	return (
+		error instanceof Prisma.PrismaClientKnownRequestError &&
+		error.code === "P2002"
+	);
+}

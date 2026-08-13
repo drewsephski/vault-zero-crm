@@ -1,5 +1,5 @@
-import { type Db, Prisma } from "@crm/db";
-import { PRIORITY } from "@crm/db/agent-tasks";
+import type { Db } from "@crm/db";
+import { PRIORITY, queueAgentTask } from "@crm/db/agent-tasks";
 import { Injectable, Logger } from "@nestjs/common";
 import { waitUntil } from "@vercel/functions";
 import { InjectDatabase } from "../database/database.constants";
@@ -229,98 +229,31 @@ export class AgentTriggerService {
 		budget: number;
 	}): Promise<EnqueueResult> {
 		const now = new Date();
-		const subject = {
-			contactId: task.contactId ?? null,
-			companyId: task.companyId ?? null,
-		};
 
 		try {
-			const pending = await this.db.agentTask.findFirst({
-				where: {
+			const result = await queueAgentTask(this.db, {
+				...task,
+				dueAt: now,
+			});
+
+			if (result.created) {
+				this.logger.log({
+					message: "Agent task queued",
 					kind: task.kind,
-					finishedAt: null,
-					...subject,
-				},
-				select: { id: true, dueAt: true, startedAt: true },
-			});
-
-			if (pending) {
-				const broughtForward = await this.bringForward(pending, task, now);
-				if (broughtForward) this.poke();
-				return { taskId: pending.id, created: false };
-			}
-
-			const created = await this.db.agentTask.create({
-				data: {
-					...subject,
-					kind: task.kind,
-					reason: task.reason,
-					priority: task.priority,
-					budget: task.budget,
-					dueAt: now,
-				},
-				select: { id: true },
-			});
-
-			this.logger.log({
-				message: "Agent task queued",
-				kind: task.kind,
-				contactId: task.contactId,
-				companyId: task.companyId,
-			});
-
-			this.poke();
-			return { taskId: created.id, created: true };
-		} catch (error) {
-			if (isUniqueConflict(error)) {
-				const pending = await this.db.agentTask.findFirst({
-					where: { kind: task.kind, finishedAt: null, ...subject },
-					select: { id: true, dueAt: true, startedAt: true },
+					contactId: task.contactId,
+					companyId: task.companyId,
 				});
-				if (pending) {
-					const broughtForward = await this.bringForward(pending, task, now);
-					if (broughtForward) this.poke();
-					return { taskId: pending.id, created: false };
-				}
 			}
 
+			if (result.created || result.advanced) this.poke();
+			return { taskId: result.taskId, created: result.created };
+		} catch (error) {
 			this.logger.error(
 				{ message: "Could not queue agent task", kind: task.kind },
 				error instanceof Error ? error.stack : String(error),
 			);
 			throw error;
 		}
-	}
-
-	private async bringForward(
-		pending: { id: string; dueAt: Date; startedAt: Date | null },
-		task: {
-			reason: string;
-			priority: number;
-			budget: number;
-		},
-		now: Date,
-	): Promise<boolean> {
-		if (pending.startedAt || pending.dueAt.getTime() <= now.getTime()) {
-			return false;
-		}
-
-		const { count } = await this.db.agentTask.updateMany({
-			where: {
-				id: pending.id,
-				finishedAt: null,
-				startedAt: null,
-				dueAt: { gt: now },
-			},
-			data: {
-				dueAt: now,
-				reason: task.reason,
-				priority: task.priority,
-				budget: task.budget,
-			},
-		});
-
-		return count === 1;
 	}
 
 	private poke(): void {
@@ -351,13 +284,4 @@ export class AgentTriggerService {
 			void dispatch;
 		}
 	}
-}
-
-function isUniqueConflict(
-	error: unknown,
-): error is Prisma.PrismaClientKnownRequestError {
-	return (
-		error instanceof Prisma.PrismaClientKnownRequestError &&
-		error.code === "P2002"
-	);
 }

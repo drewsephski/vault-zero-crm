@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { agentTaskState } from "../src/agent-tasks";
+import { db } from "../src";
+import { agentTaskState, queueAgentTask } from "../src/agent-tasks";
 
 describe("agentTaskState", () => {
 	it("maps persisted task rows to acquisition research state", () => {
@@ -69,5 +70,40 @@ describe("agentTaskState", () => {
 				now,
 			),
 		).toEqual({ status: "failed", error: "provider timeout" });
+	});
+});
+
+describe("queueAgentTask", () => {
+	it("converges concurrent scheduling on one persisted task", async () => {
+		const companyId = `db-agent-task-${crypto.randomUUID()}`;
+
+		try {
+			const results = await Promise.all(
+				Array.from({ length: 10 }, () =>
+					queueAgentTask(db, {
+						companyId,
+						kind: "acquisition-refresh",
+						reason: "Refresh acquisition fit",
+						dueAt: new Date(Date.now() + 60_000),
+						priority: 30,
+						budget: 8,
+					}),
+				),
+			);
+
+			expect(new Set(results.map((result) => result.taskId)).size).toBe(1);
+			expect(results.filter((result) => result.created)).toHaveLength(1);
+			expect(
+				await db.agentTask.count({
+					where: {
+						companyId,
+						kind: "acquisition-refresh",
+						finishedAt: null,
+					},
+				}),
+			).toBe(1);
+		} finally {
+			await db.agentTask.deleteMany({ where: { companyId } });
+		}
 	});
 });
