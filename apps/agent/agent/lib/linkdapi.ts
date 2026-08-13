@@ -1,5 +1,10 @@
+import { createHash } from "node:crypto";
+
 const HOST = "linkdapi-best-unofficial-linkedin-api.p.rapidapi.com";
 const TIMEOUT_MS = 20_000;
+const MAX_SHORT_RETRY_MS = 2_000;
+const DEFAULT_LIMIT_COOLDOWN_MS = 60_000;
+const MAX_LIMIT_COOLDOWN_MS = 5 * 60_000;
 
 export type Profile = {
 	slug: string;
@@ -45,7 +50,19 @@ export type PeopleSearchCandidate = {
 type Outcome<T> =
 	| { ok: true; data: T }
 	| { ok: false; missing: true }
-	| { ok: false; missing: false; reason: string };
+	| {
+			ok: false;
+			missing: false;
+			reason: string;
+			code?: "rate_limited";
+			retryAfterSeconds?: number;
+	  };
+
+type ActiveLimit = {
+	until: number;
+};
+
+const activeLimits = new Map<string, ActiveLimit>();
 
 function key(): string | null {
 	const value = process.env.RAPIDAPI_KEY?.trim();
@@ -233,6 +250,16 @@ async function call<T>(
 ): Promise<Outcome<T>> {
 	const apiKey = key();
 	if (!apiKey) return { ok: false, missing: false, reason: "No RAPIDAPI_KEY." };
+	const scope = limitScope(path);
+	const limitKey = `${credentialFingerprint(apiKey)}:${scope.key}`;
+	const activeLimit = activeLimits.get(limitKey);
+	if (activeLimit) {
+		const remainingMs = activeLimit.until - Date.now();
+		if (remainingMs > 0) {
+			return rateLimited(scope.label, Math.ceil(remainingMs / 1_000));
+		}
+		activeLimits.delete(limitKey);
+	}
 
 	const url = new URL(`https://${HOST}${path}`);
 	for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
@@ -241,25 +268,56 @@ async function call<T>(
 	const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
 	try {
-		const response = await fetch(url, {
-			headers: { "x-rapidapi-host": HOST, "x-rapidapi-key": apiKey },
-			signal: controller.signal,
-		});
+		for (let attempt = 0; attempt < 2; attempt += 1) {
+			const response = await fetch(url, {
+				headers: { "x-rapidapi-host": HOST, "x-rapidapi-key": apiKey },
+				signal: controller.signal,
+			});
 
-		if (!response.ok) {
-			return { ok: false, missing: false, reason: `HTTP ${response.status}` };
+			if (response.status === 429) {
+				const retryMs = retryDelayMs(response.headers);
+				if (
+					attempt === 0 &&
+					retryMs !== null &&
+					retryMs <= MAX_SHORT_RETRY_MS
+				) {
+					await new Promise((resolve) => setTimeout(resolve, retryMs));
+					continue;
+				}
+
+				const cooldownMs = Math.min(
+					Math.max(retryMs ?? DEFAULT_LIMIT_COOLDOWN_MS, 1_000),
+					MAX_LIMIT_COOLDOWN_MS,
+				);
+				const retryAfterSeconds = Math.ceil(cooldownMs / 1_000);
+				activeLimits.set(limitKey, {
+					until: Date.now() + cooldownMs,
+				});
+				return rateLimited(scope.label, retryAfterSeconds);
+			}
+
+			if (!response.ok) {
+				return {
+					ok: false,
+					missing: false,
+					reason: `HTTP ${response.status}`,
+				};
+			}
+
+			const body = (await response.json()) as {
+				success?: boolean;
+				data?: T | null;
+			};
+
+			if (body.success !== true || body.data == null) {
+				return { ok: false, missing: true };
+			}
+
+			activeLimits.delete(limitKey);
+			return { ok: true, data: body.data };
 		}
 
-		const body = (await response.json()) as {
-			success?: boolean;
-			data?: T | null;
-		};
-
-		if (body.success !== true || body.data == null) {
-			return { ok: false, missing: true };
-		}
-
-		return { ok: true, data: body.data };
+		return rateLimited(scope.label, 1);
 	} catch (error) {
 		const aborted = error instanceof Error && error.name === "AbortError";
 		return {
@@ -274,6 +332,64 @@ async function call<T>(
 	} finally {
 		clearTimeout(timer);
 	}
+}
+
+function credentialFingerprint(apiKey: string): string {
+	return createHash("sha256").update(apiKey).digest("base64url");
+}
+
+function limitScope(path: string): { key: string; label: string } {
+	if (path.includes("/search/")) {
+		return { key: "search", label: "LinkedIn search requests" };
+	}
+	if (path.includes("/profile/")) {
+		return { key: "profile", label: "LinkedIn profile requests" };
+	}
+	if (path.includes("/companies/")) {
+		return { key: "companies", label: "LinkedIn company requests" };
+	}
+	if (path.includes("/jobs/")) {
+		return { key: "jobs", label: "LinkedIn job requests" };
+	}
+	return { key: "other", label: "LinkedIn requests" };
+}
+
+function retryDelayMs(headers: Headers): number | null {
+	const retryAfter = headers.get("retry-after")?.trim();
+	if (retryAfter) {
+		const seconds = Number(retryAfter);
+		if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+
+		const date = Date.parse(retryAfter);
+		if (Number.isFinite(date)) return Math.max(date - Date.now(), 0);
+	}
+
+	for (const name of [
+		"x-ratelimit-search-reset",
+		"x-ratelimit-profile-reset",
+		"x-ratelimit-requests-reset",
+	]) {
+		const raw = headers.get(name)?.trim();
+		if (!raw) continue;
+		const seconds = Number(raw);
+		if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+	}
+
+	return null;
+}
+
+function rateLimited(label: string, retryAfterSeconds: number): Outcome<never> {
+	const duration =
+		retryAfterSeconds < 60
+			? `about ${retryAfterSeconds} seconds`
+			: `about ${Math.ceil(retryAfterSeconds / 60)} minutes`;
+	return {
+		ok: false,
+		missing: false,
+		code: "rate_limited",
+		retryAfterSeconds,
+		reason: `${label} are rate-limited by the provider for ${duration}. Retrying immediately will not help; use another configured source or try again later.`,
+	};
 }
 
 type RawProfile = {

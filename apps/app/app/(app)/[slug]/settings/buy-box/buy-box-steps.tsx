@@ -22,21 +22,20 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@crm/ui/components/select";
+import { Slider } from "@crm/ui/components/slider";
 import { Textarea } from "@crm/ui/components/textarea";
 import { BuyBoxMultiSelect } from "./buy-box-multi-select";
 import {
-	EARNINGS_RANGE_PRESETS,
 	EXCLUDED_CATEGORY_OPTIONS,
 	GEOGRAPHY_OPTIONS,
 	INDUSTRY_OPTIONS,
-	type MoneyRangePreset,
-	PURCHASE_PRICE_RANGE_PRESETS,
-	REVENUE_RANGE_PRESETS,
 } from "./buy-box-options";
 import {
 	BUY_BOX_FIELD_IDS,
 	type BuyBoxDraft,
 	type BuyBoxErrors,
+	moneySliderDraft,
+	moneySliderState,
 } from "./buy-box-values";
 
 type StepProps = {
@@ -95,18 +94,21 @@ export function FinancialStep({ values, errors, edit }: StepProps) {
 						<SelectValue />
 					</SelectTrigger>
 					<SelectContent>
-						{CURRENCIES.map((currency) => (
-							<SelectItem key={currency.code} value={currency.code}>
-								{currency.code} · {currency.name}
-							</SelectItem>
-						))}
+						<SelectGroup>
+							{CURRENCIES.map((currency) => (
+								<SelectItem key={currency.code} value={currency.code}>
+									{currency.code} · {currency.name}
+								</SelectItem>
+							))}
+						</SelectGroup>
 					</SelectContent>
 				</Select>
 			</Field>
 			<MoneyRange
 				label="Annual revenue"
 				currency={values.currency}
-				presets={REVENUE_RANGE_PRESETS}
+				sliderMaximum={50_000_000}
+				sliderStep={250_000}
 				minimum={values.revenueMin}
 				maximum={values.revenueMax}
 				minimumId={BUY_BOX_FIELD_IDS.revenueMin}
@@ -115,14 +117,13 @@ export function FinancialStep({ values, errors, edit }: StepProps) {
 				maximumError={errors.revenueMax}
 				onMinimum={(revenueMin) => edit({ revenueMin })}
 				onMaximum={(revenueMax) => edit({ revenueMax })}
-				onRange={(revenueMin, revenueMax) =>
-					edit({ revenueMin, revenueMax })
-				}
+				onRange={(revenueMin, revenueMax) => edit({ revenueMin, revenueMax })}
 			/>
 			<MoneyRange
 				label="EBITDA or SDE"
 				currency={values.currency}
-				presets={EARNINGS_RANGE_PRESETS}
+				sliderMaximum={10_000_000}
+				sliderStep={100_000}
 				minimum={values.ebitdaMin}
 				maximum={values.ebitdaMax}
 				minimumId={BUY_BOX_FIELD_IDS.ebitdaMin}
@@ -131,14 +132,13 @@ export function FinancialStep({ values, errors, edit }: StepProps) {
 				maximumError={errors.ebitdaMax}
 				onMinimum={(ebitdaMin) => edit({ ebitdaMin })}
 				onMaximum={(ebitdaMax) => edit({ ebitdaMax })}
-				onRange={(ebitdaMin, ebitdaMax) =>
-					edit({ ebitdaMin, ebitdaMax })
-				}
+				onRange={(ebitdaMin, ebitdaMax) => edit({ ebitdaMin, ebitdaMax })}
 			/>
 			<MoneyRange
 				label="Purchase price"
 				currency={values.currency}
-				presets={PURCHASE_PRICE_RANGE_PRESETS}
+				sliderMaximum={50_000_000}
+				sliderStep={250_000}
 				minimum={values.purchasePriceMin}
 				maximum={values.purchasePriceMax}
 				minimumId={BUY_BOX_FIELD_IDS.purchasePriceMin}
@@ -261,7 +261,8 @@ export function FinancingStep({ values, errors, edit }: StepProps) {
 function MoneyRange({
 	label,
 	currency,
-	presets,
+	sliderMaximum,
+	sliderStep,
 	minimum,
 	maximum,
 	minimumId,
@@ -274,7 +275,8 @@ function MoneyRange({
 }: {
 	label: string;
 	currency: string;
-	presets: readonly MoneyRangePreset[];
+	sliderMaximum: number;
+	sliderStep: number;
 	minimum: string;
 	maximum: string;
 	minimumId: string;
@@ -285,86 +287,86 @@ function MoneyRange({
 	onMaximum: (value: string) => void;
 	onRange: (minimum: string, maximum: string) => void;
 }) {
-	const selectedPresetIndex = presets.findIndex(
-		(preset) => preset.minimum === minimum && preset.maximum === maximum,
-	);
-	const selectedPreset =
-		selectedPresetIndex >= 0 ? `PRESET_${selectedPresetIndex}` : "CUSTOM";
-	const presetId = `${minimumId}-preset`;
+	const {
+		minimumValue,
+		maximumValue,
+		rangeMaximum,
+		values: sliderValues,
+	} = moneySliderState(minimum, maximum, sliderMaximum, sliderStep);
+	const sliderId = `${minimumId}-slider`;
 
 	return (
-		<FieldGroup className="grid gap-3 sm:grid-cols-2">
-			<Field className="sm:col-span-2">
-				<FieldLabel htmlFor={presetId}>{label} range</FieldLabel>
-				<Select
-					value={selectedPreset}
-					onValueChange={(nextValue) => {
-						if (nextValue === "CUSTOM") return;
-						const preset = presets[Number(nextValue.replace("PRESET_", ""))];
-						if (preset) onRange(preset.minimum, preset.maximum);
-					}}
-				>
-					<SelectTrigger id={presetId} className="w-full">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent position="popper" align="start">
-						<SelectGroup>
-							{presets.map((preset, index) => (
-								<SelectItem
-									key={`${preset.minimum}-${preset.maximum}`}
-									value={`PRESET_${index}`}
-								>
-									{moneyRangeLabel(preset, currency)}
-								</SelectItem>
-							))}
-							<SelectItem value="CUSTOM" disabled>
-								Custom range
-							</SelectItem>
-						</SelectGroup>
-					</SelectContent>
-				</Select>
+		<FieldGroup>
+			<Field data-invalid={Boolean(minimumError || maximumError)}>
+				<FieldLabel htmlFor={sliderId}>{label} range</FieldLabel>
+				<div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+					<span>
+						{minimumValue === null
+							? "No minimum"
+							: moneyLabel(minimum, currency)}
+					</span>
+					<span>
+						{maximumValue === null
+							? "No maximum"
+							: moneyLabel(maximum, currency)}
+					</span>
+				</div>
+				<Slider
+					id={sliderId}
+					value={sliderValues}
+					min={0}
+					max={rangeMaximum}
+					step={sliderStep}
+					minStepsBetweenThumbs={1}
+					thumbLabels={[`${label} range minimum`, `${label} range maximum`]}
+					thumbValueTexts={[
+						minimumValue === null
+							? "No minimum"
+							: moneyLabel(minimum, currency),
+						maximumValue === null
+							? "No maximum"
+							: moneyLabel(maximum, currency),
+					]}
+					onValueChange={(nextRange) =>
+						onRange(
+							...moneySliderDraft(nextRange, minimum, maximum, rangeMaximum),
+						)
+					}
+				/>
 				<FieldDescription>
-					Choose a preset or enter exact minimum and maximum amounts below.
+					Drag either end of the range or enter exact amounts below.
 				</FieldDescription>
 			</Field>
-			<Field data-invalid={Boolean(minimumError)}>
-				<FieldLabel htmlFor={minimumId}>{label} minimum</FieldLabel>
-				<Input
-					id={minimumId}
-					aria-invalid={Boolean(minimumError)}
-					aria-describedby={minimumError ? `${minimumId}-error` : undefined}
-					inputMode="decimal"
-					value={minimum}
-					onChange={(event) => onMinimum(event.target.value)}
-					placeholder="No minimum"
-				/>
-				<FieldError id={`${minimumId}-error`}>{minimumError}</FieldError>
-			</Field>
-			<Field data-invalid={Boolean(maximumError)}>
-				<FieldLabel htmlFor={maximumId}>{label} maximum</FieldLabel>
-				<Input
-					id={maximumId}
-					aria-invalid={Boolean(maximumError)}
-					aria-describedby={maximumError ? `${maximumId}-error` : undefined}
-					inputMode="decimal"
-					value={maximum}
-					onChange={(event) => onMaximum(event.target.value)}
-					placeholder="No maximum"
-				/>
-				<FieldError id={`${maximumId}-error`}>{maximumError}</FieldError>
-			</Field>
+			<FieldGroup className="grid gap-3 sm:grid-cols-2">
+				<Field data-invalid={Boolean(minimumError)}>
+					<FieldLabel htmlFor={minimumId}>{label} minimum</FieldLabel>
+					<Input
+						id={minimumId}
+						aria-invalid={Boolean(minimumError)}
+						aria-describedby={minimumError ? `${minimumId}-error` : undefined}
+						inputMode="decimal"
+						value={minimum}
+						onChange={(event) => onMinimum(event.target.value)}
+						placeholder="No minimum"
+					/>
+					<FieldError id={`${minimumId}-error`}>{minimumError}</FieldError>
+				</Field>
+				<Field data-invalid={Boolean(maximumError)}>
+					<FieldLabel htmlFor={maximumId}>{label} maximum</FieldLabel>
+					<Input
+						id={maximumId}
+						aria-invalid={Boolean(maximumError)}
+						aria-describedby={maximumError ? `${maximumId}-error` : undefined}
+						inputMode="decimal"
+						value={maximum}
+						onChange={(event) => onMaximum(event.target.value)}
+						placeholder="No maximum"
+					/>
+					<FieldError id={`${maximumId}-error`}>{maximumError}</FieldError>
+				</Field>
+			</FieldGroup>
 		</FieldGroup>
 	);
-}
-
-function moneyRangeLabel(
-	preset: MoneyRangePreset,
-	currency: string,
-): string {
-	if (!preset.minimum && !preset.maximum) return "Any range";
-	if (!preset.minimum) return `Up to ${moneyLabel(preset.maximum, currency)}`;
-	if (!preset.maximum) return `${moneyLabel(preset.minimum, currency)}+`;
-	return `${moneyLabel(preset.minimum, currency)}–${moneyLabel(preset.maximum, currency)}`;
 }
 
 function moneyLabel(value: string, currency: string): string {
@@ -399,16 +401,16 @@ function PreferenceSelect<T extends string>({
 				<SelectTrigger id={id}>
 					<SelectValue />
 				</SelectTrigger>
-			<SelectContent>
-				<SelectGroup>
-					<SelectItem value="ANY">No preference</SelectItem>
-					{options.map(([option, optionLabel]) => (
-						<SelectItem key={option} value={option}>
-							{optionLabel}
-						</SelectItem>
-					))}
-				</SelectGroup>
-			</SelectContent>
+				<SelectContent>
+					<SelectGroup>
+						<SelectItem value="ANY">No preference</SelectItem>
+						{options.map(([option, optionLabel]) => (
+							<SelectItem key={option} value={option}>
+								{optionLabel}
+							</SelectItem>
+						))}
+					</SelectGroup>
+				</SelectContent>
 			</Select>
 		</Field>
 	);

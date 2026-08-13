@@ -4,6 +4,8 @@ import {
 	type BuyBoxDraft,
 	listValues,
 	moneyCents,
+	moneySliderDraft,
+	moneySliderState,
 	validateBuyBoxDraft,
 } from "../app/(app)/[slug]/settings/buy-box/buy-box-values";
 
@@ -42,6 +44,21 @@ describe("buy box values", () => {
 		expect(moneyCents("")).toBeNull();
 		expect(moneyCents("not money")).toBeNull();
 		expect(moneyCents(String(Number.MAX_SAFE_INTEGER))).toBeNull();
+	});
+
+	it("maps slider endpoints without replacing open bounds", () => {
+		expect(moneySliderState("", "", 50_000_000, 250_000)).toEqual({
+			minimumValue: null,
+			maximumValue: null,
+			rangeMaximum: 50_000_000,
+			values: [0, 50_000_000],
+		});
+		expect(
+			moneySliderDraft([1_000_000, 50_000_000], "", "", 50_000_000),
+		).toEqual(["1000000", ""]);
+		expect(
+			moneySliderDraft([1_000_000, 50_000_000], "", "50000000", 50_000_000),
+		).toEqual(["1000000", "50000000"]);
 	});
 
 	it("reports invalid values instead of silently clearing them", () => {
