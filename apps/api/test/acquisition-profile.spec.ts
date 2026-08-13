@@ -7,19 +7,21 @@ import {
 	type Prisma,
 	WorkspaceMode,
 } from "@crm/db";
+import { ACTIVE_ACQUISITION_STAGES } from "@crm/db/acquisition";
 import {
 	acquisitionCandidateIdInput,
 	updateAcquisitionTargetInput,
 } from "../src/acquisition/acquisition.contracts";
 import {
+	acquisitionTargetWhere,
+	companyTargetWhere,
+} from "../src/acquisition/acquisition-where";
+import {
 	myTasksInput,
 	taskCountsInput,
 } from "../src/activities/activities.contracts";
 import { taskDayWindow } from "../src/activities/task-window";
-import {
-	visibleCriteriaCount,
-	visibleFitWhere,
-} from "../src/dashboard/acquisition-summary";
+import { visibleCriteriaCount } from "../src/dashboard/acquisition-summary";
 import {
 	setWorkspaceModeInput,
 	updateAcquisitionProfileInput,
@@ -92,6 +94,26 @@ describe("acquisition profile contracts", () => {
 });
 
 describe("acquisition operating contracts", () => {
+	it("builds the canonical active company target scope", () => {
+		expect(companyTargetWhere("active", { ownerId: "viewer" })).toEqual({
+			AND: [
+				{ ownerId: "viewer" },
+				{
+					acquisitionTarget: {
+						is: { stage: { in: [...ACTIVE_ACQUISITION_STAGES] } },
+					},
+				},
+			],
+		});
+	});
+
+	it("builds the canonical rejected target scope through company ownership", () => {
+		expect(acquisitionTargetWhere("rejected", { ownerId: "viewer" })).toEqual({
+			stage: AcquisitionStage.REJECTED,
+			company: { is: { ownerId: "viewer" } },
+		});
+	});
+
 	it("accepts a candidate review decision", () => {
 		expect(acquisitionCandidateIdInput.parse({ id: "candidate-1" })).toEqual({
 			id: "candidate-1",
@@ -142,7 +164,7 @@ describe("task window contracts", () => {
 	});
 });
 
-describe("visible buy-box matching", () => {
+describe("visible buy-box criteria", () => {
 	const profile = {
 		id: "workspace",
 		mode: WorkspaceMode.ACQUISITION,
@@ -167,46 +189,5 @@ describe("visible buy-box matching", () => {
 
 	it("counts only criteria represented on company records", () => {
 		expect(visibleCriteriaCount(profile)).toBe(3);
-	});
-
-	it("builds a deterministic industry and geography filter", () => {
-		expect(visibleFitWhere(profile, { ownerId: "viewer" })).toEqual({
-			AND: [
-				{ ownerId: "viewer" },
-				{
-					OR: [
-						{ industry: { contains: "HVAC", mode: "insensitive" } },
-						{ subIndustry: { contains: "HVAC", mode: "insensitive" } },
-					],
-				},
-				{
-					OR: [
-						{ city: { contains: "TX", mode: "insensitive" } },
-						{ stateCode: { contains: "TX", mode: "insensitive" } },
-						{ country: { contains: "TX", mode: "insensitive" } },
-						{ countryCode: { contains: "TX", mode: "insensitive" } },
-					],
-				},
-				{
-					NOT: {
-						OR: [
-							{
-								industry: { contains: "Restaurants", mode: "insensitive" },
-							},
-							{
-								subIndustry: {
-									contains: "Restaurants",
-									mode: "insensitive",
-								},
-							},
-						],
-					},
-				},
-			],
-		});
-	});
-
-	it("does not claim a match before visible criteria exist", () => {
-		expect(visibleFitWhere(null, {})).toBeNull();
 	});
 });

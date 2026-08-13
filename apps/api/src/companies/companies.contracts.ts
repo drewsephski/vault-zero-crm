@@ -6,6 +6,9 @@ export const companyListInput = listInput.extend({
 	industry: z.string().default("all"),
 	enrichment: z.string().default("all"),
 	source: z.string().default("all"),
+	targetView: z
+		.enum(["active", "rejected", "acquired", "history"])
+		.default("active"),
 });
 
 export type CompanyListInput = z.infer<typeof companyListInput>;

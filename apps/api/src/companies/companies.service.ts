@@ -16,6 +16,7 @@ import {
 	Logger,
 	NotFoundException,
 } from "@nestjs/common";
+import { companyTargetWhere } from "../acquisition/acquisition-where";
 import { AgentQueueService } from "../agent/agent-queue.service";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
 import {
@@ -114,7 +115,16 @@ export class CompaniesService {
 	) {}
 
 	async list(input: CompanyListInput): Promise<ListResult<CompanyRow>> {
-		const where = this.buildWhere(input);
+		const acquisitionProfile = await this.db.acquisitionProfile.findUnique({
+			where: { id: WORKSPACE_ID },
+			select: { mode: true },
+		});
+		const acquisitionMode =
+			acquisitionProfile?.mode === WorkspaceMode.ACQUISITION;
+		const baseWhere = this.buildWhere(input);
+		const where = acquisitionMode
+			? companyTargetWhere(input.targetView, baseWhere)
+			: baseWhere;
 		const { skip, take } = paginate(input);
 
 		const [rows, total, facetCounts] = await Promise.all([
@@ -157,7 +167,7 @@ export class CompaniesService {
 				},
 			}),
 			this.db.company.count({ where }),
-			this.facetCounts(input),
+			this.facetCounts(input, acquisitionMode),
 		]);
 
 		const queued = await this.queue.queuedCompanies(rows.map((row) => row.id));
@@ -694,8 +704,11 @@ export class CompaniesService {
 		return where;
 	}
 
-	private async facetCounts(input: CompanyListInput) {
-		const where = this.searchFilter(input.q);
+	private async facetCounts(input: CompanyListInput, acquisitionMode: boolean) {
+		const searchWhere = this.searchFilter(input.q);
+		const where = acquisitionMode
+			? companyTargetWhere(input.targetView, searchWhere)
+			: searchWhere;
 
 		const [owners, industries, enrichment, sources] = await Promise.all([
 			this.db.company.groupBy({

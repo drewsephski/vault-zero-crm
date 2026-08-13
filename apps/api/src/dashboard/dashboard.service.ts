@@ -2,15 +2,15 @@ import { WORKSPACE_ID } from "@crm/auth";
 import {
 	AcquisitionCandidateStatus,
 	AcquisitionFit,
-	AcquisitionStage,
 	ActivityType,
 	type Db,
 	DealStage,
-	EnrichmentStatus,
 	type Prisma,
 	WorkspaceMode,
 } from "@crm/db";
+import { ACQUISITION_TASK_KINDS } from "@crm/db/acquisition";
 import { Injectable } from "@nestjs/common";
+import { acquisitionTargetWhere } from "../acquisition/acquisition-where";
 import { toCents } from "../crm/values";
 import { ConversionService } from "../currency/conversion.service";
 import { InjectDatabase } from "../database/database.constants";
@@ -390,9 +390,10 @@ export class DashboardService {
 		profile: Prisma.AcquisitionProfileGetPayload<object> | null,
 		now: Date,
 	) {
-		const targetWhere: Prisma.CompanyWhereInput = mine
+		const companyWhere: Prisma.CompanyWhereInput = mine
 			? { ownerId: actingUserId }
 			: {};
+		const activeTargetWhere = acquisitionTargetWhere("active", companyWhere);
 		const dealWhere: Prisma.DealWhereInput = mine
 			? { ownerId: actingUserId }
 			: {};
@@ -416,58 +417,29 @@ export class DashboardService {
 			candidates,
 			activeAgentWork,
 		] = await Promise.all([
-			this.db.company.count({ where: targetWhere }),
+			this.db.acquisitionTarget.count({ where: activeTargetWhere }),
 			hasVisibleCriteria
-				? this.db.company.count({
+				? this.db.acquisitionTarget.count({
 						where: {
 							AND: [
-								targetWhere,
+								activeTargetWhere,
 								{
-									acquisitionTarget: {
-										is: {
-											fit: {
-												in: [AcquisitionFit.STRONG, AcquisitionFit.POTENTIAL],
-											},
-										},
+									fit: {
+										in: [AcquisitionFit.STRONG, AcquisitionFit.POTENTIAL],
 									},
 								},
 							],
 						},
 					})
 				: Promise.resolve(null),
-			this.db.company.count({
+			this.db.acquisitionTarget.count({
 				where: {
-					AND: [
-						targetWhere,
-						{
-							OR: [
-								{ acquisitionTarget: { is: null } },
-								{ acquisitionTarget: { is: { researchedAt: null } } },
-								{
-									enrichmentStatus: {
-										in: [
-											EnrichmentStatus.PENDING,
-											EnrichmentStatus.RUNNING,
-											EnrichmentStatus.FAILED,
-											EnrichmentStatus.SKIPPED,
-										],
-									},
-								},
-							],
-						},
-					],
+					AND: [activeTargetWhere, { researchedAt: null }],
 				},
 			}),
-			this.db.company.count({
+			this.db.acquisitionTarget.count({
 				where: {
-					AND: [
-						targetWhere,
-						{
-							acquisitionTarget: {
-								is: { researchedAt: { lt: staleBefore } },
-							},
-						},
-					],
+					AND: [activeTargetWhere, { researchedAt: { lt: staleBefore } }],
 				},
 			}),
 			this.db.deal.count({
@@ -537,11 +509,14 @@ export class DashboardService {
 			}),
 			this.db.acquisitionTarget.findMany({
 				where: {
-					fit: { in: [AcquisitionFit.STRONG, AcquisitionFit.POTENTIAL] },
-					stage: {
-						notIn: [AcquisitionStage.REJECTED, AcquisitionStage.ACQUIRED],
-					},
-					company: { is: targetWhere },
+					AND: [
+						activeTargetWhere,
+						{
+							fit: {
+								in: [AcquisitionFit.STRONG, AcquisitionFit.POTENTIAL],
+							},
+						},
+					],
 				},
 				orderBy: [{ researchedAt: "desc" }, { updatedAt: "desc" }],
 				take: 8,
@@ -583,7 +558,12 @@ export class DashboardService {
 					createdAt: true,
 				},
 			}),
-			this.db.agentTask.count({ where: { finishedAt: null } }),
+			this.db.agentTask.count({
+				where: {
+					kind: { in: [...ACQUISITION_TASK_KINDS] },
+					finishedAt: null,
+				},
+			}),
 		]);
 
 		return {
