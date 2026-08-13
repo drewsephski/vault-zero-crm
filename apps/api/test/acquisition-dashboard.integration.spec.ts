@@ -252,6 +252,12 @@ beforeAll(async () => {
 			},
 			{
 				type: ActivityType.TASK,
+				subject: "Acquired target deal task",
+				dealId: acquiredDeal.id,
+				createdById: viewerId,
+			},
+			{
+				type: ActivityType.TASK,
 				subject: "Recordless task",
 				createdById: viewerId,
 			},
