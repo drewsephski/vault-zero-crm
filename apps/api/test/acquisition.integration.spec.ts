@@ -288,12 +288,25 @@ describe("acquisition dossier read model", () => {
 			[{ ...dossierACriteria[0], result: "LIKELY" }],
 			[{ ...dossierACriteria[0], explanation: " " }],
 			[{ ...dossierACriteria[0], blocksQualification: "false" }],
+			[{ ...dossierACriteria[0], blocksQualification: true }],
+			...["MATCH", "PARTIAL", "CONCERN"].map((result) => [
+				{ ...dossierACriteria[0], result, evidence: [] },
+			]),
 			[
 				{
 					...dossierACriteria[0],
 					evidence: [{ label: "Source", url: "not a URL" }],
 				},
 			],
+			...[
+				"ftp://dossier.example.test/source",
+				"mailto:source@example.test",
+			].map((url) => [
+				{
+					...dossierACriteria[0],
+					evidence: [{ label: "Source", url }],
+				},
+			]),
 			{ legacy: true },
 		]) {
 			await db.acquisitionTarget.update({

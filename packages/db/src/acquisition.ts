@@ -59,6 +59,15 @@ export type AcquisitionCriterionAssessment = {
 	evidence: { label: string; url: string }[];
 };
 
+export function isAcquisitionEvidenceUrl(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return url.protocol === "https:" || url.protocol === "http:";
+	} catch {
+		return false;
+	}
+}
+
 type AcquisitionFocus = {
 	preferredIndustries: readonly string[];
 	geographies: readonly string[];

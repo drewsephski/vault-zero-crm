@@ -146,6 +146,56 @@ describe("agent tool contracts", () => {
 		).toBe(false);
 	});
 
+	it("rejects non-http acquisition criterion evidence", () => {
+		const dossier = {
+			companyId: "company-1",
+			fit: "POTENTIAL",
+			summary:
+				"The business is a plausible fit, pending confirmation of its economics.",
+			strengths: [],
+			concerns: [],
+			missingInformation: ["Revenue and owner transition preference"],
+			recommendedAction: "Confirm ownership and financial scale.",
+			recommendedStage: "QUALIFIED",
+		};
+		const assessment = {
+			id: "industry",
+			result: "MATCH",
+			explanation: "The company operates in a preferred service category.",
+			blocksQualification: false,
+			evidence: [
+				{
+					label: "Company service category",
+					url: "https://example-mechanical.test/services",
+				},
+			],
+		};
+
+		for (const url of [
+			"ftp://example-mechanical.test/services",
+			"mailto:source@example.test",
+		]) {
+			expect(
+				writeAcquisitionDossier.inputSchema.safeParse({
+					...dossier,
+					criteria: [
+						{
+							...assessment,
+							evidence: [{ ...assessment.evidence[0], url }],
+						},
+					],
+				}).success,
+			).toBe(false);
+		}
+
+		expect(
+			writeAcquisitionDossier.inputSchema.safeParse({
+				...dossier,
+				criteria: [assessment],
+			}).success,
+		).toBe(true);
+	});
+
 	it("requires evidence for every acquisition conclusion", () => {
 		const dossier = {
 			companyId: "company-1",

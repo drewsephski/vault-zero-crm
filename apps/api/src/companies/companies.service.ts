@@ -12,6 +12,7 @@ import {
 	ACQUISITION_CRITERION_IDS,
 	ACQUISITION_CRITERION_RESULTS,
 	type AcquisitionCriterionAssessment,
+	isAcquisitionEvidenceUrl,
 } from "@crm/db/acquisition";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
@@ -833,12 +834,14 @@ function parseDossierCriteria(
 				typeof source.label !== "string" ||
 				!source.label.trim() ||
 				typeof source.url !== "string" ||
-				!isWebUrl(source.url)
+				!isAcquisitionEvidenceUrl(source.url)
 			) {
 				return [];
 			}
 			evidence.push({ label: source.label, url: source.url });
 		}
+		if (item.result !== "UNKNOWN" && evidence.length === 0) return [];
+		if (item.blocksQualification && item.result !== "UNKNOWN") return [];
 
 		criteria.push({
 			id: item.id as AcquisitionCriterionAssessment["id"],
@@ -850,13 +853,4 @@ function parseDossierCriteria(
 	}
 
 	return criteria;
-}
-
-function isWebUrl(value: string): boolean {
-	try {
-		const url = new URL(value);
-		return url.protocol === "https:" || url.protocol === "http:";
-	} catch {
-		return false;
-	}
 }

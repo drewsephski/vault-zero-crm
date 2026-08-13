@@ -3,12 +3,13 @@ import {
 	ACQUISITION_CRITERION_RESULTS,
 	type AcquisitionCriterionAssessment,
 	type AcquisitionCriterionId,
+	isAcquisitionEvidenceUrl,
 } from "@crm/db/acquisition";
 import { z } from "zod";
 
 const criterionEvidenceSchema = z.object({
 	label: z.string().trim().min(5).max(300),
-	url: z.url(),
+	url: z.url().refine(isAcquisitionEvidenceUrl),
 });
 
 export const acquisitionCriterionAssessmentSchema = z
