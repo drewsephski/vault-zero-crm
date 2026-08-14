@@ -20,13 +20,12 @@ import {
 import Logo from "@crm/ui/components/logo";
 import { Separator } from "@crm/ui/components/separator";
 import { Skeleton } from "@crm/ui/components/skeleton";
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { parseAsBoolean, useQueryState } from "nuqs";
 import { toast } from "sonner";
 import { useMobileNav } from "@/components/mobile-nav";
-import { useTRPC } from "@/lib/trpc/client";
+import { useHydratedWorkspace } from "@/lib/use-workspace-labels";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 
 type User = { name: string; email: string; image: string | null };
@@ -41,14 +40,13 @@ export function workspaceLabel(name: string | undefined): string {
 
 export function AppHeader({ user }: { user: User }) {
 	const { setOpen: setMobileNavOpen } = useMobileNav();
-	const trpc = useTRPC();
 	const workspaceUrl = useWorkspaceUrl();
-	const workspace = useQuery(trpc.workspace.get.queryOptions());
+	const workspace = useHydratedWorkspace();
 	const [, setQuickOpen] = useQueryState(
 		"k",
 		parseAsBoolean.withDefault(false),
 	);
-	const label = workspaceLabel(workspace.data?.name);
+	const label = workspaceLabel(workspace?.name);
 
 	async function handleSignOut() {
 		const { error } = await signOut();
