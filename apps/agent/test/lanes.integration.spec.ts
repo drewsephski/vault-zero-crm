@@ -15,10 +15,11 @@ async function clear() {
 beforeEach(clear);
 afterEach(clear);
 
-async function queue(kind: string, priority: number) {
+async function queue(kind: string, priority: number, companyId?: string) {
 	return db.agentTask.create({
 		data: {
 			kind,
+			companyId,
 			reason: REASON,
 			dueAt: new Date(Date.now() - 1000),
 			priority,
@@ -48,7 +49,7 @@ describe("dispatch lanes", () => {
 
 	it("a logo is never starved by a queue full of research", async () => {
 		for (let i = 0; i < 30; i += 1) {
-			await queue("identify", PRIORITY.identify);
+			await queue("identify", PRIORITY.identify, `lane-company-${i}`);
 		}
 
 		const brand = await queue("brand", PRIORITY.brand);
