@@ -14,6 +14,7 @@ import {
 	SETTINGS_ID,
 	writeAgentModel,
 } from "@crm/db/settings";
+import { acquireCanonicalWorkspaceFixture } from "../../../packages/db/test/canonical-workspace-fixture";
 import { selectedModel } from "../agent/lib/model";
 
 async function clear() {
@@ -26,16 +27,22 @@ async function clear() {
  * back sends them through the research-key gate again with nothing saying why.
  */
 let saved: Prisma.AppSettingUncheckedCreateInput | null = null;
+let releaseCanonicalWorkspace: (() => Promise<void>) | undefined;
 
 beforeAll(async () => {
+	releaseCanonicalWorkspace = await acquireCanonicalWorkspaceFixture();
 	saved = await db.appSetting.findUnique({ where: { id: SETTINGS_ID } });
-});
+}, 120_000);
 
 beforeEach(clear);
 afterEach(clear);
 
 afterAll(async () => {
-	if (saved) await db.appSetting.create({ data: saved });
+	try {
+		if (saved) await db.appSetting.create({ data: saved });
+	} finally {
+		await releaseCanonicalWorkspace?.();
+	}
 });
 
 describe("the configured model", () => {

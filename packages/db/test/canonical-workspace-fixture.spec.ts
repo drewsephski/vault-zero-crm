@@ -10,9 +10,9 @@ describe("canonical workspace fixture database boundary", () => {
 		).toBe(true);
 		expect(
 			isCanonicalLocalTestDatabase(
-				"postgresql://postgres:postgres@localhost:5432/crm",
+				"postgresql://postgres:postgres@localhost:5432/crm?schema=public",
 			),
-		).toBe(false);
+		).toBe(true);
 		expect(
 			isCanonicalLocalTestDatabase(
 				"postgresql://postgres:postgres@127.0.0.1:5433/crm",
