@@ -322,12 +322,13 @@ model Company {
   primaryContactId String?  @unique
   primaryContact   Contact? @relation("PrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
 
-  enrichmentStatus   EnrichmentStatus      @default(PENDING)
-  enrichedAt         DateTime?
-  enrichmentError    String?
-  enrichment         CompanyEnrichment?
-  acquisitionTarget  AcquisitionTarget?
-  discoveryCandidate AcquisitionCandidate?
+  enrichmentStatus    EnrichmentStatus                @default(PENDING)
+  enrichedAt          DateTime?
+  enrichmentError     String?
+  enrichment          CompanyEnrichment?
+  acquisitionTarget   AcquisitionTarget?
+  targetCreateRequest AcquisitionTargetCreateRequest?
+  discoveryCandidate  AcquisitionCandidate?
 
   source RecordSource @default(MANUAL)
 
@@ -372,6 +373,17 @@ model AcquisitionTarget {
   @@index([stage, fit])
   @@index([researchedAt])
   @@map("acquisitionTarget")
+}
+
+model AcquisitionTargetCreateRequest {
+  idempotencyKey String @id @db.Uuid
+
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("acquisitionTargetCreateRequest")
 }
 
 model CompanyEnrichment {

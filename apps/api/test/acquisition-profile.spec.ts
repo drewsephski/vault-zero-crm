@@ -10,6 +10,7 @@ import {
 import { ACTIVE_ACQUISITION_STAGES } from "@crm/db/acquisition";
 import {
 	acquisitionCandidateIdInput,
+	createAcquisitionTargetInput,
 	updateAcquisitionTargetInput,
 } from "../src/acquisition/acquisition.contracts";
 import {
@@ -118,6 +119,25 @@ describe("acquisition operating contracts", () => {
 		expect(acquisitionCandidateIdInput.parse({ id: "candidate-1" })).toEqual({
 			id: "candidate-1",
 		});
+	});
+
+	it("requires a UUID idempotency key for manual target creation", () => {
+		const input = {
+			name: "Atlas Services",
+			idempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
+		};
+
+		expect(createAcquisitionTargetInput.parse(input)).toEqual(input);
+		expect(
+			createAcquisitionTargetInput.safeParse({ name: "Atlas Services" })
+				.success,
+		).toBe(false);
+		expect(
+			createAcquisitionTargetInput.safeParse({
+				name: "Atlas Services",
+				idempotencyKey: "retry-me",
+			}).success,
+		).toBe(false);
 	});
 
 	it("accepts every acquisition lifecycle stage", () => {

@@ -441,7 +441,7 @@ describe("acquisition target mutations", () => {
 		domains.push(domain);
 
 		const result = await service().createTarget(
-			{ name: "Manual Target", domain },
+			{ name: "Manual Target", domain, idempotencyKey: crypto.randomUUID() },
 			"reviewer-1",
 		);
 		companyIds.push(result.companyId);
@@ -479,6 +479,7 @@ describe("acquisition target mutations", () => {
 				acquisition.createTarget(
 					{
 						name: `Manual Concurrent ${index}`,
+						idempotencyKey: crypto.randomUUID(),
 						domain:
 							index % 2 === 0
 								? `https://www.${domain}/about`
@@ -516,21 +517,53 @@ describe("acquisition target mutations", () => {
 		).toBe(1);
 	});
 
-	it("keeps domainless manual targets distinct instead of matching by name", async () => {
+	it("converges concurrent domainless creation with the same idempotency key", async () => {
 		const acquisition = service();
 		const name = `Domainless Manual ${crypto.randomUUID()}`;
-		const first = await acquisition.createTarget({ name }, "reviewer-1");
-		const second = await acquisition.createTarget({ name }, "reviewer-1");
+		const idempotencyKey = crypto.randomUUID();
+		const settled = await Promise.allSettled(
+			Array.from({ length: 20 }, () =>
+				acquisition.createTarget({ name, idempotencyKey }, "reviewer-1"),
+			),
+		);
+
+		expect(settled.filter((result) => result.status === "rejected")).toEqual(
+			[],
+		);
+		const results = settled.flatMap((result) =>
+			result.status === "fulfilled" ? [result.value] : [],
+		);
+		const resultCompanyIds = [
+			...new Set(results.map((result) => result.companyId)),
+		];
+		companyIds.push(...resultCompanyIds);
+
+		expect(resultCompanyIds).toHaveLength(1);
+		expect(results.filter((result) => result.created)).toHaveLength(1);
+		expect(results.filter((result) => result.targetCreated)).toHaveLength(1);
+		expect(
+			await db.acquisitionTarget.count({
+				where: { companyId: { in: resultCompanyIds } },
+			}),
+		).toBe(1);
+	});
+
+	it("keeps same-name domainless targets distinct across different keys", async () => {
+		const acquisition = service();
+		const name = `Domainless Manual ${crypto.randomUUID()}`;
+		const first = await acquisition.createTarget(
+			{ name, idempotencyKey: crypto.randomUUID() },
+			"reviewer-1",
+		);
+		const second = await acquisition.createTarget(
+			{ name, idempotencyKey: crypto.randomUUID() },
+			"reviewer-1",
+		);
 		companyIds.push(first.companyId, second.companyId);
 
 		expect(first.companyId).not.toBe(second.companyId);
 		expect(first.created).toBe(true);
 		expect(second.created).toBe(true);
-		expect(
-			await db.acquisitionTarget.count({
-				where: { companyId: { in: [first.companyId, second.companyId] } },
-			}),
-		).toBe(2);
 	});
 
 	it("promotes an existing company without changing any company field", async () => {

@@ -348,6 +348,7 @@ export class CompaniesService {
 		input: CompanyCreateInput,
 		source: RecordSource = RecordSource.MANUAL,
 		acquisitionTarget?: Prisma.AcquisitionTargetCreateWithoutCompanyInput,
+		acquisitionTargetCreateRequestKey?: string,
 	) {
 		const domain = normalizeDomain(input.domain);
 
@@ -374,6 +375,13 @@ export class CompaniesService {
 					source,
 					acquisitionTarget: acquisitionTarget
 						? { create: acquisitionTarget }
+						: undefined,
+					targetCreateRequest: acquisitionTargetCreateRequestKey
+						? {
+								create: {
+									idempotencyKey: acquisitionTargetCreateRequestKey,
+								},
+							}
 						: undefined,
 				},
 				select: { id: true, name: true, domain: true },

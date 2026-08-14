@@ -16,11 +16,11 @@ import {
 	NotFoundException,
 } from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
-import type { CompanyCreateInput } from "../companies/companies.contracts";
 import { CompaniesService } from "../companies/companies.service";
 import { normalizeDomain } from "../companies/domain";
 import { InjectDatabase } from "../database/database.constants";
 import type {
+	CreateAcquisitionTargetInput,
 	TargetMutationResult,
 	TargetResearchResult,
 } from "./acquisition.contracts";
@@ -47,28 +47,50 @@ export class AcquisitionService {
 	) {}
 
 	async createTarget(
-		input: CompanyCreateInput,
+		input: CreateAcquisitionTargetInput,
 		actingUserId: string,
 	): Promise<TargetMutationResult> {
+		const { idempotencyKey, ...companyInput } = input;
+		const prior = await this.db.acquisitionTargetCreateRequest.findUnique({
+			where: { idempotencyKey },
+			select: { companyId: true },
+		});
+		if (prior) return this.addTarget(prior.companyId, actingUserId);
+
 		const domain = normalizeDomain(input.domain);
 		let company: { id: string };
 		try {
 			company = await this.companies.create(
-				input,
+				companyInput,
 				RecordSource.MANUAL,
 				acquisitionTargetData([]),
+				idempotencyKey,
 			);
 		} catch (error) {
-			if (!(error instanceof ConflictException) || !domain) throw error;
-			const winner = await this.db.company.findUnique({
-				where: { domain },
-				select: { id: true },
-			});
+			if (!(error instanceof ConflictException)) throw error;
+			const winner = await this.findCreateTargetWinner(idempotencyKey, domain);
 			if (!winner) throw error;
 			return this.addTarget(winner.id, actingUserId);
 		}
 
 		return this.targetResult(company.id, actingUserId, true, true);
+	}
+
+	private async findCreateTargetWinner(
+		idempotencyKey: string,
+		domain: string | null,
+	): Promise<{ id: string } | null> {
+		const request = await this.db.acquisitionTargetCreateRequest.findUnique({
+			where: { idempotencyKey },
+			select: { companyId: true },
+		});
+		if (request) return { id: request.companyId };
+		if (!domain) return null;
+
+		return this.db.company.findUnique({
+			where: { domain },
+			select: { id: true },
+		});
 	}
 
 	async addTarget(

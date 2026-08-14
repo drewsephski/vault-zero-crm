@@ -2,7 +2,13 @@ import { AcquisitionStage } from "@crm/db";
 import { z } from "zod";
 import { companyCreateInput } from "../companies/companies.contracts";
 
-export const createAcquisitionTargetInput = companyCreateInput;
+export const createAcquisitionTargetInput = companyCreateInput.extend({
+	idempotencyKey: z.string().uuid(),
+});
+
+export type CreateAcquisitionTargetInput = z.infer<
+	typeof createAcquisitionTargetInput
+>;
 
 export const addAcquisitionTargetInput = z.object({
 	companyId: z.string().min(1),

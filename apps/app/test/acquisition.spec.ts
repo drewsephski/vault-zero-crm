@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { companiesSearchParams } from "../app/(app)/[slug]/companies/companies-search-params";
 import {
 	acquisitionCriterionLabel,
+	acquisitionTargetCreateSubmission,
 	criterionGroups,
 	defaultCompanyTab,
 	safeAcquisitionCandidateSource,
@@ -67,6 +68,22 @@ describe("acquisition presentation", () => {
 		expect(
 			safeAcquisitionCandidateSource("javascript:alert(document.domain)"),
 		).toBeNull();
+	});
+
+	it("reuses the same target creation key when a submission is retried", () => {
+		const fields = {
+			name: "Atlas Services",
+			domain: undefined,
+			ownerId: null,
+		};
+		const idempotencyKey = "123e4567-e89b-42d3-a456-426614174000";
+
+		expect(acquisitionTargetCreateSubmission(fields, idempotencyKey)).toEqual(
+			acquisitionTargetCreateSubmission(fields, idempotencyKey),
+		);
+		expect(
+			acquisitionTargetCreateSubmission(fields, idempotencyKey).idempotencyKey,
+		).toBe(idempotencyKey);
 	});
 
 	it("defaults real targets to Acquisition without changing generic companies", () => {

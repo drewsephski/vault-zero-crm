@@ -39,6 +39,19 @@ export function safeAcquisitionCandidateSource(
 	return isAcquisitionEvidenceUrl(sourceUrl) ? sourceUrl : null;
 }
 
+type AcquisitionTargetCreateFields = {
+	name: string;
+	domain?: string;
+	ownerId?: string | null;
+};
+
+export function acquisitionTargetCreateSubmission(
+	fields: AcquisitionTargetCreateFields,
+	idempotencyKey: string,
+): AcquisitionTargetCreateFields & { idempotencyKey: string } {
+	return { ...fields, idempotencyKey };
+}
+
 type CompanyTargetState =
 	| { acquisitionTarget?: unknown | null }
 	| null

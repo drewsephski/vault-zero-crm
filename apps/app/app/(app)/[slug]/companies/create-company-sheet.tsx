@@ -31,10 +31,13 @@ import {
 import { Spinner } from "@crm/ui/components/spinner";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { parseAsBoolean, useQueryState } from "nuqs";
-import { type ComponentProps, Suspense, useId, useState } from "react";
+import { type ComponentProps, Suspense, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
-import { targetResearchCopy } from "@/lib/acquisition";
+import {
+	acquisitionTargetCreateSubmission,
+	targetResearchCopy,
+} from "@/lib/acquisition";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
@@ -72,11 +75,18 @@ function CreateCompanyForm() {
 	const [name, setName] = useState("");
 	const [domain, setDomain] = useState("");
 	const [ownerId, setOwnerId] = useState(UNASSIGNED);
+	const targetCreateKey = useRef(crypto.randomUUID());
 
 	const nameId = useId();
 	const domainId = useId();
 
 	const users = useQuery(trpc.users.list.queryOptions());
+	const resetForm = () => {
+		setName("");
+		setDomain("");
+		setOwnerId(UNASSIGNED);
+		targetCreateKey.current = crypto.randomUUID();
+	};
 
 	const createCompany = useMutation(
 		trpc.companies.create.mutationOptions({
@@ -84,9 +94,7 @@ function CreateCompanyForm() {
 				await cache.company(company.id);
 				toast.success(`${company.name} added.`);
 				await setOpen(null);
-				setName("");
-				setDomain("");
-				setOwnerId(UNASSIGNED);
+				resetForm();
 				openRecord({ kind: "company", id: company.id });
 			},
 			onError: (error) => toast.error(error.message),
@@ -103,9 +111,7 @@ function CreateCompanyForm() {
 					toast.error(feedback.message);
 				}
 				await setOpen(null);
-				setName("");
-				setDomain("");
-				setOwnerId(UNASSIGNED);
+				resetForm();
 				openRecord({ kind: "company", id: result.companyId });
 			},
 			onError: (error) => toast.error(error.message),
@@ -114,7 +120,13 @@ function CreateCompanyForm() {
 	const pending = createCompany.isPending || createTarget.isPending;
 
 	return (
-		<Sheet open={open} onOpenChange={(next) => setOpen(next || null)}>
+		<Sheet
+			open={open}
+			onOpenChange={(next) => {
+				if (!next && !pending) targetCreateKey.current = crypto.randomUUID();
+				void setOpen(next || null);
+			}}
+		>
 			<SheetTrigger asChild>
 				<AddButton />
 			</SheetTrigger>
@@ -139,7 +151,12 @@ function CreateCompanyForm() {
 							ownerId: ownerId === UNASSIGNED ? null : ownerId,
 						};
 						if (labels.acquisition) {
-							createTarget.mutate(input);
+							createTarget.mutate(
+								acquisitionTargetCreateSubmission(
+									input,
+									targetCreateKey.current,
+								),
+							);
 						} else {
 							createCompany.mutate(input);
 						}
