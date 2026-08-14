@@ -68,8 +68,12 @@ const TARGET_COLUMNS: SimpleTableColumn[] = [
 
 const DISCOVERY_COLUMNS: SimpleTableColumn[] = [
 	{ header: "Candidate" },
-	{ header: "Evidence", width: "w-[42%]" },
-	{ srLabel: "Actions", width: "w-36", align: "right" },
+	{
+		header: "Evidence",
+		width: "w-[42%]",
+		className: "hidden sm:table-cell",
+	},
+	{ srLabel: "Actions", width: "w-28 sm:w-44", align: "right" },
 ];
 
 export function acquisitionApprovalFeedback(
@@ -141,7 +145,7 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 			: `${formatCount(acquisition.visibleMatches, "target")} have an evidence-backed strong or potential fit`;
 
 	return (
-		<div className="order-last flex min-w-0 flex-col gap-6 @5xl/page-content:order-first">
+		<div className="@container/acquisition-dashboard order-last flex min-w-0 flex-col gap-6 @5xl/page-content:order-first">
 			<StatGroup>
 				<StatCard
 					label="Buy-box fit"
@@ -188,7 +192,7 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 				</Alert>
 			) : null}
 
-			<div className="grid gap-6 @3xl/page-content:grid-cols-2">
+			<div className="grid gap-6 @5xl/acquisition-dashboard:grid-cols-2">
 				<Card className="min-w-0">
 					<CardHeader>
 						<CardTitle>Targets worth attention</CardTitle>
@@ -286,14 +290,31 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 													<span className="truncate text-muted-foreground">
 														{candidate.rationale}
 													</span>
+													<span className="mt-2 flex min-w-0 flex-col gap-1 whitespace-normal sm:hidden">
+														<span className="line-clamp-2 break-words">
+															{candidate.evidence}
+														</span>
+														<TextLink
+															className="truncate"
+															variant="quiet"
+															href={candidate.sourceUrl}
+															target="_blank"
+															rel="noreferrer noopener"
+														>
+															{candidate.sourceTitle ?? candidate.domain}
+														</TextLink>
+													</span>
 												</span>
 											</TableCell>
-											<TableCell className={CELL}>
+											<TableCell
+												className={`${CELL} hidden whitespace-normal sm:table-cell`}
+											>
 												<span className="flex min-w-0 flex-col">
-													<span className="line-clamp-2">
+													<span className="line-clamp-2 break-words">
 														{candidate.evidence}
 													</span>
 													<TextLink
+														className="truncate"
 														variant="quiet"
 														href={candidate.sourceUrl}
 														target="_blank"
@@ -304,7 +325,7 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 												</span>
 											</TableCell>
 											<TableCell className={`${CELL} text-right`}>
-												<span className="inline-flex gap-1">
+												<span className="flex flex-col items-stretch gap-1 sm:inline-flex sm:flex-row sm:items-center">
 													<Button
 														variant="ghost"
 														size="sm"
@@ -335,7 +356,7 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 				</Card>
 			</div>
 
-			<div className="grid gap-6 @3xl/page-content:grid-cols-2">
+			<div className="grid gap-6 @5xl/acquisition-dashboard:grid-cols-2">
 				<Card className="min-w-0">
 					<CardHeader>
 						<CardTitle>Next actions</CardTitle>

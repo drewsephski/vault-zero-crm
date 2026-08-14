@@ -61,7 +61,7 @@ const CELL = "px-3 py-2.5 align-middle";
 
 export function DashboardSummary() {
 	return (
-		<div className="grid items-start gap-6 @5xl/page-content:grid-cols-2">
+		<div className="grid items-start gap-6 @5xl/page-content:grid-cols-[minmax(0,3fr)_minmax(24rem,2fr)]">
 			<div className="order-first @5xl/page-content:order-last @5xl/page-content:sticky @5xl/page-content:top-6">
 				<OverviewAgent />
 			</div>

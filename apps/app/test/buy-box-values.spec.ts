@@ -1,7 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import {
+	appendListValues,
 	type BuyBoxDraft,
+	listValues,
 	moneyCents,
+	moneySliderDraft,
+	moneySliderState,
 	validateBuyBoxDraft,
 } from "../app/(app)/[slug]/settings/buy-box/buy-box-values";
 
@@ -24,11 +28,37 @@ const draft = {
 } satisfies BuyBoxDraft;
 
 describe("buy box values", () => {
+	it("parses selected values and appends distinct custom entries", () => {
+		expect(listValues("HVAC, Commercial services\nManufacturing")).toEqual([
+			"HVAC",
+			"Commercial services",
+			"Manufacturing",
+		]);
+		expect(
+			appendListValues("HVAC, Commercial services", "hvac, Plumbing"),
+		).toBe("HVAC, Commercial services, Plumbing");
+	});
+
 	it("converts valid amounts to safe integer cents", () => {
 		expect(moneyCents("1234.56")).toBe(123_456);
 		expect(moneyCents("")).toBeNull();
 		expect(moneyCents("not money")).toBeNull();
 		expect(moneyCents(String(Number.MAX_SAFE_INTEGER))).toBeNull();
+	});
+
+	it("maps slider endpoints without replacing open bounds", () => {
+		expect(moneySliderState("", "", 50_000_000, 250_000)).toEqual({
+			minimumValue: null,
+			maximumValue: null,
+			rangeMaximum: 50_000_000,
+			values: [0, 50_000_000],
+		});
+		expect(
+			moneySliderDraft([1_000_000, 50_000_000], "", "", 50_000_000),
+		).toEqual(["1000000", ""]);
+		expect(
+			moneySliderDraft([1_000_000, 50_000_000], "", "50000000", 50_000_000),
+		).toEqual(["1000000", "50000000"]);
 	});
 
 	it("reports invalid values instead of silently clearing them", () => {

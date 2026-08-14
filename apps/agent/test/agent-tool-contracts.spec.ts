@@ -1,11 +1,53 @@
 import { describe, expect, it } from "bun:test";
+import { acquisitionProfileValues } from "../agent/lib/acquisition-profile";
 import createContact from "../agent/tools/create_contact";
 import getLinkedInProfile from "../agent/tools/get_linkedin_profile";
 import proposeAcquisitionCandidates from "../agent/tools/propose_acquisition_candidates";
 import readLinkedInProfile from "../agent/tools/read_linkedin_profile";
+import updateAcquisitionProfile, {
+	mergeValues,
+} from "../agent/tools/update_acquisition_profile";
 import writeAcquisitionDossier from "../agent/tools/write_acquisition_dossier";
 
 describe("agent tool contracts", () => {
+	it("accepts a complete acquisition buy box in whole currency units", () => {
+		expect(
+			updateAcquisitionProfile.inputSchema.safeParse({
+				operation: "replace",
+				preferredIndustries: ["HVAC"],
+				geographies: ["Texas"],
+				currency: "usd",
+				revenueMin: 1_000_000,
+				revenueMax: 5_000_000,
+				ownerInvolvement: "TRANSITIONAL",
+			}).success,
+		).toBe(true);
+	});
+
+	it("replaces omitted buy-box fields and updates only named fields", () => {
+		const current = {
+			...acquisitionProfileValues(null),
+			preferredIndustries: ["HVAC"],
+			geographies: ["Texas"],
+			revenueMin: 1_000_000,
+		};
+
+		expect(
+			mergeValues({ operation: "update", geographies: ["Midwest"] }, current),
+		).toMatchObject({
+			preferredIndustries: ["HVAC"],
+			geographies: ["Midwest"],
+			revenueMin: 1_000_000,
+		});
+		expect(
+			mergeValues({ operation: "replace", geographies: ["Midwest"] }, current),
+		).toMatchObject({
+			preferredIndustries: [],
+			geographies: ["Midwest"],
+			revenueMin: null,
+		});
+	});
+
 	it("accepts an unassigned contact creation request", () => {
 		const result = createContact.inputSchema.safeParse({
 			firstName: "Drew",

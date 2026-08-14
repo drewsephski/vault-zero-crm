@@ -185,8 +185,8 @@ export function BuyBoxForm() {
 								aria-current={index === step ? "step" : undefined}
 								className={
 									index === step
-										? "border-primary border-t-2 pt-2 font-medium text-xs"
-										: "border-t pt-2 text-muted-foreground text-xs"
+										? "border-primary border-t-2 pt-2 text-center font-medium text-xs"
+										: "border-t pt-2 text-center text-muted-foreground text-xs"
 								}
 							>
 								<span className="hidden sm:inline">{label}</span>

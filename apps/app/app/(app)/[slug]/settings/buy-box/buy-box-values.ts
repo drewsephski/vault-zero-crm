@@ -87,6 +87,71 @@ export function listValues(value: string): string[] {
 		.filter(Boolean);
 }
 
+export function appendListValues(value: string, additions: string): string {
+	const entries = listValues(value);
+	const seen = new Set(entries.map((entry) => entry.toLowerCase()));
+	for (const entry of listValues(additions)) {
+		const normalized = entry.toLowerCase();
+		if (seen.has(normalized)) continue;
+		entries.push(entry);
+		seen.add(normalized);
+	}
+	return entries.join(", ");
+}
+
+export function moneySliderState(
+	minimum: string,
+	maximum: string,
+	baseMaximum: number,
+	step: number,
+): {
+	minimumValue: number | null;
+	maximumValue: number | null;
+	rangeMaximum: number;
+	values: [number, number];
+} {
+	const minimumValue = numericMoneyValue(minimum);
+	const maximumValue = numericMoneyValue(maximum);
+	const rangeMaximum = Math.max(
+		baseMaximum,
+		Math.ceil(Math.max(minimumValue ?? 0, maximumValue ?? 0) / step) * step,
+	);
+	const lowerValue = Math.min(minimumValue ?? 0, rangeMaximum);
+	return {
+		minimumValue,
+		maximumValue,
+		rangeMaximum,
+		values: [
+			lowerValue,
+			Math.max(
+				Math.min(maximumValue ?? rangeMaximum, rangeMaximum),
+				lowerValue,
+			),
+		],
+	};
+}
+
+export function moneySliderDraft(
+	values: readonly number[],
+	minimum: string,
+	maximum: string,
+	rangeMaximum: number,
+): [string, string] {
+	const nextMinimum = values[0] ?? 0;
+	const nextMaximum = values[1] ?? rangeMaximum;
+	return [
+		minimum.trim() === "" && nextMinimum === 0 ? "" : String(nextMinimum),
+		maximum.trim() === "" && nextMaximum === rangeMaximum
+			? ""
+			: String(nextMaximum),
+	];
+}
+
+function numericMoneyValue(value: string): number | null {
+	const amount = Number(value);
+	return value.trim() && Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
 function moneyInput(cents: number | null): string {
 	return cents === null ? "" : String(cents / 100);
 }

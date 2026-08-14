@@ -30,6 +30,33 @@ function stub(body: unknown, status = 200): void {
 	}) as typeof fetch;
 }
 
+function stubSequence(
+	responses: {
+		body: unknown;
+		status: number;
+		headers?: Record<string, string>;
+	}[],
+): void {
+	let index = 0;
+	globalThis.fetch = (async (
+		input: string | URL | Request,
+		init?: RequestInit,
+	) => {
+		requests.push({ url: String(input), init });
+		const response = responses[Math.min(index, responses.length - 1)];
+		index += 1;
+		if (!response) throw new Error("A response fixture is required.");
+
+		return new Response(JSON.stringify(response.body), {
+			status: response.status,
+			headers: {
+				"content-type": "application/json",
+				...response.headers,
+			},
+		});
+	}) as typeof fetch;
+}
+
 describe("LinkdAPI people search", () => {
 	it("normalizes a LinkedIn URL or username to a profile slug", () => {
 		expect(slugFromLinkedinInput("drew-sepeczi")).toBe("drew-sepeczi");
@@ -132,5 +159,78 @@ describe("LinkdAPI people search", () => {
 		const result = await searchPeople({ keyword: "Jane Doe" });
 
 		expect(result).toEqual({ ok: true, data: [] });
+	});
+
+	it("retries one short provider throttle after Retry-After", async () => {
+		process.env.RAPIDAPI_KEY = "rapid-short-throttle";
+		stubSequence([
+			{
+				body: { message: "Too many requests" },
+				status: 429,
+				headers: { "retry-after": "0" },
+			},
+			{
+				body: { success: true, data: { people: [] } },
+				status: 200,
+			},
+		]);
+
+		const result = await searchPeople({ keyword: "Jane Doe" });
+
+		expect(result).toEqual({ ok: true, data: [] });
+		expect(requests).toHaveLength(2);
+	});
+
+	it("does not retry a provider limit without reset headers", async () => {
+		process.env.RAPIDAPI_KEY = "rapid-provider-limit-no-reset";
+		stubSequence([
+			{
+				body: { message: "Too many requests" },
+				status: 429,
+			},
+		]);
+
+		const result = await searchPeople({ keyword: "Jane Doe" });
+
+		expect(result).toMatchObject({
+			ok: false,
+			missing: false,
+			code: "rate_limited",
+			retryAfterSeconds: 60,
+		});
+		expect(requests).toHaveLength(1);
+	});
+
+	it("suppresses duplicate calls while a provider limit is active", async () => {
+		process.env.RAPIDAPI_KEY = "rapid-provider-limit";
+		stubSequence([
+			{
+				body: {
+					message:
+						"You have exceeded the rate limit per month for your BASIC plan.",
+				},
+				status: 429,
+				headers: { "retry-after": "120" },
+			},
+		]);
+
+		const first = await searchPeople({ keyword: "Jane Doe" });
+		const second = await searchPeople({ keyword: "John Doe" });
+
+		expect(first).toMatchObject({
+			ok: false,
+			missing: false,
+			code: "rate_limited",
+			retryAfterSeconds: 120,
+		});
+		expect(second).toMatchObject({
+			ok: false,
+			missing: false,
+			code: "rate_limited",
+		});
+		if (!first.ok && !first.missing) {
+			expect(first.reason).toContain("Retrying immediately will not help");
+		}
+		expect(requests).toHaveLength(1);
 	});
 });

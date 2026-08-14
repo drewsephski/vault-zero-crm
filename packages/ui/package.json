@@ -17,6 +17,7 @@
 		"clean": "rm -rf .turbo node_modules"
 	},
 	"dependencies": {
+		"@base-ui/react": "^1.7.0",
 		"@carbon/icons-react": "^11.82.0",
 		"@crm/db": "workspace:*",
 		"@shadcn/react": "^0.2.1",
