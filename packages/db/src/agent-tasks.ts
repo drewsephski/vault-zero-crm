@@ -101,40 +101,39 @@ export async function queueAgentTask(
 		contactId: input.contactId ?? null,
 		companyId: input.companyId ?? null,
 	};
-	const existing = await database.agentTask.findFirst({
-		where: { kind: input.kind, finishedAt: null, ...subject },
-		select: { id: true, dueAt: true, startedAt: true },
-	});
 
-	if (existing) {
-		const advanced = await advanceAgentTask(database, existing, input);
-		return { taskId: existing.id, created: false, advanced };
-	}
-
-	try {
-		const created = await database.agentTask.create({
-			data: {
-				...subject,
-				kind: input.kind,
-				reason: input.reason,
-				dueAt: input.dueAt,
-				priority: input.priority ?? 0,
-				budget: input.budget ?? 4,
-			},
-			select: { id: true },
-		});
-		return { taskId: created.id, created: true, advanced: false };
-	} catch (error) {
-		if (!isUniqueConflict(error)) throw error;
-
-		const winner = await database.agentTask.findFirst({
+	while (true) {
+		const existing = await database.agentTask.findFirst({
 			where: { kind: input.kind, finishedAt: null, ...subject },
 			select: { id: true, dueAt: true, startedAt: true },
 		});
-		if (!winner) throw error;
 
-		const advanced = await advanceAgentTask(database, winner, input);
-		return { taskId: winner.id, created: false, advanced };
+		if (existing) {
+			const resolution = await advanceAgentTask(database, existing, input);
+			if (resolution === "lost") continue;
+			return {
+				taskId: existing.id,
+				created: false,
+				advanced: resolution === "advanced",
+			};
+		}
+
+		try {
+			const created = await database.agentTask.create({
+				data: {
+					...subject,
+					kind: input.kind,
+					reason: input.reason,
+					dueAt: input.dueAt,
+					priority: input.priority ?? 0,
+					budget: input.budget ?? 4,
+				},
+				select: { id: true },
+			});
+			return { taskId: created.id, created: true, advanced: false };
+		} catch (error) {
+			if (!isUniqueConflict(error)) throw error;
+		}
 	}
 }
 
@@ -142,9 +141,9 @@ async function advanceAgentTask(
 	database: Db,
 	existing: { id: string; dueAt: Date; startedAt: Date | null },
 	input: QueueAgentTaskInput,
-): Promise<boolean> {
+): Promise<"advanced" | "unchanged" | "lost"> {
 	if (existing.startedAt || existing.dueAt.getTime() <= input.dueAt.getTime()) {
-		return false;
+		return "unchanged";
 	}
 
 	const { count } = await database.agentTask.updateMany({
@@ -162,7 +161,7 @@ async function advanceAgentTask(
 		},
 	});
 
-	return count === 1;
+	return count === 1 ? "advanced" : "lost";
 }
 
 function isUniqueConflict(

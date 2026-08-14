@@ -74,6 +74,75 @@ describe("agentTaskState", () => {
 });
 
 describe("queueAgentTask", () => {
+	it("advances the recurrence when completion wins the enqueue race", async () => {
+		const dueNow = new Date("2026-08-13T18:00:00.000Z");
+		const originalDueAt = new Date("2026-09-12T18:00:00.000Z");
+		const tasks = {
+			finishing: {
+				id: "finishing-task",
+				dueAt: originalDueAt,
+				startedAt: null,
+			},
+			recurrence: {
+				id: "recurrence-task",
+				dueAt: originalDueAt,
+				startedAt: null,
+				reason: "Scheduled recurrence",
+				priority: 30,
+				budget: 4,
+			},
+		};
+		let active: "finishing" | "recurrence" = "finishing";
+		const database = {
+			agentTask: {
+				findFirst: async () => tasks[active],
+				create: async () => {
+					throw new Error("The recurrence should win without another create.");
+				},
+				updateMany: async (input: {
+					where: { id: string };
+					data: {
+						dueAt: Date;
+						reason: string;
+						priority: number;
+						budget: number;
+					};
+				}) => {
+					if (input.where.id === tasks.finishing.id) {
+						active = "recurrence";
+						return { count: 0 };
+					}
+					tasks.recurrence.dueAt = input.data.dueAt;
+					tasks.recurrence.reason = input.data.reason;
+					tasks.recurrence.priority = input.data.priority;
+					tasks.recurrence.budget = input.data.budget;
+					return { count: 1 };
+				},
+			},
+		} as unknown as typeof db;
+
+		const result = await queueAgentTask(database, {
+			companyId: "company-1",
+			kind: "acquisition-refresh",
+			reason: "Manual acquisition refresh",
+			dueAt: dueNow,
+			priority: 300,
+			budget: 12,
+		});
+
+		expect(result).toEqual({
+			taskId: "recurrence-task",
+			created: false,
+			advanced: true,
+		});
+		expect(tasks.recurrence).toMatchObject({
+			dueAt: dueNow,
+			reason: "Manual acquisition refresh",
+			priority: 300,
+			budget: 12,
+		});
+	});
+
 	it("converges concurrent scheduling on one persisted task", async () => {
 		const companyId = `db-agent-task-${crypto.randomUUID()}`;
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { db } from "@crm/db";
+import { db, Prisma } from "@crm/db";
 import { AgentQueueService } from "../src/agent/agent-queue.service";
 import {
 	AgentTriggerService,
@@ -101,6 +101,128 @@ describe("AgentTriggerService", () => {
 				where: { companyId, kind: "acquisition-refresh", finishedAt: null },
 			}),
 		).toBe(1);
+	});
+
+	it("converges concurrent backfill producers without dropping subjects", async () => {
+		const contactIds = Array.from(
+			{ length: 20 },
+			(_, index) => `backfill-${crypto.randomUUID()}-${index}`,
+		);
+
+		try {
+			const settled = await Promise.allSettled(
+				Array.from({ length: 10 }, () =>
+					service.backfill({
+						kind: "identify",
+						reason: "Concurrent identity backfill",
+						contactIds,
+					}),
+				),
+			);
+
+			expect(settled.filter((result) => result.status === "rejected")).toEqual(
+				[],
+			);
+			const results = settled.flatMap((result) =>
+				result.status === "fulfilled" ? [result.value] : [],
+			);
+			expect(results.reduce((total, result) => total + result.queued, 0)).toBe(
+				contactIds.length,
+			);
+			expect(
+				await db.agentTask.count({
+					where: {
+						contactId: { in: contactIds },
+						kind: "identify",
+						finishedAt: null,
+					},
+				}),
+			).toBe(contactIds.length);
+		} finally {
+			await db.agentTask.deleteMany({
+				where: { contactId: { in: contactIds } },
+			});
+		}
+	});
+
+	it("recovers the persisted winners after concurrent backfill preflights", async () => {
+		const contactIds = ["contact-1", "contact-2"];
+		const tasks = new Map<
+			string,
+			{
+				id: string;
+				contactId: string;
+				dueAt: Date;
+				startedAt: null;
+			}
+		>();
+		let preflights = 0;
+		let releasePreflights: (() => void) | undefined;
+		const bothPreflighted = new Promise<void>((resolve) => {
+			releasePreflights = resolve;
+		});
+		const uniqueConflict = () =>
+			new Prisma.PrismaClientKnownRequestError("Unique task", {
+				code: "P2002",
+				clientVersion: "test",
+			});
+		const database = {
+			agentTask: {
+				findMany: async () => {
+					preflights += 1;
+					if (preflights === 2) releasePreflights?.();
+					await bothPreflighted;
+					return [];
+				},
+				createMany: async (input: {
+					data: Array<{ contactId: string; dueAt: Date }>;
+				}) => {
+					if (tasks.size > 0) throw uniqueConflict();
+					for (const task of input.data) {
+						tasks.set(task.contactId, {
+							id: `task-${task.contactId}`,
+							contactId: task.contactId,
+							dueAt: task.dueAt,
+							startedAt: null,
+						});
+					}
+					return { count: input.data.length };
+				},
+				findFirst: async (input: { where: { contactId: string | null } }) =>
+					input.where.contactId
+						? (tasks.get(input.where.contactId) ?? null)
+						: null,
+				create: async (input: { data: { contactId: string; dueAt: Date } }) => {
+					if (tasks.has(input.data.contactId)) throw uniqueConflict();
+					const task = {
+						id: `task-${input.data.contactId}`,
+						contactId: input.data.contactId,
+						dueAt: input.data.dueAt,
+						startedAt: null,
+					};
+					tasks.set(input.data.contactId, task);
+					return { id: task.id };
+				},
+				updateMany: async () => ({ count: 0 }),
+			},
+		} as unknown as typeof db;
+		const first = new AgentTriggerService(database);
+		const second = new AgentTriggerService(database);
+
+		const settled = await Promise.allSettled(
+			[first, second].map((producer) =>
+				producer.backfill({
+					kind: "identify",
+					reason: "Concurrent identity backfill",
+					contactIds,
+				}),
+			),
+		);
+
+		expect(settled.filter((result) => result.status === "rejected")).toEqual(
+			[],
+		);
+		expect(tasks.size).toBe(contactIds.length);
 	});
 
 	it("brings a future acquisition recurrence due now", async () => {

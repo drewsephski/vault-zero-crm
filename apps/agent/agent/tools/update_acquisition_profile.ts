@@ -2,11 +2,12 @@ import {
 	AcquisitionAssetPreference,
 	AcquisitionOwnerInvolvement,
 	AcquisitionRevenuePreference,
+	type Db,
 	db,
 	Prisma,
 	WorkspaceMode,
 } from "@crm/db";
-import { PRIORITY } from "@crm/db/agent-tasks";
+import { PRIORITY, queueAgentTask } from "@crm/db/agent-tasks";
 import { isCurrencyCode, normalizeCurrency } from "@crm/db/currency";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import { defineTool } from "eve/tools";
@@ -158,7 +159,7 @@ export default defineTool({
 				profile.geographies.length > 0
 			) {
 				try {
-					await queueDiscovery();
+					await queueAcquisitionDiscovery(db);
 					discoveryQueued = true;
 				} catch (error) {
 					console.error("[agent] could not queue acquisition discovery", error);
@@ -252,20 +253,12 @@ function decimal(value: number | null): Prisma.Decimal | null {
 	return value === null ? null : new Prisma.Decimal(value);
 }
 
-async function queueDiscovery(): Promise<void> {
-	const pending = await db.agentTask.findFirst({
-		where: { kind: "acquisition-discovery", finishedAt: null },
-		select: { id: true },
-	});
-	if (pending) return;
-
-	await db.agentTask.create({
-		data: {
-			kind: "acquisition-discovery",
-			reason: "Eve updated the buy box; refresh the discovery strategy",
-			priority: PRIORITY.acquisitionDiscovery,
-			budget: 12,
-			dueAt: new Date(),
-		},
+export async function queueAcquisitionDiscovery(database: Db) {
+	return queueAgentTask(database, {
+		kind: "acquisition-discovery",
+		reason: "Eve updated the buy box; refresh the discovery strategy",
+		priority: PRIORITY.acquisitionDiscovery,
+		budget: 12,
+		dueAt: new Date(),
 	});
 }

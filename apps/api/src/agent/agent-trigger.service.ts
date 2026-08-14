@@ -165,51 +165,39 @@ export class AgentTriggerService {
 		budget?: number;
 		priority?: number;
 	}): Promise<{ queued: number; alreadyQueued: number }> {
-		const subject = input.contactIds ? "contactId" : "companyId";
 		const ids = [...new Set(input.contactIds ?? input.companyIds ?? [])];
 		if (ids.length === 0) return { queued: 0, alreadyQueued: 0 };
 
 		try {
-			const outstanding = await this.db.agentTask.findMany({
-				where: {
-					kind: input.kind,
-					finishedAt: null,
-					[subject]: { in: ids },
-				},
-				select: { [subject]: true },
-			});
-
-			const taken = new Set(
-				outstanding.map((row) => (row as Record<string, unknown>)[subject]),
-			);
-			const fresh = ids.filter((id) => !taken.has(id));
-
-			if (fresh.length > 0) {
-				await this.db.agentTask.createMany({
-					data: fresh.map((id) => ({
-						contactId: input.contactIds ? id : null,
-						companyId: input.companyIds ? id : null,
+			const dueAt = new Date();
+			const results = await Promise.all(
+				ids.map((id) =>
+					queueAgentTask(this.db, {
+						contactId: input.contactIds ? id : undefined,
+						companyId: input.companyIds ? id : undefined,
 						kind: input.kind,
 						reason: input.reason,
 						priority: input.priority ?? PRIORITY.sweep,
 						budget: input.budget ?? 4,
-						dueAt: new Date(),
-					})),
-				});
-			}
+						dueAt,
+					}),
+				),
+			);
+			const queued = results.filter((result) => result.created).length;
 
 			this.logger.log({
 				message: "Backfill queued",
 				kind: input.kind,
-				queued: fresh.length,
-				alreadyQueued: ids.length - fresh.length,
+				queued,
+				alreadyQueued: ids.length - queued,
 			});
 
-			if (fresh.length > 0) this.poke();
+			if (results.some((result) => result.created || result.advanced))
+				this.poke();
 
 			return {
-				queued: fresh.length,
-				alreadyQueued: ids.length - fresh.length,
+				queued,
+				alreadyQueued: ids.length - queued,
 			};
 		} catch (error) {
 			this.logger.error(
