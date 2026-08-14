@@ -1,9 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { db } from "@crm/db";
 import { DIRECT_KINDS, isDirectKind, PRIORITY } from "@crm/db/agent-tasks";
 import { claimDue } from "../agent/lib/tasks";
 
-const REASON = "lane-test";
+function laneFixtureIdentity(runId: string) {
+	return {
+		reason: `lane-test-${runId}`,
+		companyId: (index: number) => `lane-company-${runId}-${index}`,
+	};
+}
+
+const suffix = process.env.TEST_RUN_ID ?? randomUUID();
+const identity = laneFixtureIdentity(suffix);
+const REASON = identity.reason;
+let queuedCompany = 0;
 
 const VISIBLE = { only: DIRECT_KINDS } as const;
 const RESEARCH = { except: DIRECT_KINDS } as const;
@@ -19,7 +30,7 @@ async function queue(kind: string, priority: number, companyId?: string) {
 	return db.agentTask.create({
 		data: {
 			kind,
-			companyId,
+			companyId: companyId ?? identity.companyId(queuedCompany++),
 			reason: REASON,
 			dueAt: new Date(Date.now() - 1000),
 			priority,
@@ -49,7 +60,7 @@ describe("dispatch lanes", () => {
 
 	it("a logo is never starved by a queue full of research", async () => {
 		for (let i = 0; i < 30; i += 1) {
-			await queue("identify", PRIORITY.identify, `lane-company-${i}`);
+			await queue("identify", PRIORITY.identify, identity.companyId(i));
 		}
 
 		const brand = await queue("brand", PRIORITY.brand);
@@ -98,6 +109,16 @@ describe("dispatch lanes", () => {
 });
 
 describe("kind vocabulary", () => {
+	it("keeps concurrent test runs from sharing fixture identities", () => {
+		const first = laneFixtureIdentity("run-a");
+		const second = laneFixtureIdentity("run-b");
+
+		expect(first.reason).toBe("lane-test-run-a");
+		expect(second.reason).toBe("lane-test-run-b");
+		expect(first.companyId(0)).toBe("lane-company-run-a-0");
+		expect(second.companyId(0)).toBe("lane-company-run-b-0");
+	});
+
 	it("agrees on which kinds skip the model", () => {
 		expect(isDirectKind("brand")).toBe(true);
 		expect(isDirectKind("portrait")).toBe(true);
