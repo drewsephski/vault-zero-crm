@@ -1,18 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { randomUUID } from "node:crypto";
 import { db } from "@crm/db";
 import { DIRECT_KINDS, isDirectKind, PRIORITY } from "@crm/db/agent-tasks";
 import { claimDue } from "../agent/lib/tasks";
+import { laneFixtureIdentity } from "./lanes-fixture";
 
-function laneFixtureIdentity(runId: string) {
-	return {
-		reason: `lane-test-${runId}`,
-		companyId: (index: number) => `lane-company-${runId}-${index}`,
-	};
-}
-
-const suffix = process.env.TEST_RUN_ID ?? randomUUID();
-const identity = laneFixtureIdentity(suffix);
+const identity = laneFixtureIdentity();
 const REASON = identity.reason;
 let queuedCompany = 0;
 
