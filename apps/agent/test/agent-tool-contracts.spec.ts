@@ -97,6 +97,13 @@ describe("agent tool contracts", () => {
 		expect(
 			proposeAcquisitionCandidates.inputSchema.safeParse({
 				candidates: [
+					{ ...candidate, sourceUrl: "javascript:alert(document.domain)" },
+				],
+			}).success,
+		).toBe(false);
+		expect(
+			proposeAcquisitionCandidates.inputSchema.safeParse({
+				candidates: [
 					{ ...candidate, sourceUrl: "https://example-mechanical.test" },
 				],
 			}).success,
@@ -276,5 +283,49 @@ describe("agent tool contracts", () => {
 				],
 			}).success,
 		).toBe(true);
+	});
+
+	it("rejects non-http evidence for strengths and concerns", () => {
+		const dossier = {
+			companyId: "company-1",
+			criteria: [],
+			fit: "POTENTIAL",
+			summary:
+				"The business is a plausible fit, pending confirmation of its economics.",
+			strengths: [],
+			concerns: [],
+			missingInformation: ["Revenue and owner transition preference"],
+			recommendedAction: "Confirm ownership and financial scale.",
+			recommendedStage: "QUALIFIED",
+		};
+		const conclusion = {
+			summary: "The company operates in a preferred service category.",
+			evidence: [
+				{
+					label: "Commercial HVAC service offering",
+					url: "javascript:alert(document.domain)",
+				},
+			],
+		};
+
+		expect(
+			writeAcquisitionDossier.inputSchema.safeParse({
+				...dossier,
+				strengths: [conclusion],
+			}).success,
+		).toBe(false);
+		expect(
+			writeAcquisitionDossier.inputSchema.safeParse({
+				...dossier,
+				concerns: [
+					{
+						...conclusion,
+						evidence: [
+							{ ...conclusion.evidence[0], url: "file:///etc/passwd" },
+						],
+					},
+				],
+			}).success,
+		).toBe(false);
 	});
 });

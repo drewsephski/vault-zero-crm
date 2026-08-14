@@ -37,6 +37,7 @@ import {
 	AcquisitionStageIndicator,
 } from "@/components/crm/acquisition-status";
 import { RecordLink } from "@/components/crm/record-sheet/record-link";
+import { safeAcquisitionCandidateSource } from "@/lib/acquisition";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
@@ -280,6 +281,9 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 											approveCandidate.variables?.id === candidate.id) ||
 										(dismissCandidate.isPending &&
 											dismissCandidate.variables?.id === candidate.id);
+									const sourceUrl = safeAcquisitionCandidateSource(
+										candidate.sourceUrl,
+									);
 									return (
 										<SimpleTableRow key={candidate.id}>
 											<TableCell className={CELL}>
@@ -294,15 +298,17 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 														<span className="line-clamp-2 break-words">
 															{candidate.evidence}
 														</span>
-														<TextLink
-															className="truncate"
-															variant="quiet"
-															href={candidate.sourceUrl}
-															target="_blank"
-															rel="noreferrer noopener"
-														>
-															{candidate.sourceTitle ?? candidate.domain}
-														</TextLink>
+														{sourceUrl ? (
+															<TextLink
+																className="truncate"
+																variant="quiet"
+																href={sourceUrl}
+																target="_blank"
+																rel="noreferrer noopener"
+															>
+																{candidate.sourceTitle ?? candidate.domain}
+															</TextLink>
+														) : null}
 													</span>
 												</span>
 											</TableCell>
@@ -313,15 +319,17 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 													<span className="line-clamp-2 break-words">
 														{candidate.evidence}
 													</span>
-													<TextLink
-														className="truncate"
-														variant="quiet"
-														href={candidate.sourceUrl}
-														target="_blank"
-														rel="noreferrer noopener"
-													>
-														{candidate.sourceTitle ?? candidate.domain}
-													</TextLink>
+													{sourceUrl ? (
+														<TextLink
+															className="truncate"
+															variant="quiet"
+															href={sourceUrl}
+															target="_blank"
+															rel="noreferrer noopener"
+														>
+															{candidate.sourceTitle ?? candidate.domain}
+														</TextLink>
+													) : null}
 												</span>
 											</TableCell>
 											<TableCell className={`${CELL} text-right`}>

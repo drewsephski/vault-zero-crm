@@ -385,6 +385,29 @@ describe("write_acquisition_dossier", () => {
 		});
 	}
 
+	it("refuses to create a target while writing a dossier", async () => {
+		await db.acquisitionTarget.delete({ where: { companyId } });
+
+		const result = await writeAcquisitionDossier.execute(
+			{
+				...baseDossierB,
+				companyId,
+				criteria: validCriteria,
+			},
+			toolContext,
+		);
+
+		expect(result).toEqual({
+			written: false,
+			reason:
+				"This company is not an acquisition target. Add it to targets before writing a dossier.",
+		});
+		expect(
+			await db.acquisitionTarget.findUnique({ where: { companyId } }),
+		).toBeNull();
+		expect(await db.activity.count({ where: { companyId } })).toBe(0);
+	});
+
 	it("commits dossier B, evidence sources, activity, and timestamps together", async () => {
 		const startedAt = new Date();
 		const result = await writeAcquisitionDossier.execute(

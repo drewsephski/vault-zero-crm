@@ -5,7 +5,10 @@ import {
 	db,
 	WorkspaceMode,
 } from "@crm/db";
-import { expectedAcquisitionCriterionIds } from "@crm/db/acquisition";
+import {
+	expectedAcquisitionCriterionIds,
+	isAcquisitionEvidenceUrl,
+} from "@crm/db/acquisition";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
@@ -16,7 +19,7 @@ import {
 
 const evidence = z.object({
 	label: z.string().trim().min(5).max(300),
-	url: z.url(),
+	url: z.url().refine(isAcquisitionEvidenceUrl),
 });
 
 const finding = z.object({
@@ -92,6 +95,13 @@ export default defineTool({
 
 		if (!company)
 			return { written: false as const, reason: "No such company." };
+		if (!company.acquisitionTarget) {
+			return {
+				written: false as const,
+				reason:
+					"This company is not an acquisition target. Add it to targets before writing a dossier.",
+			};
+		}
 		if (profile?.mode !== WorkspaceMode.ACQUISITION) {
 			return {
 				written: false as const,
@@ -127,24 +137,10 @@ export default defineTool({
 		}
 		const researchedAt = new Date();
 
-		await db.$transaction(async (tx) => {
-			await tx.acquisitionTarget.upsert({
+		const written = await db.$transaction(async (tx) => {
+			const { count } = await tx.acquisitionTarget.updateMany({
 				where: { companyId: company.id },
-				create: {
-					companyId: company.id,
-					fit: input.fit,
-					summary: input.summary,
-					strengths: input.strengths,
-					concerns: input.concerns,
-					criteria: input.criteria,
-					missingInformation: input.missingInformation,
-					recommendedAction: input.recommendedAction,
-					recommendedStage: input.recommendedStage,
-					sourceUrls,
-					researchedAt,
-					sourceSessionId: ctx.session.id,
-				},
-				update: {
+				data: {
 					fit: input.fit,
 					summary: input.summary,
 					strengths: input.strengths,
@@ -158,6 +154,7 @@ export default defineTool({
 					sourceSessionId: ctx.session.id,
 				},
 			});
+			if (count === 0) return false;
 
 			await tx.activity.create({
 				data: {
@@ -180,7 +177,15 @@ export default defineTool({
 				where: { id: company.id },
 				data: { lastActivityAt: researchedAt },
 			});
+			return true;
 		});
+		if (!written) {
+			return {
+				written: false as const,
+				reason:
+					"This company is not an acquisition target. Add it to targets before writing a dossier.",
+			};
+		}
 
 		return {
 			written: true as const,

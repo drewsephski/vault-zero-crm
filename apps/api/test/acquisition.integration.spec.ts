@@ -380,6 +380,55 @@ describe("acquisition dossier read model", () => {
 });
 
 describe("acquisition target mutations", () => {
+	it("requires explicit promotion before acquisition research", async () => {
+		const domain = `generic-research-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const company = await db.company.create({
+			data: { name: "Generic CRM Company", domain },
+		});
+		companyIds.push(company.id);
+		const companies = companyService();
+
+		await expect(companies.research(company.id, "reviewer-1")).rejects.toThrow(
+			"Add this company to targets before analyzing fit.",
+		);
+		await expect(
+			companies.analyzeAcquisition(company.id, "reviewer-1"),
+		).rejects.toThrow("Add this company to targets before analyzing fit.");
+		expect(
+			await db.acquisitionTarget.findUnique({
+				where: { companyId: company.id },
+			}),
+		).toBeNull();
+		expect(
+			await db.agentTask.count({
+				where: { companyId: company.id, kind: "acquisition-refresh" },
+			}),
+		).toBe(0);
+	});
+
+	it("returns not found instead of creating a lifecycle record", async () => {
+		const domain = `generic-lifecycle-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const company = await db.company.create({
+			data: { name: "Generic Lifecycle Company", domain },
+		});
+		companyIds.push(company.id);
+
+		await expect(
+			service().updateTarget(
+				company.id,
+				AcquisitionStage.QUALIFIED,
+				"reviewer-1",
+			),
+		).rejects.toThrow("That target no longer exists.");
+		expect(
+			await db.acquisitionTarget.findUnique({
+				where: { companyId: company.id },
+			}),
+		).toBeNull();
+	});
+
 	it("creates a manual company and acquisition target atomically", async () => {
 		const domain = `manual-target-${crypto.randomUUID()}.test`;
 		domains.push(domain);
@@ -412,6 +461,69 @@ describe("acquisition target mutations", () => {
 				fit: AcquisitionFit.UNKNOWN,
 			},
 		});
+	});
+
+	it("converges concurrent manual target creation by normalized domain", async () => {
+		const domain = `manual-concurrent-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const acquisition = service();
+		const settled = await Promise.allSettled(
+			Array.from({ length: 20 }, (_, index) =>
+				acquisition.createTarget(
+					{
+						name: `Manual Concurrent ${index}`,
+						domain:
+							index % 2 === 0
+								? `https://www.${domain}/about`
+								: domain.toUpperCase(),
+					},
+					"reviewer-1",
+				),
+			),
+		);
+
+		expect(settled.filter((result) => result.status === "rejected")).toEqual(
+			[],
+		);
+		const results = settled.flatMap((result) =>
+			result.status === "fulfilled" ? [result.value] : [],
+		);
+		const companyId = results[0]?.companyId;
+		expect(companyId).toBeString();
+		if (!companyId) throw new Error("Manual creation returned no company.");
+		companyIds.push(companyId);
+
+		expect(new Set(results.map((result) => result.companyId)).size).toBe(1);
+		expect(results.filter((result) => result.created)).toHaveLength(1);
+		expect(results.filter((result) => result.targetCreated)).toHaveLength(1);
+		expect(await db.company.count({ where: { domain } })).toBe(1);
+		expect(await db.acquisitionTarget.count({ where: { companyId } })).toBe(1);
+		expect(
+			await db.agentTask.count({
+				where: {
+					companyId,
+					kind: "acquisition-refresh",
+					finishedAt: null,
+				},
+			}),
+		).toBe(1);
+	});
+
+	it("keeps domainless manual targets distinct instead of matching by name", async () => {
+		const acquisition = service();
+		const name = `Domainless Manual ${crypto.randomUUID()}`;
+		const first = await acquisition.createTarget({ name }, "reviewer-1");
+		const second = await acquisition.createTarget({ name }, "reviewer-1");
+		companyIds.push(first.companyId, second.companyId);
+
+		expect(first.companyId).not.toBe(second.companyId);
+		expect(first.created).toBe(true);
+		expect(second.created).toBe(true);
+		expect(
+			await db.acquisitionTarget.count({
+				where: { companyId: { in: [first.companyId, second.companyId] } },
+			}),
+		).toBe(2);
 	});
 
 	it("promotes an existing company without changing any company field", async () => {
@@ -894,7 +1006,19 @@ describe("acquisition candidate review", () => {
 		const domain = `actions-${crypto.randomUUID()}.test`;
 		domains.push(domain);
 		const company = await db.company.create({
-			data: { name: "Action Target", domain, website: `https://${domain}` },
+			data: {
+				name: "Action Target",
+				domain,
+				website: `https://${domain}`,
+				acquisitionTarget: {
+					create: {
+						strengths: [],
+						concerns: [],
+						missingInformation: [],
+						sourceUrls: [],
+					},
+				},
+			},
 		});
 		const companies = companyService();
 
@@ -930,6 +1054,7 @@ describe("acquisition candidate review", () => {
 					findUnique: async () => ({
 						id: "unfocused-target",
 						domain: "target.test",
+						acquisitionTarget: { companyId: "unfocused-target" },
 					}),
 				},
 				acquisitionProfile: {

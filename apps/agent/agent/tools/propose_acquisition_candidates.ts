@@ -1,4 +1,5 @@
 import { AcquisitionCandidateStatus, db, WorkspaceMode } from "@crm/db";
+import { isAcquisitionEvidenceUrl } from "@crm/db/acquisition";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
@@ -9,7 +10,7 @@ const candidate = z.object({
 	domain: z.string().trim().min(1).max(255),
 	rationale: z.string().trim().min(20).max(700),
 	evidence: z.string().trim().min(10).max(700),
-	sourceUrl: z.url(),
+	sourceUrl: z.url().refine(isAcquisitionEvidenceUrl),
 	sourceTitle: z.string().trim().max(200).nullable().default(null),
 });
 

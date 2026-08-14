@@ -4,6 +4,7 @@ import {
 	acquisitionCriterionLabel,
 	criterionGroups,
 	defaultCompanyTab,
+	safeAcquisitionCandidateSource,
 	safeAcquisitionEvidence,
 	targetResearchCopy,
 } from "../lib/acquisition";
@@ -57,6 +58,15 @@ describe("acquisition presentation", () => {
 		).toEqual([
 			{ label: "Company profile", url: "https://target.test/profile" },
 		]);
+	});
+
+	it("rejects unsafe legacy candidate source links", () => {
+		expect(safeAcquisitionCandidateSource("https://target.test/profile")).toBe(
+			"https://target.test/profile",
+		);
+		expect(
+			safeAcquisitionCandidateSource("javascript:alert(document.domain)"),
+		).toBeNull();
 	});
 
 	it("defaults real targets to Acquisition without changing generic companies", () => {

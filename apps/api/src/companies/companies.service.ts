@@ -596,7 +596,11 @@ export class CompaniesService {
 		const [company, profile] = await Promise.all([
 			this.db.company.findUnique({
 				where: { id },
-				select: { id: true, domain: true },
+				select: {
+					id: true,
+					domain: true,
+					acquisitionTarget: { select: { companyId: true } },
+				},
 			}),
 			this.db.acquisitionProfile.findUnique({
 				where: { id: WORKSPACE_ID },
@@ -612,19 +616,24 @@ export class CompaniesService {
 			throw new NotFoundException(`No company with id ${id}.`);
 		}
 
-		if (!company.domain) {
-			throw new BadRequestException(
-				"There is nothing to read without a domain — add one first.",
-			);
-		}
-
 		if (profile?.mode === WorkspaceMode.ACQUISITION) {
+			if (!company.acquisitionTarget) {
+				throw new BadRequestException(
+					"Add this company to targets before analyzing fit.",
+				);
+			}
 			if (!hasDiscoveryFocus(profile)) {
 				throw new BadRequestException(
 					"Add at least one preferred industry or geography to the buy box before analyzing fit.",
 				);
 			}
 			return this.analyzeAcquisition(id, actingUserId);
+		}
+
+		if (!company.domain) {
+			throw new BadRequestException(
+				"There is nothing to read without a domain — add one first.",
+			);
 		}
 
 		await this.agent.companyResearchRequested(
@@ -642,11 +651,20 @@ export class CompaniesService {
 	async analyzeAcquisition(id: string, actingUserId: string) {
 		const company = await this.db.company.findUnique({
 			where: { id },
-			select: { id: true, domain: true },
+			select: {
+				id: true,
+				domain: true,
+				acquisitionTarget: { select: { companyId: true } },
+			},
 		});
 
 		if (!company) {
 			throw new NotFoundException(`No company with id ${id}.`);
+		}
+		if (!company.acquisitionTarget) {
+			throw new BadRequestException(
+				"Add this company to targets before analyzing fit.",
+			);
 		}
 		if (!company.domain) {
 			throw new BadRequestException(

@@ -50,11 +50,23 @@ export class AcquisitionService {
 		input: CompanyCreateInput,
 		actingUserId: string,
 	): Promise<TargetMutationResult> {
-		const company = await this.companies.create(
-			input,
-			RecordSource.MANUAL,
-			acquisitionTargetData([]),
-		);
+		const domain = normalizeDomain(input.domain);
+		let company: { id: string };
+		try {
+			company = await this.companies.create(
+				input,
+				RecordSource.MANUAL,
+				acquisitionTargetData([]),
+			);
+		} catch (error) {
+			if (!(error instanceof ConflictException) || !domain) throw error;
+			const winner = await this.db.company.findUnique({
+				where: { domain },
+				select: { id: true },
+			});
+			if (!winner) throw error;
+			return this.addTarget(winner.id, actingUserId);
+		}
 
 		return this.targetResult(company.id, actingUserId, true, true);
 	}
@@ -289,22 +301,18 @@ export class AcquisitionService {
 			},
 		});
 		if (!company) throw new NotFoundException("That target no longer exists.");
+		if (!company.acquisitionTarget) {
+			throw new NotFoundException("That target no longer exists.");
+		}
 
 		const target = await this.db.$transaction(async (tx) => {
-			const updated = await tx.acquisitionTarget.upsert({
+			const { count } = await tx.acquisitionTarget.updateMany({
 				where: { companyId },
-				create: {
-					companyId,
-					stage,
-					fit: AcquisitionFit.UNKNOWN,
-					strengths: [],
-					concerns: [],
-					missingInformation: [],
-					sourceUrls: [],
-				},
-				update: { stage },
-				select: { companyId: true, stage: true, updatedAt: true },
+				data: { stage },
 			});
+			if (count === 0) {
+				throw new NotFoundException("That target no longer exists.");
+			}
 			if (company.acquisitionTarget?.stage !== stage) {
 				await tx.activity.create({
 					data: {
@@ -315,7 +323,10 @@ export class AcquisitionService {
 					},
 				});
 			}
-			return updated;
+			return tx.acquisitionTarget.findUniqueOrThrow({
+				where: { companyId },
+				select: { companyId: true, stage: true, updatedAt: true },
+			});
 		});
 
 		this.logger.log({

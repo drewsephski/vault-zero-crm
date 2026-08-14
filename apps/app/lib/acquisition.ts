@@ -33,6 +33,12 @@ export function safeAcquisitionEvidence<
 	return evidence.filter((source) => isAcquisitionEvidenceUrl(source.url));
 }
 
+export function safeAcquisitionCandidateSource(
+	sourceUrl: string,
+): string | null {
+	return isAcquisitionEvidenceUrl(sourceUrl) ? sourceUrl : null;
+}
+
 type CompanyTargetState =
 	| { acquisitionTarget?: unknown | null }
 	| null
