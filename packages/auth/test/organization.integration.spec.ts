@@ -7,6 +7,7 @@ import {
 	it,
 } from "bun:test";
 import { db } from "@crm/db";
+import { acquireCanonicalWorkspaceFixture } from "../../db/test/canonical-workspace-fixture";
 import { ensureWorkspaceMembership, WORKSPACE_ID } from "../src/organization";
 
 const suffix = process.env.TEST_RUN_ID ?? "organization-spec";
@@ -26,6 +27,7 @@ type Snapshot = {
 let snapshot: Snapshot;
 let firstId: string;
 let secondId: string;
+let releaseCanonicalWorkspace: (() => Promise<void>) | undefined;
 
 const seedUser = async (label: string, createdAt: Date): Promise<string> => {
 	const user = await db.user.create({
@@ -60,6 +62,7 @@ const clear = async () => {
 };
 
 beforeAll(async () => {
+	releaseCanonicalWorkspace = await acquireCanonicalWorkspaceFixture();
 	const organization = await db.organization.findUnique({
 		where: { id: WORKSPACE_ID },
 		select: { name: true, slug: true, website: true, metadata: true },
@@ -72,7 +75,7 @@ beforeAll(async () => {
 			select: { id: true, userId: true, role: true, createdAt: true },
 		}),
 	};
-});
+}, 120_000);
 
 beforeEach(async () => {
 	await clear();
@@ -82,23 +85,27 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-	await clear();
+	try {
+		await clear();
 
-	if (snapshot.organization) {
-		await db.organization.create({
-			data: {
-				id: WORKSPACE_ID,
-				createdAt: new Date(),
-				...snapshot.organization,
-			},
-		});
+		if (snapshot.organization) {
+			await db.organization.create({
+				data: {
+					id: WORKSPACE_ID,
+					createdAt: new Date(),
+					...snapshot.organization,
+				},
+			});
 
-		await db.member.createMany({
-			data: snapshot.members.map((member) => ({
-				...member,
-				organizationId: WORKSPACE_ID,
-			})),
-		});
+			await db.member.createMany({
+				data: snapshot.members.map((member) => ({
+					...member,
+					organizationId: WORKSPACE_ID,
+				})),
+			});
+		}
+	} finally {
+		await releaseCanonicalWorkspace?.();
 	}
 });
 

@@ -3,6 +3,7 @@ import { DealStage, db, RateSource, WorkspaceMode } from "@crm/db";
 import { normalizeCurrency } from "@crm/db/currency";
 import { SETTINGS_ID, writeReportingCurrency } from "@crm/db/settings";
 import { WORKSPACE_ID } from "@crm/db/workspace";
+import { acquireCanonicalWorkspaceFixture } from "../../../packages/db/test/canonical-workspace-fixture";
 import { ActivityStampService } from "../src/crm/activity-stamp.service";
 import { ConversionService } from "../src/currency/conversion.service";
 import { DashboardService } from "../src/dashboard/dashboard.service";
@@ -19,6 +20,7 @@ const dashboard = new DashboardService(db, conversion);
 let companyId: string;
 let previousReportingCurrency: string | null = null;
 let previousWorkspaceMode: WorkspaceMode | null = null;
+let releaseCanonicalWorkspace: (() => Promise<void>) | undefined;
 
 const MILLION = 100_000_000;
 const HALF_MILLION = 50_000_000;
@@ -58,6 +60,7 @@ async function pipelineCents(): Promise<number> {
 }
 
 beforeAll(async () => {
+	releaseCanonicalWorkspace = await acquireCanonicalWorkspaceFixture();
 	const existing = await db.appSetting.findUnique({
 		where: { id: SETTINGS_ID },
 		select: { reportingCurrency: true },
@@ -106,29 +109,33 @@ beforeAll(async () => {
 	companyId = company.id;
 
 	await rate("EUR", "1.10", RateSource.FETCHED);
-});
+}, 120_000);
 
 afterAll(async () => {
-	await db.deal.deleteMany({ where: { companyId } });
-	await db.company.deleteMany({ where: { domain } });
-	await db.user.deleteMany({ where: { id: userId } });
-	await clearRates();
+	try {
+		await db.deal.deleteMany({ where: { companyId } });
+		await db.company.deleteMany({ where: { domain } });
+		await db.user.deleteMany({ where: { id: userId } });
+		await clearRates();
 
-	if (previousReportingCurrency) {
-		await writeReportingCurrency(db, previousReportingCurrency);
-	} else {
-		await db.appSetting.updateMany({ data: { reportingCurrency: null } });
-	}
-	if (previousWorkspaceMode) {
-		await db.acquisitionProfile.update({
-			where: { id: WORKSPACE_ID },
-			data: { mode: previousWorkspaceMode },
-		});
-	} else {
-		await db.acquisitionProfile.delete({ where: { id: WORKSPACE_ID } });
-	}
+		if (previousReportingCurrency) {
+			await writeReportingCurrency(db, previousReportingCurrency);
+		} else {
+			await db.appSetting.updateMany({ data: { reportingCurrency: null } });
+		}
+		if (previousWorkspaceMode) {
+			await db.acquisitionProfile.update({
+				where: { id: WORKSPACE_ID },
+				data: { mode: previousWorkspaceMode },
+			});
+		} else {
+			await db.acquisitionProfile.delete({ where: { id: WORKSPACE_ID } });
+		}
 
-	await conversion.rerateAll();
+		await conversion.rerateAll();
+	} finally {
+		await releaseCanonicalWorkspace?.();
+	}
 });
 
 describe("a total across currencies", () => {

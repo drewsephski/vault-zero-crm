@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { DealStage, db } from "@crm/db";
+import { acquireCanonicalWorkspaceFixture } from "../../../packages/db/test/canonical-workspace-fixture";
 import {
 	companyPreamble,
 	composeClosing,
@@ -9,7 +10,7 @@ import {
 	sessionPreamble,
 	workspacePreamble,
 } from "../agent/lib/preamble";
-import { identity } from "../agent/lib/workspace";
+import { acquisitionContext, identity } from "../agent/lib/workspace";
 
 const suffix = process.env.TEST_RUN_ID ?? "preamble-spec";
 const domain = `fernhill-${suffix}.test`;
@@ -18,10 +19,12 @@ let companyId: string;
 let dealId: string;
 let paulaId: string;
 let tomiId: string;
+let releaseCanonicalWorkspace: (() => Promise<void>) | undefined;
 
 const rep = { dispatched: false };
 
 beforeAll(async () => {
+	releaseCanonicalWorkspace = await acquireCanonicalWorkspaceFixture();
 	await cleanup();
 
 	const user = await db.user.create({
@@ -81,9 +84,15 @@ beforeAll(async () => {
 		select: { id: true },
 	});
 	dealId = deal.id;
-});
+}, 120_000);
 
-afterAll(cleanup);
+afterAll(async () => {
+	try {
+		await cleanup();
+	} finally {
+		await releaseCanonicalWorkspace?.();
+	}
+});
 
 async function cleanup(): Promise<void> {
 	const company = await db.company.findFirst({
@@ -216,7 +225,10 @@ describe("sessionPreamble", () => {
 
 describe("every session is told who we are", () => {
 	it("ends each preamble with the same account of us", async () => {
-		const expected = await composeClosing(await identity());
+		const expected = await composeClosing(
+			await identity(),
+			await acquisitionContext(),
+		);
 
 		for (const { markdown } of [
 			await contactPreamble(paulaId, rep),

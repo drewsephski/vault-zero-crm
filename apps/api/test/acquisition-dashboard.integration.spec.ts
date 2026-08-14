@@ -10,6 +10,7 @@ import {
 } from "@crm/db";
 import { ACQUISITION_TASK_KINDS } from "@crm/db/acquisition";
 import { WORKSPACE_ID } from "@crm/db/workspace";
+import { acquireCanonicalWorkspaceFixture } from "../../../packages/db/test/canonical-workspace-fixture";
 import { AgentQueueService } from "../src/agent/agent-queue.service";
 import { AgentTriggerService } from "../src/agent/agent-trigger.service";
 import { companyListInput } from "../src/companies/companies.contracts";
@@ -41,6 +42,7 @@ let previousProfile: {
 } | null = null;
 let baselineAcquisitionWork = 0;
 let activeContactId = "";
+let releaseCanonicalWorkspace: (() => Promise<void>) | undefined;
 
 async function createCompany(
 	name: string,
@@ -100,6 +102,7 @@ const activeTaskSubjects = [
 ];
 
 beforeAll(async () => {
+	releaseCanonicalWorkspace = await acquireCanonicalWorkspaceFixture();
 	previousProfile = await db.acquisitionProfile.findUnique({
 		where: { id: WORKSPACE_ID },
 		select: {
@@ -286,21 +289,29 @@ beforeAll(async () => {
 			},
 		],
 	});
-});
+}, 120_000);
 
 afterAll(async () => {
-	await db.agentTask.deleteMany({ where: { companyId: { in: companyIds } } });
-	await db.activity.deleteMany({ where: { createdById: viewerId } });
-	await db.contact.deleteMany({ where: { id: activeContactId } });
-	await db.company.deleteMany({ where: { id: { in: companyIds } } });
-	await db.user.deleteMany({ where: { id: { in: [viewerId, otherUserId] } } });
-	if (previousProfile) {
-		await db.acquisitionProfile.update({
-			where: { id: WORKSPACE_ID },
-			data: previousProfile,
+	try {
+		await db.agentTask.deleteMany({
+			where: { companyId: { in: companyIds } },
 		});
-	} else {
-		await db.acquisitionProfile.delete({ where: { id: WORKSPACE_ID } });
+		await db.activity.deleteMany({ where: { createdById: viewerId } });
+		await db.contact.deleteMany({ where: { id: activeContactId } });
+		await db.company.deleteMany({ where: { id: { in: companyIds } } });
+		await db.user.deleteMany({
+			where: { id: { in: [viewerId, otherUserId] } },
+		});
+		if (previousProfile) {
+			await db.acquisitionProfile.update({
+				where: { id: WORKSPACE_ID },
+				data: previousProfile,
+			});
+		} else {
+			await db.acquisitionProfile.delete({ where: { id: WORKSPACE_ID } });
+		}
+	} finally {
+		await releaseCanonicalWorkspace?.();
 	}
 });
 

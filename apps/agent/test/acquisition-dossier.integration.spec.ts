@@ -15,6 +15,7 @@ import {
 } from "@crm/db";
 import type { AcquisitionCriterionAssessment } from "@crm/db/acquisition";
 import { WORKSPACE_ID } from "@crm/db/workspace";
+import { acquireCanonicalWorkspaceFixture } from "../../../packages/db/test/canonical-workspace-fixture";
 import writeAcquisitionDossier from "../agent/tools/write_acquisition_dossier";
 
 const suffix = process.env.TEST_RUN_ID ?? crypto.randomUUID();
@@ -85,6 +86,7 @@ let userId: string;
 let previousProfile: Awaited<
 	ReturnType<typeof db.acquisitionProfile.findUnique>
 >;
+let releaseCanonicalWorkspace: (() => Promise<void>) | undefined;
 
 const toolContext = {
 	session: { id: `acquisition-dossier-session-${suffix}` },
@@ -158,6 +160,7 @@ const validCriteria: AcquisitionCriterionAssessment[] = [
 ];
 
 beforeAll(async () => {
+	releaseCanonicalWorkspace = await acquireCanonicalWorkspaceFixture();
 	await cleanup();
 	previousProfile = await db.acquisitionProfile.findUnique({
 		where: { id: WORKSPACE_ID },
@@ -214,37 +217,42 @@ beforeAll(async () => {
 		select: { id: true },
 	});
 	companyId = company.id;
-});
+}, 120_000);
 
 beforeEach(seedDossierA);
 
 afterAll(async () => {
-	await cleanup();
+	try {
+		await cleanup();
 
-	if (previousProfile) {
-		await db.acquisitionProfile.update({
-			where: { id: WORKSPACE_ID },
-			data: {
-				mode: previousProfile.mode,
-				preferredIndustries: previousProfile.preferredIndustries,
-				geographies: previousProfile.geographies,
-				excludedCategories: previousProfile.excludedCategories,
-				currency: previousProfile.currency,
-				revenueMin: previousProfile.revenueMin,
-				revenueMax: previousProfile.revenueMax,
-				ebitdaMin: previousProfile.ebitdaMin,
-				ebitdaMax: previousProfile.ebitdaMax,
-				purchasePriceMin: previousProfile.purchasePriceMin,
-				purchasePriceMax: previousProfile.purchasePriceMax,
-				ownerInvolvement: previousProfile.ownerInvolvement,
-				recurringRevenuePreference: previousProfile.recurringRevenuePreference,
-				customerConcentrationMax: previousProfile.customerConcentrationMax,
-				assetPreference: previousProfile.assetPreference,
-				financingAssumptions: previousProfile.financingAssumptions,
-			},
-		});
-	} else {
-		await db.acquisitionProfile.deleteMany({ where: { id: WORKSPACE_ID } });
+		if (previousProfile) {
+			await db.acquisitionProfile.update({
+				where: { id: WORKSPACE_ID },
+				data: {
+					mode: previousProfile.mode,
+					preferredIndustries: previousProfile.preferredIndustries,
+					geographies: previousProfile.geographies,
+					excludedCategories: previousProfile.excludedCategories,
+					currency: previousProfile.currency,
+					revenueMin: previousProfile.revenueMin,
+					revenueMax: previousProfile.revenueMax,
+					ebitdaMin: previousProfile.ebitdaMin,
+					ebitdaMax: previousProfile.ebitdaMax,
+					purchasePriceMin: previousProfile.purchasePriceMin,
+					purchasePriceMax: previousProfile.purchasePriceMax,
+					ownerInvolvement: previousProfile.ownerInvolvement,
+					recurringRevenuePreference:
+						previousProfile.recurringRevenuePreference,
+					customerConcentrationMax: previousProfile.customerConcentrationMax,
+					assetPreference: previousProfile.assetPreference,
+					financingAssumptions: previousProfile.financingAssumptions,
+				},
+			});
+		} else {
+			await db.acquisitionProfile.deleteMany({ where: { id: WORKSPACE_ID } });
+		}
+	} finally {
+		await releaseCanonicalWorkspace?.();
 	}
 });
 

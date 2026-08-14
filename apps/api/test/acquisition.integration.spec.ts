@@ -18,6 +18,7 @@ import {
 } from "@crm/db";
 import type { AcquisitionCriterionAssessment } from "@crm/db/acquisition";
 import { WORKSPACE_ID } from "@crm/db/workspace";
+import { acquireCanonicalWorkspaceFixture } from "../../../packages/db/test/canonical-workspace-fixture";
 import { AcquisitionService } from "../src/acquisition/acquisition.service";
 import { AgentQueueService } from "../src/agent/agent-queue.service";
 import { AgentTriggerService } from "../src/agent/agent-trigger.service";
@@ -31,8 +32,10 @@ let originalFocus: {
 	preferredIndustries: string[];
 	geographies: string[];
 } | null;
+let releaseCanonicalWorkspace: (() => Promise<void>) | undefined;
 
 beforeAll(async () => {
+	releaseCanonicalWorkspace = await acquireCanonicalWorkspaceFixture();
 	originalFocus = await db.acquisitionProfile.findUnique({
 		where: { id: WORKSPACE_ID },
 		select: {
@@ -41,7 +44,7 @@ beforeAll(async () => {
 			geographies: true,
 		},
 	});
-});
+}, 120_000);
 
 beforeEach(async () => {
 	await db.acquisitionProfile.upsert({
@@ -84,13 +87,17 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-	if (originalFocus) {
-		await db.acquisitionProfile.update({
-			where: { id: WORKSPACE_ID },
-			data: originalFocus,
-		});
-	} else {
-		await db.acquisitionProfile.deleteMany({ where: { id: WORKSPACE_ID } });
+	try {
+		if (originalFocus) {
+			await db.acquisitionProfile.update({
+				where: { id: WORKSPACE_ID },
+				data: originalFocus,
+			});
+		} else {
+			await db.acquisitionProfile.deleteMany({ where: { id: WORKSPACE_ID } });
+		}
+	} finally {
+		await releaseCanonicalWorkspace?.();
 	}
 });
 
