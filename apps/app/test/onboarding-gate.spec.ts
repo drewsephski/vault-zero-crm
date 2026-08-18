@@ -49,17 +49,19 @@ function setup({
 	onboarded = true,
 	canRename = true,
 	slug = SLUG,
+	website,
 }: {
 	onboarded?: boolean;
 	canRename?: boolean;
 	slug?: string;
+	website?: string;
 } = {}) {
 	const calls = { workspace: 0 };
 
 	stub(async (url) => {
 		if (url.includes("workspace.get")) {
 			calls.workspace += 1;
-			return json(workspace({ onboarded, canRename, slug }));
+			return json(workspace({ onboarded, canRename, slug, website }));
 		}
 
 		return json({ error: { message: "Unexpected procedure" } }, 404);
