@@ -1,7 +1,6 @@
 import { AUTH_COOKIE_PREFIX } from "@crm/auth/cookies";
 import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
-import { isMarketing } from "@/lib/env";
 import { ONBOARDING_PATH, readWorkspaceGate } from "@/lib/onboarding";
 import { workspaceUrl } from "@/lib/workspace-url";
 
@@ -60,7 +59,7 @@ function isUnder(pathname: string, prefix: string): boolean {
 }
 
 function isPublic(pathname: string): boolean {
-	return pathname === LANDING_PATH && isMarketing();
+	return pathname === LANDING_PATH;
 }
 
 function isUngated(pathname: string): boolean {
