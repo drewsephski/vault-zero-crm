@@ -7,6 +7,25 @@ const GATE_TIMEOUT_MS = 2_000;
 
 export type Gate = "settled" | "required" | "unknown";
 
+type WorkspaceCheck = {
+	onboarded?: boolean;
+	canRename?: boolean;
+	website?: string | null;
+};
+
+export function hasCompletedAcquisitionWorkspace(
+	workspace: WorkspaceCheck | null,
+): boolean {
+	if (!workspace) return false;
+
+	if (workspace.canRename === false) return true;
+	if (workspace.onboarded === true) return true;
+
+	return (
+		typeof workspace.website === "string" && workspace.website.trim().length > 0
+	);
+}
+
 async function read<T>(
 	request: NextRequest,
 	procedure: string,
@@ -41,6 +60,7 @@ export async function readWorkspaceGate(
 		onboarded?: boolean;
 		canRename?: boolean;
 		slug?: string;
+		website?: string | null;
 	}>(request, "workspace.get");
 
 	const slug = workspace?.slug ? workspace.slug : null;
@@ -49,8 +69,7 @@ export async function readWorkspaceGate(
 		return { gate: "unknown", slug };
 	}
 
-	return {
-		gate: workspace.onboarded || !workspace.canRename ? "settled" : "required",
-		slug,
-	};
+	const settled = hasCompletedAcquisitionWorkspace(workspace);
+
+	return { gate: settled ? "settled" : "required", slug };
 }

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AuthHeading, AuthShell } from "@/components/auth-shell";
 import { requireGoogleAccess } from "@/lib/session";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
+import { hasCompletedAcquisitionWorkspace } from "@/lib/onboarding";
 import { workspaceUrl } from "@/lib/workspace-url";
 import { OnboardingForm } from "./onboarding-form";
 
@@ -20,7 +21,7 @@ export default async function OnboardingPage() {
 		.fetchQuery(getServerTrpc().workspace.get.queryOptions())
 		.catch(() => null);
 
-	if (workspace && (workspace.onboarded || !workspace.canRename)) {
+	if (workspace && hasCompletedAcquisitionWorkspace(workspace)) {
 		redirect(workspaceUrl(workspace.slug));
 	}
 

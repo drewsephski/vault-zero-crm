@@ -41,6 +41,7 @@ function answerWith(body: unknown, status = 200) {
 const workspace = (data: {
 	onboarded: boolean;
 	canRename: boolean;
+	website?: string;
 	slug?: string;
 }) => ({ result: { data: { slug: SLUG, ...data } } });
 
@@ -88,6 +89,12 @@ describe("readWorkspaceGate", () => {
 		answerWith(workspace({ onboarded: false, canRename: true }));
 
 		expect(await gateOf("/")).toBe("required");
+
+		answerWith(
+			workspace({ onboarded: false, canRename: true, website: "acme.com" }),
+		);
+
+		expect(await gateOf("/")).toBe("settled");
 	});
 
 	it("settles for someone who could not answer the form anyway", async () => {
@@ -230,6 +237,14 @@ describe("proxy", () => {
 		expect(
 			redirectedTo(await proxy(request("/onboarding", [SESSION_COOKIE]))),
 		).toBe(`/${SLUG}`);
+	});
+
+	it("uses legacy setup values to keep onboarded users off /onboarding", async () => {
+		setup({ onboarded: false, canRename: true, website: "acme.com" });
+
+		expect(
+			redirectedTo(await proxy(request(`/${SLUG}/companies`, [SESSION_COOKIE]))),
+		).toBe(`/${SLUG}/companies`);
 	});
 
 	it("never fights /grant-access, which would ping-pong forever", async () => {
