@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { AuthHeading, AuthShell } from "@/components/auth-shell";
 import { getSession } from "@/lib/session";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
+import { EmailPasswordAuth } from "./email-password-auth";
 import { GoogleSignIn } from "./google-sign-in";
 import { type SsoProvider, SsoSignIn } from "./sso-sign-in";
 
@@ -65,23 +66,8 @@ async function SignIn({
 	const insistOnGoogle = method === "google" && google;
 	const showSso = providers.length > 0 && !insistOnGoogle;
 	const showGoogle = google && (providers.length === 0 || insistOnGoogle);
-
-	if (!showSso && !showGoogle) {
-		return (
-			<>
-				<AuthHeading
-					title="No way in yet"
-					description="This CRM has no sign-in method configured, so nobody can get in — including you."
-				/>
-
-				<p className="text-center text-muted-foreground text-sm/5">
-					Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the root .env file
-					and restart. Your own identity provider can be added from Settings
-					once somebody is signed in.
-				</p>
-			</>
-		);
-	}
+	const showEmailPassword = true;
+	const showOnlyEmailPassword = showEmailPassword && !showSso && !showGoogle;
 
 	return (
 		<>
@@ -89,6 +75,12 @@ async function SignIn({
 				title="Welcome back"
 				description="Sign in with your account to continue."
 			/>
+			{showOnlyEmailPassword ? (
+				<p className="text-sm text-muted-foreground">
+					This install currently has no Google or identity-provider sign-in configured.
+				</p>
+			) : null}
+			<EmailPasswordAuth />
 
 			{showSso ? <SsoSignIn providers={providers} /> : null}
 			{showGoogle ? <GoogleSignIn /> : null}
