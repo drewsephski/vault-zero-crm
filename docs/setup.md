@@ -16,6 +16,11 @@ bun run dev                 # app :3000, api :3001, agent :2000
 Prisma from the repo root: `db:generate`, `db:migrate`, `db:push`, `db:reset`,
 `db:seed`, `db:studio`, `db:deploy`.
 
+Prisma commands prefer `DIRECT_DATABASE_URL`, `POSTGRES_URL_NON_POOLING`, or
+`DATABASE_URL_UNPOOLED`, in that order. When only a pooled Neon `DATABASE_URL`
+is available, the Prisma config resolves its `-pooler` host to the matching direct
+endpoint so migrations never hold session advisory locks through PgBouncer.
+
 ## Google Cloud
 
 - **Enable the Gmail API and the Google Calendar API** on the project.
