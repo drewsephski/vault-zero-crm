@@ -48,3 +48,15 @@ export const updateAcquisitionEngagementStageInput = z.object({
 		AcquisitionEngagementStage.PASSED,
 	]),
 });
+
+export type CreateAcquisitionEngagementInput = z.infer<
+	typeof createAcquisitionEngagementInput
+>;
+
+export type ListAcquisitionEngagementsInput = z.infer<
+	typeof listAcquisitionEngagementsInput
+>;
+
+export type UpdateAcquisitionEngagementStageInput = z.infer<
+	typeof updateAcquisitionEngagementStageInput
+>;

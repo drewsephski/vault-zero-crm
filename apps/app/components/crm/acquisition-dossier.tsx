@@ -32,9 +32,10 @@ import Link from "next/link";
 import { useId } from "react";
 import { toast } from "sonner";
 import {
-	ACQUISITION_STAGES,
+	TARGET_LIFECYCLE_STAGES,
 	AcquisitionFitIndicator,
 	acquisitionStageLabel,
+	type TargetLifecycleStage,
 } from "@/components/crm/acquisition-status";
 import {
 	DetailSheetBody,
@@ -409,10 +410,15 @@ export function LifecycleControl({
 }: {
 	stage: AcquisitionStage;
 	pending: boolean;
-	onStageChange: (stage: AcquisitionStage) => void;
+	onStageChange: (stage: TargetLifecycleStage) => void;
 }) {
 	const labelId = useId();
 	const statusId = useId();
+	const lifecycleOptions: AcquisitionStage[] = TARGET_LIFECYCLE_STAGES.includes(
+		stage as TargetLifecycleStage,
+	)
+		? [...TARGET_LIFECYCLE_STAGES]
+		: [...TARGET_LIFECYCLE_STAGES, stage];
 
 	return (
 		<DetailSheetProperty
@@ -431,7 +437,9 @@ export function LifecycleControl({
 				<Select
 					value={stage}
 					disabled={pending}
-					onValueChange={(value) => onStageChange(value as AcquisitionStage)}
+					onValueChange={(value) =>
+						onStageChange(value as TargetLifecycleStage)
+					}
 				>
 					<SelectTrigger
 						size="sm"
@@ -443,7 +451,7 @@ export function LifecycleControl({
 					</SelectTrigger>
 					<SelectContent>
 						<SelectGroup>
-							{ACQUISITION_STAGES.map((option) => (
+							{lifecycleOptions.map((option) => (
 								<SelectItem key={option} value={option}>
 									{acquisitionStageLabel(option)}
 								</SelectItem>

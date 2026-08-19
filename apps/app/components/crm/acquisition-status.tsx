@@ -4,18 +4,17 @@ import {
 	type StatusTone,
 } from "@crm/ui/components/status-indicator";
 
-export const ACQUISITION_STAGES = [
+export const TARGET_LIFECYCLE_STAGES = [
 	AcquisitionStage.DISCOVERED,
-	AcquisitionStage.RESEARCHING,
 	AcquisitionStage.QUALIFIED,
 	AcquisitionStage.WATCHLIST,
-	AcquisitionStage.CONTACTED,
-	AcquisitionStage.INTERESTED,
-	AcquisitionStage.OPPORTUNITY,
-	AcquisitionStage.DILIGENCE,
 	AcquisitionStage.REJECTED,
 	AcquisitionStage.ACQUIRED,
 ] as const;
+
+export type TargetLifecycleStage = (typeof TARGET_LIFECYCLE_STAGES)[number];
+
+export const ACQUISITION_STAGES = TARGET_LIFECYCLE_STAGES;
 
 const STAGE_LABELS: Record<AcquisitionStage, string> = {
 	DISCOVERED: "Discovered",
