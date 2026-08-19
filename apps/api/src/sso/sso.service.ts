@@ -7,7 +7,6 @@ import {
 	ssoCallbackBase,
 	ssoCallbackURL,
 	ssoProviderName,
-	WORKSPACE_ID,
 	type WorkspaceRole,
 } from "@crm/auth";
 import type { Db, Prisma } from "@crm/db";
@@ -138,7 +137,6 @@ export class SsoService {
 
 	async signInOptions(): Promise<SignInOptions> {
 		const rows = await this.db.ssoProvider.findMany({
-			where: { organizationId: WORKSPACE_ID },
 			select: { providerId: true },
 			orderBy: { providerId: "asc" },
 		});
@@ -160,8 +158,11 @@ export class SsoService {
 		};
 	}
 
-	async list(input: SsoProviderListInput): Promise<ListResult<SsoProvider>> {
-		const where = this.searchWhere(input.q);
+	async list(
+		userId: string,
+		input: SsoProviderListInput,
+	): Promise<ListResult<SsoProvider>> {
+		const where = await this.searchWhere(input.q, userId);
 		const { skip, take } = paginate(input);
 
 		const [rows, total] = await Promise.all([
@@ -193,6 +194,13 @@ export class SsoService {
 			);
 		}
 
+		const membership = await this.membershipOf(userId);
+		if (!membership) {
+			throw new InternalServerErrorException(
+				"Your workspace could not be created. Sign in again in a moment.",
+			);
+		}
+
 		await this.call(() =>
 			auth.api.registerSSOProvider({
 				headers,
@@ -200,7 +208,7 @@ export class SsoService {
 					providerId: input.providerId,
 					issuer: input.issuer,
 					domain: domains.join(","),
-					organizationId: WORKSPACE_ID,
+					organizationId: membership.organizationId,
 					oidcConfig: {
 						clientId: input.clientId,
 						clientSecret: input.clientSecret,
@@ -248,10 +256,14 @@ export class SsoService {
 		return { providerId: input.providerId };
 	}
 
-	private searchWhere(q: string): Prisma.SsoProviderWhereInput {
+	private async searchWhere(
+		q: string,
+		userId: string,
+	): Promise<Prisma.SsoProviderWhereInput> {
+		const membership = await this.membershipOf(userId);
 		const term = q.trim();
 		const where: Prisma.SsoProviderWhereInput = {
-			organizationId: WORKSPACE_ID,
+			organizationId: membership?.organizationId ?? "__none__",
 		};
 
 		if (term) {
@@ -298,14 +310,16 @@ export class SsoService {
 		}
 	}
 
-	private async roleOf(userId: string): Promise<WorkspaceRole | null> {
-		const member = await this.db.member.findUnique({
-			where: {
-				organizationId_userId: { organizationId: WORKSPACE_ID, userId },
-			},
-			select: { role: true },
+	private async membershipOf(userId: string) {
+		return this.db.member.findFirst({
+			where: { userId },
+			orderBy: { createdAt: "asc" },
+			select: { role: true, organizationId: true },
 		});
+	}
 
+	private async roleOf(userId: string): Promise<WorkspaceRole | null> {
+		const member = await this.membershipOf(userId);
 		if (!member) return null;
 
 		return isWorkspaceRole(member.role) ? member.role : "member";

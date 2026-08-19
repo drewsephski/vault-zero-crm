@@ -13,3 +13,10 @@ export type {
 	FactEvidence,
 	WorkspaceProfileSections,
 } from "./json";
+export {
+	getOrganizationId,
+	requireOrganizationId,
+	runInOrganization,
+	tenantDomainWhere,
+	tenantEmailWhere,
+} from "./tenancy";

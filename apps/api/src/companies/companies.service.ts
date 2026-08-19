@@ -14,6 +14,7 @@ import {
 	type AcquisitionCriterionAssessment,
 	isAcquisitionEvidenceUrl,
 } from "@crm/db/acquisition";
+import { getOrganizationId } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
 	BadRequestException,
@@ -122,7 +123,7 @@ export class CompaniesService {
 
 	async list(input: CompanyListInput): Promise<ListResult<CompanyRow>> {
 		const acquisitionProfile = await this.db.acquisitionProfile.findUnique({
-			where: { id: WORKSPACE_ID },
+			where: { id: getOrganizationId() ?? WORKSPACE_ID },
 			select: { mode: true },
 		});
 		const acquisitionMode =
@@ -353,7 +354,7 @@ export class CompaniesService {
 		const domain = normalizeDomain(input.domain);
 
 		if (domain) {
-			const existing = await this.db.company.findUnique({
+			const existing = await this.db.company.findFirst({
 				where: { domain },
 				select: { id: true, name: true },
 			});
@@ -611,7 +612,7 @@ export class CompaniesService {
 				},
 			}),
 			this.db.acquisitionProfile.findUnique({
-				where: { id: WORKSPACE_ID },
+				where: { id: getOrganizationId() ?? WORKSPACE_ID },
 				select: {
 					mode: true,
 					preferredIndustries: true,

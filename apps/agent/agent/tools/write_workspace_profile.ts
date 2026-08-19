@@ -1,4 +1,4 @@
-import { db } from "@crm/db";
+import { db, getOrganizationId } from "@crm/db";
 import {
 	MAX_LINE,
 	MAX_NARRATIVE,
@@ -56,7 +56,15 @@ export default defineTool({
 			};
 		}
 
-		const profile = await writeWorkspaceProfile(db, {
+		const organizationId = getOrganizationId();
+		if (!organizationId) {
+			return {
+				written: false as const,
+				reason: "This session is not attached to a workspace.",
+			};
+		}
+
+		const profile = await writeWorkspaceProfile(db, organizationId, {
 			website: us.website,
 			narrative,
 			sections: {

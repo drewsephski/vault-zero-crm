@@ -3,13 +3,13 @@ import {
 	AcquisitionStage,
 	ActivityType,
 	db,
+	getOrganizationId,
 	WorkspaceMode,
 } from "@crm/db";
 import {
 	expectedAcquisitionCriterionIds,
 	isAcquisitionEvidenceUrl,
 } from "@crm/db/acquisition";
-import { WORKSPACE_ID } from "@crm/db/workspace";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import {
@@ -72,7 +72,7 @@ export default defineTool({
 				},
 			}),
 			db.acquisitionProfile.findUnique({
-				where: { id: WORKSPACE_ID },
+				where: { id: getOrganizationId() ?? "" },
 				select: {
 					mode: true,
 					preferredIndustries: true,

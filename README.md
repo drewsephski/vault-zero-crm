@@ -207,15 +207,18 @@ bun run dev
 The app is on [localhost:3000](http://localhost:3000), the API on
 [localhost:3001](http://localhost:3001).
 
-### The four values
+### The values that matter
 
-Open `.env` and set these. Everything else in the file is optional and commented out.
+Open `.env` and set a `BETTER_AUTH_SECRET`. Leave `ALLOWED_SIGN_IN` empty so anyone
+can create an account (each person gets their own workspace). Google is optional —
+email and password sign-in works without it. Everything else in the file is optional
+and commented out.
 
 | Variable                                   | What to put in it                                                    |
 | ------------------------------------------ | -------------------------------------------------------------------- |
 | `BETTER_AUTH_SECRET`                       | `openssl rand -base64 32`                                             |
-| `ALLOWED_SIGN_IN`                          | Your email domain, e.g. `acme.com`. Or one address, e.g. `you@gmail.com`. |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`| A Google OAuth client — 2 minutes, below. Both or neither.             |
+| `ALLOWED_SIGN_IN`                          | Empty for open signup. A domain or address only if this install should stay private. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`| A Google OAuth client if you want Gmail/Calendar sync. Both or neither. |
 
 `DATABASE_URL` already matches the `docker compose` Postgres, so leave it alone unless
 you brought your own.
@@ -238,9 +241,8 @@ Google. If your account is on a Google Workspace domain, set the consent screen 
 
 </details>
 
-`ALLOWED_SIGN_IN` is the entire authorisation model — an unset value means nobody can
-sign in, which is the safe direction to fail. It takes whole domains, individual
-addresses, or a mix:
+`ALLOWED_SIGN_IN` is optional. Empty lets anyone create an account, and each person
+gets their own workspace. Set it only for a private self-hosted install:
 
 ```sh
 ALLOWED_SIGN_IN="acme.com"                       # everyone at your company

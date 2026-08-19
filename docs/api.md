@@ -31,24 +31,25 @@ so the row survives the agent being down.
 About to add a vendor client to `apps/api`? You want `apps/agent/agent/lib`. One
 documented exception, for timing: the exchange-rate fetcher, below.
 
-## One organization, and it is not a tenancy boundary
+## Workspaces are the tenancy boundary
 
-Single tenant. No org header, no org interceptor, no org-scoped cache keys, **no
-`organizationId` on any CRM record.**
+Each signed-in user gets **their own organization**. CRM records carry
+`organizationId`. Auth middleware resolves the session's workspace and runs the
+request inside that scope; the agent does the same when it leases a task.
+A new account is **owner of a new workspace**, not a member of anyone else's.
 
-A **singleton workspace** exists — Better Auth's `organization` plugin, one row with
-id `WORKSPACE_ID` (the literal `workspace`, in `@crm/db`, re-exported by `@crm/auth`
-so the agent needn't depend on it). It answers only: what are we called, who works
-here, what do we sell.
+Existing members of the legacy singleton (`WORKSPACE_ID`, the literal
+`workspace`) stay there so current data is not split. New sign-ups never join
+that row.
 
-- **The id is a constant, never a parameter.** A function taking an `organizationId`
-  has turned the plugin into tenancy plumbing.
 - **Signing in is the join; no invite flow.** `ensureWorkspaceMembership` runs in
   `databaseHooks.session.create.before` and **degrades, never throws** — a throw fails
-  the session create and locks everyone out. The plugin's `invitation` table is unused.
-- **First account is owner**, and the hook enrols pre-existing users, oldest first. If
-  a legacy or partially migrated workspace has members but no owner, the same hook
-  repairs the invariant by promoting the earliest member.
+  the session create and locks everyone out. If the user already has a membership,
+  that organization is reused. Otherwise a new organization is created with that
+  user as owner.
+- **`ALLOWED_SIGN_IN` is optional.** Empty means anyone can create an account.
+  When set, it is still an allow-list (self-hosters who want a private install).
+  It is **not** the tenancy boundary.
 - **Permissions come from `@crm/auth`** — `canRenameWorkspace`, `canChangeRole`,
   `canConfigureSso`, `canManageCurrency` — enforced by the service *and* used to
   disable the UI control, so the button and the 403 cannot disagree.
@@ -60,7 +61,7 @@ here, what do we sell.
 - **Onboarded state is `onboardedAt` inside the plugin's `metadata` blob**, not a
   column; `isOnboarded`/`markOnboarded` (`@crm/db/workspace`) are the only accessors,
   and `markOnboarded` preserves every other key.
-- **The name starts as `DEFAULT_WORKSPACE_NAME` (`Vault Zero`), a product default not an
+- **The name starts as `DEFAULT_WORKSPACE_NAME` (`My workspace`), a product default not an
   answer.** The header renders `<name> CRM`, so `workspaceLabel` tests the name rather
   than comparing to the default.
 - **The website queues the agent's `workspace-profile` task** and goes through
@@ -72,8 +73,10 @@ here, what do we sell.
 Workspace onboarding is the only product gate. Optional research credentials live in
 Settings and never prevent a signed-in user from entering the workspace.
 
-- **`getSessionCookie()` decides signed-in**; pages still resolve the real session via
-  `requireGoogleAccess()`.
+- **`getSessionCookie()` decides signed-in**; pages resolve the real session via
+  `requireSession()`. Gmail/Calendar consent is optional: `needsGoogleGrant` only
+  walls a Google-only account that has not granted sync scopes, and `/grant-access`
+  is the place to do that — not onboarding, not the app shell.
 - **Nothing is cached in a cookie** — onboarding state reverts on a database reset
   rather than leaving a year-long marker that insists the gate passed. Cache in the
   API if cost ever matters.
@@ -85,13 +88,12 @@ Settings and never prevent a signed-in user from entering the workspace.
 
 ### The name is also the URL
 
-Served under the workspace slug (`/comp-ai/companies`). **Cosmetic, not tenancy** —
-every query still resolves through `WORKSPACE_ID`.
+Served under the workspace slug (`/comp-ai/companies`). The slug is per workspace.
 
 - **The slug is the plugin's column**, written by `workspaceSlug(name)`
   (`@crm/db/workspace`) on rename and create. **Never derive it on read.**
 - `ensureWorkspaceMembership` reconciles it; `RESERVED_SLUGS` prevents collision with
-  a real route (a collision gets `-crm`).
+  a real route (a collision gets `-crm`). Colliding names get a unique suffix.
 - **The proxy is the only thing that puts the slug on.** Missing or stale slugs are
   redirected with the query string intact, not 404'd; `[slug]/layout.tsx` is the
   backstop.
@@ -107,7 +109,7 @@ self-hoster's admin cannot redeploy.
 
 - **OpenID Connect only** — issuer, client id, secret; endpoints from discovery. No
   SAML UI: it needs an X.509 cert and SP signing key we have nowhere to keep.
-- `SsoService` passes `WORKSPACE_ID`, never an input.
+- `SsoService` stores the provider on the admin's workspace, never an input from the client.
 - **Management is tRPC (`sso.*`); signing in is `authClient.signIn.sso()`.**
 - **`sso.signInOptions` is the one public procedure in the app.** Every other `sso.*`
   takes `AuthMiddleware` at the *method*, which is what leaves it open. A client
@@ -119,10 +121,10 @@ self-hoster's admin cannot redeploy.
   `/sign-in?method=google` still works, so a mistyped issuer cannot lock an admin out.
 - **Signing in with an IdP does not cost you Gmail.** `needsGoogleGrant` (`@crm/auth`)
   walls only an account whose sole sign-in row is Google.
-- `ALLOWED_SIGN_IN` still decides who gets an account, in
-  `databaseHooks.user.create.before`, for SSO sign-ups too.
+- `ALLOWED_SIGN_IN`, when set, still decides who gets an account, in
+  `databaseHooks.user.create.before`, for SSO sign-ups too. Empty means open signup.
 - `organizationProvisioning: { disabled: true }` — `ensureWorkspaceMembership` already
-  does the join.
+  creates or reuses that user's workspace.
 
 ## tRPC is the data surface; REST is auth and health only
 

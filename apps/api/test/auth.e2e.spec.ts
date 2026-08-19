@@ -1,8 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import "@crm/env/load";
+import { db } from "@crm/db";
+import { WORKSPACE_ID } from "@crm/db/workspace";
 import type { INestApplication } from "@nestjs/common";
 import { Test, type TestingModule } from "@nestjs/testing";
 import request from "supertest";
+import { isCanonicalLocalTestDatabase } from "../../../packages/db/test/canonical-workspace-fixture";
 
 const fallback = (key: string, value: string) => {
 	if (!process.env[key]) {
@@ -56,7 +59,9 @@ describe("Auth (e2e)", () => {
 			.get("/api/trpc/sso.signInOptions")
 			.expect(200);
 
-		expect(response.body.result.data).toEqual({ google: true, providers: [] });
+		expect(response.body.result.data.providers).toEqual([]);
+		expect(typeof response.body.result.data.google).toBe("boolean");
+		expect(typeof response.body.result.data.microsoft).toBe("boolean");
 	});
 
 	it("keeps the SSO configuration itself behind the session", async () => {
@@ -65,5 +70,69 @@ describe("Auth (e2e)", () => {
 		);
 
 		expect(response.status).toBe(401);
+	});
+
+	it("gives each email/password account its own workspace", async () => {
+		if (!isCanonicalLocalTestDatabase(process.env.DATABASE_URL ?? "")) {
+			return;
+		}
+
+		process.env.ALLOWED_SIGN_IN = "";
+		const suffix = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+		const password = "password12";
+
+		const signUp = async (label: string) => {
+			const response = await request(app.getHttpServer())
+				.post("/api/auth/sign-up/email")
+				.set("Origin", process.env.APP_URL ?? "http://localhost:3000")
+				.send({
+					name: label,
+					email: `${label}.${suffix}@example.test`,
+					password,
+				});
+
+			expect(response.status).toBeLessThan(300);
+			const userId = (response.body as { user?: { id?: string } }).user?.id;
+			expect(userId).toBeDefined();
+			return userId as string;
+		};
+
+		const firstId = await signUp("alpha");
+		const secondId = await signUp("beta");
+		const organizationIds: string[] = [];
+
+		try {
+			const [first, second] = await Promise.all([
+				db.member.findFirst({
+					where: { userId: firstId },
+					select: { organizationId: true, role: true },
+				}),
+				db.member.findFirst({
+					where: { userId: secondId },
+					select: { organizationId: true, role: true },
+				}),
+			]);
+
+			expect(first?.role).toBe("owner");
+			expect(second?.role).toBe("owner");
+			expect(first?.organizationId).toBeDefined();
+			expect(second?.organizationId).toBeDefined();
+			expect(first?.organizationId).not.toBe(second?.organizationId);
+			expect(first?.organizationId).not.toBe(WORKSPACE_ID);
+			expect(second?.organizationId).not.toBe(WORKSPACE_ID);
+
+			if (first) organizationIds.push(first.organizationId);
+			if (second) organizationIds.push(second.organizationId);
+		} finally {
+			await db.member.deleteMany({
+				where: { userId: { in: [firstId, secondId] } },
+			});
+			if (organizationIds.length > 0) {
+				await db.organization.deleteMany({
+					where: { id: { in: organizationIds } },
+				});
+			}
+			await db.user.deleteMany({ where: { id: { in: [firstId, secondId] } } });
+		}
 	});
 });

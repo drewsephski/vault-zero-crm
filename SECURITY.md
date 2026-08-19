@@ -13,28 +13,32 @@ project and there is no bounty.
 
 ## What this is, and what it assumes
 
-This CRM is built for **one organisation of authenticated internal users**. It is not a hardened
-public or multi-tenant service boundary, and the design says so out loud in a few places. The
-limits below are real and worth reading before you put customer data in it.
+This CRM is built so **each signed-in user has their own workspace**. Records are
+scoped by `organizationId`. Operators of the deployment can still read the database.
 
-**Sign-in is the entire authorisation model.** `ALLOWED_SIGN_IN` decides who gets in; after that,
-every signed-in person can read and write every record. There are no roles, no per-record
-permissions and no organizations — deliberately, because a permissions check that always returns
-`true` reads like a real one at review time. If you need someone to see only part of the pipeline,
-this is the wrong tool today.
+**Sign-in.** Email/password is always on. Google and Microsoft are optional. An empty
+`ALLOWED_SIGN_IN` lets anyone create an account (the hosted product). When that
+variable is set, it is an allow-list for a private self-hosted install. A list that
+names a consumer domain (`gmail.com`) is an open door, which is why single addresses
+are supported.
 
-An unset `ALLOWED_SIGN_IN` fails closed: nobody can sign in. A list that names a consumer domain
-(`gmail.com`) is an open door, which is why single addresses are supported.
+**Workspace membership is the authorisation model after sign-in.** A user can read and
+write records in workspaces they belong to. There are owner/admin/member roles for
+workspace settings (rename, SSO, currency). If you need per-record permissions inside
+one workspace, this is still the wrong tool today.
 
-**Operators can read everything.** Whoever runs the deployment has the database, the environment
-and the logs. Nothing here protects data from the person hosting it.
+An unset `ALLOWED_SIGN_IN` is open signup, not a lockout.
 
-**The agent reads your mail.** Gmail and Calendar access is a condition of signing in, because
-reading the mailbox is what the CRM is for. The research agent reads message bodies, meeting
-attendees and signature blocks belonging to real people who did not sign up for this. It is
-deliberately unrestricted on the *read* side and constrained on the *write* and *egress* sides —
-see `apps/agent/agent/skills/data-boundaries.md`. If you deploy this, you are the data controller
-for those mailboxes.
+**Operators can read everything.** Whoever runs the deployment has the database, the
+environment and the logs. Nothing here protects data from the person hosting it.
+
+**The agent can read your mail.** Gmail and Calendar access is optional. Google sign-in
+requests those scopes; email/password users connect from Settings if they want sync.
+The research agent reads message bodies, meeting attendees and signature blocks
+belonging to real people who did not sign up for this. It is deliberately unrestricted
+on the *read* side and constrained on the *write* and *egress* sides —
+see `apps/agent/agent/skills/data-boundaries.md`. If you deploy this, you are the data
+controller for those mailboxes.
 
 **Outbound calls send data to third parties.** Each optional key in `.env.example` turns on a
 vendor the agent can query, and a query carries whatever it needs to ask the question — typically a
@@ -51,7 +55,7 @@ every session at once.
 
 ## Deploying it safely
 
-- Set `ALLOWED_SIGN_IN` to a domain you control. Never a public mail provider.
+- Leave `ALLOWED_SIGN_IN` empty for a hosted product, or set it to a domain you control for a private install. Never a public mail provider unless you mean to allow that entire provider.
 - Generate `BETTER_AUTH_SECRET` yourself (`openssl rand -base64 32`). The value in any example file
   is not a secret.
 - Serve both processes over HTTPS. Secure cookies switch on with `NODE_ENV=production`.

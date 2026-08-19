@@ -7,6 +7,8 @@ export const DEFAULT_WORKSPACE_SLUG = "workspace";
 
 export const MAX_SLUG = 48;
 
+export const MAX_NARRATIVE = 320;
+
 export const RESERVED_SLUGS: readonly string[] = [
 	"_next",
 	"api",
@@ -34,7 +36,34 @@ export function workspaceSlug(name: string): string {
 	return RESERVED_SLUGS.includes(base) ? `${base}-crm` : base;
 }
 
-export const MAX_NARRATIVE = 320;
+export async function uniqueWorkspaceSlug(
+	exists: (slug: string) => Promise<boolean>,
+	name: string,
+	disambiguator: string,
+): Promise<string> {
+	const trySlug = async (value: string): Promise<string | null> => {
+		const slug = workspaceSlug(value);
+		return (await exists(slug)) ? null : slug;
+	};
+
+	const available = await trySlug(name);
+	if (available) return available;
+
+	const token =
+		disambiguator
+			.replace(/[^a-z0-9]/gi, "")
+			.toLowerCase()
+			.slice(0, 8) || "ws";
+	const withToken = await trySlug(`${name}-${token}`);
+	if (withToken) return withToken;
+
+	for (let n = 2; n < 1000; n += 1) {
+		const numbered = await trySlug(`${name}-${token}-${n}`);
+		if (numbered) return numbered;
+	}
+
+	return workspaceSlug(crypto.randomUUID());
+}
 
 export const MAX_LINE = 140;
 
@@ -84,9 +113,10 @@ export type WorkspaceIdentity = {
 
 export async function readWorkspaceProfile(
 	db: Db,
+	organizationId: string,
 ): Promise<WorkspaceProfile | null> {
 	const row = await db.workspaceProfile.findUnique({
-		where: { id: WORKSPACE_ID },
+		where: { id: organizationId },
 		select: {
 			website: true,
 			narrative: true,
@@ -133,13 +163,14 @@ export function profileOf(
 
 export async function readWorkspaceIdentity(
 	db: Db,
+	organizationId: string,
 ): Promise<WorkspaceIdentity | null> {
 	const [workspace, profile] = await Promise.all([
 		db.organization.findUnique({
-			where: { id: WORKSPACE_ID },
+			where: { id: organizationId },
 			select: { name: true, website: true },
 		}),
-		readWorkspaceProfile(db),
+		readWorkspaceProfile(db, organizationId),
 	]);
 
 	if (!workspace) return null;
@@ -153,6 +184,7 @@ export async function readWorkspaceIdentity(
 
 export async function writeWorkspaceProfile(
 	db: Db,
+	organizationId: string,
 	input: {
 		website: string;
 		narrative: string;
@@ -171,8 +203,8 @@ export async function writeWorkspaceProfile(
 	};
 
 	const row = await db.workspaceProfile.upsert({
-		where: { id: WORKSPACE_ID },
-		create: { id: WORKSPACE_ID, ...fields },
+		where: { id: organizationId },
+		create: { id: organizationId, ...fields },
 		update: fields,
 		select: {
 			website: true,

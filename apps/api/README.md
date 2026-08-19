@@ -13,13 +13,14 @@ bun run test
 bun run build && bun run start:prod
 ```
 
-Three values are required and the process refuses to boot without them, naming
-the one it is missing: `DATABASE_URL`, `BETTER_AUTH_SECRET` and
-`ALLOWED_SIGN_IN`. `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are the fourth
-value almost every install wants — they are both the sign-in button and the
-Gmail and Calendar sync — but they are optional and set as a pair, because an
-install that signs in through its own identity provider on **Settings → SSO**
-needs neither. With them, register
+Two values are required and the process refuses to boot without them, naming
+the one it is missing: `DATABASE_URL` and `BETTER_AUTH_SECRET`.
+`ALLOWED_SIGN_IN` is optional — empty lets anyone create an account, each with
+their own workspace. Set it only for a private self-hosted install.
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are the values almost every
+install wants for Gmail and Calendar sync — they are optional and set as a pair,
+because an install that signs in with email and password, or through its own
+identity provider on **Settings → SSO**, needs neither. With them, register
 `http://localhost:3001/api/auth/callback/google` as an authorised redirect URI.
 `src/config/env.validation.ts` is the full list of what this process reads;
 [`docs/environment.md`](../../docs/environment.md) explains where the file is

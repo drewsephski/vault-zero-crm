@@ -39,8 +39,11 @@ export class SsoRouter {
 
 	@Query({ input: ssoProviderListInput })
 	@UseMiddlewares(AuthMiddleware)
-	async list(@Input() input: z.infer<typeof ssoProviderListInput>) {
-		return this.sso.list(input);
+	async list(
+		@Ctx() ctx: AuthedTrpcContext,
+		@Input() input: z.infer<typeof ssoProviderListInput>,
+	) {
+		return this.sso.list(ctx.user.id, input);
 	}
 
 	@Mutation({ input: registerSsoProviderInput })

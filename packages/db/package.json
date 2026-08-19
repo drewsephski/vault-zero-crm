@@ -16,6 +16,7 @@
 		"./images": "./src/images.ts",
 		"./safe-fetch": "./src/safe-fetch.ts",
 		"./settings": "./src/settings.ts",
+		"./tenancy": "./src/tenancy.ts",
 		"./workspace": "./src/workspace.ts"
 	},
 	"scripts": {

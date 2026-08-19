@@ -1,6 +1,10 @@
-import { AcquisitionCandidateStatus, db, WorkspaceMode } from "@crm/db";
+import {
+	AcquisitionCandidateStatus,
+	db,
+	getOrganizationId,
+	WorkspaceMode,
+} from "@crm/db";
 import { isAcquisitionEvidenceUrl } from "@crm/db/acquisition";
-import { WORKSPACE_ID } from "@crm/db/workspace";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { normalizeDomain } from "../lib/record-writes";
@@ -21,8 +25,16 @@ export default defineTool({
 		candidates: z.array(candidate).min(1).max(10),
 	}),
 	async execute({ candidates }, ctx) {
+		const organizationId = getOrganizationId();
+		if (!organizationId) {
+			return {
+				saved: 0,
+				reason: "This session is not attached to a workspace.",
+			};
+		}
+
 		const profile = await db.acquisitionProfile.findUnique({
-			where: { id: WORKSPACE_ID },
+			where: { id: organizationId },
 			select: { mode: true },
 		});
 		if (profile?.mode !== WorkspaceMode.ACQUISITION) {

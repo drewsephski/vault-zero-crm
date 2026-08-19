@@ -2,6 +2,7 @@ import "@crm/env/load";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { type Prisma, PrismaClient } from "./generated/prisma/client";
+import { applyTenancy } from "./tenancy";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -71,7 +72,7 @@ const createPrismaClient = () => {
 		sink({ level: "query", message: query, target, durationMs: duration });
 	});
 
-	return client;
+	return applyTenancy(client);
 };
 
 const globalForPrisma = globalThis as unknown as {

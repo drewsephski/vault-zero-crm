@@ -19,7 +19,7 @@ export class UsersRouter {
 	}
 
 	@Query()
-	async list() {
-		return this.users.list();
+	async list(@Ctx() ctx: AuthedTrpcContext) {
+		return this.users.list(ctx.organizationId);
 	}
 }

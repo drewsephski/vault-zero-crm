@@ -1,13 +1,14 @@
 "use client";
 
 import { signIn, signUp } from "@crm/auth/client";
+import { Button } from "@crm/ui/components/button";
 import {
 	Field,
+	FieldDescription,
 	FieldGroup,
 	FieldLabel,
 } from "@crm/ui/components/field";
 import { Input } from "@crm/ui/components/input";
-import { Button } from "@crm/ui/components/button";
 import { Spinner } from "@crm/ui/components/spinner";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -35,16 +36,30 @@ export function EmailPasswordAuth() {
 
 		let error: { message?: string } | null = null;
 
+		if (mode === "signUp" && password.length < 8) {
+			toast.error("Use a password of at least 8 characters.");
+			setPending(false);
+			return;
+		}
+
 		if (mode === "signIn") {
 			({ error } = await signIn.email({ email, password, ...redirectOptions }));
 		} else {
-			({ error } = await signUp.email({ name, email, password, ...redirectOptions }));
+			({ error } = await signUp.email({
+				name,
+				email,
+				password,
+				...redirectOptions,
+			}));
 		}
 
 		if (error) {
 			toast.error(error.message ?? "Could not complete email authentication.");
 			setPending(false);
+			return;
 		}
+
+		window.location.assign("/");
 	}
 
 	return (
@@ -55,6 +70,7 @@ export function EmailPasswordAuth() {
 					variant={mode === "signIn" ? "default" : "outline"}
 					onClick={() => setMode("signIn")}
 					disabled={pending}
+					aria-pressed={mode === "signIn"}
 				>
 					Sign in
 				</Button>
@@ -63,6 +79,7 @@ export function EmailPasswordAuth() {
 					variant={mode === "signUp" ? "default" : "outline"}
 					onClick={() => setMode("signUp")}
 					disabled={pending}
+					aria-pressed={mode === "signUp"}
 				>
 					Create account
 				</Button>
@@ -103,9 +120,15 @@ export function EmailPasswordAuth() {
 							id="auth-password"
 							name="password"
 							type="password"
-							autoComplete={mode === "signIn" ? "current-password" : "new-password"}
+							autoComplete={
+								mode === "signIn" ? "current-password" : "new-password"
+							}
+							minLength={8}
 							required
 						/>
+						{mode === "signUp" ? (
+							<FieldDescription>At least 8 characters.</FieldDescription>
+						) : null}
 					</Field>
 				</FieldGroup>
 

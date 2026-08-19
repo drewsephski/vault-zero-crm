@@ -1,4 +1,5 @@
 import { EnrichmentStatus } from "@crm/db";
+import { runInOrganization } from "@crm/db/tenancy";
 import { APP_AUTH, type AppAuth } from "./app-auth";
 import { brandOutcome, runBrand } from "./brand";
 import { markRunning, settle } from "./enrichment";
@@ -51,7 +52,9 @@ export async function runVisibleLane(): Promise<number> {
 
 		if (tasks.length === 0) break;
 
-		await runLimited(VISIBLE_CONCURRENCY, tasks, runDirect);
+		await runLimited(VISIBLE_CONCURRENCY, tasks, (task) =>
+			runInOrganization(task.organizationId, () => runDirect(task)),
+		);
 		handled += tasks.length;
 	}
 
@@ -103,9 +106,11 @@ export async function runResearchLane(
 	await Promise.all(
 		tasks.map(async (task) => {
 			try {
-				await markRunning(task);
-				const session = await start(task);
-				await noteSession(task.id, session.id);
+				await runInOrganization(task.organizationId, async () => {
+					await markRunning(task);
+					const session = await start(task);
+					await noteSession(task.id, session.id);
+				});
 			} catch (error) {
 				const reason = error instanceof Error ? error.message : String(error);
 				await settle(task, EnrichmentStatus.FAILED, reason).catch(() => {});

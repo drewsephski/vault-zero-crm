@@ -1,5 +1,6 @@
 import { workspaceDomains } from "@crm/auth/workspace";
 import { type Db, RecordSource } from "@crm/db";
+import { getOrganizationId, tenantEmailWhere } from "@crm/db/tenancy";
 import { Injectable, Logger } from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
 import { CompanyDirectoryService } from "../companies/company-directory.service";
@@ -53,13 +54,32 @@ export class GoogleMatchService {
 		addresses: Set<string>;
 		domains: Set<string>;
 	}> {
-		const users = await this.db.user.findMany({ select: { email: true } });
+		const organizationId = getOrganizationId();
+		const [members, organization] = await Promise.all([
+			organizationId
+				? this.db.member.findMany({
+						where: { organizationId },
+						select: { user: { select: { email: true } } },
+					})
+				: [],
+			organizationId
+				? this.db.organization.findUnique({
+						where: { id: organizationId },
+						select: { website: true },
+					})
+				: null,
+		]);
 
 		const addresses = new Set<string>();
 		const domains = new Set<string>(workspaceDomains());
 
-		for (const user of users) {
-			const email = user.email.toLowerCase();
+		const website = organization?.website
+			?.replace(/^https?:\/\//, "")
+			.split("/")[0];
+		if (website) domains.add(website.toLowerCase());
+
+		for (const member of members) {
+			const email = member.user.email.toLowerCase();
 			addresses.add(email);
 
 			const domain = workDomain(email);
@@ -214,12 +234,12 @@ export class GoogleMatchService {
 		const { firstName, lastName } = splitName(person.name, person.email);
 
 		const existing = await this.db.contact.findUnique({
-			where: { email: person.email },
+			where: tenantEmailWhere(person.email),
 			select: { id: true },
 		});
 
 		const contact = await this.db.contact.upsert({
-			where: { email: person.email },
+			where: tenantEmailWhere(person.email),
 			create: {
 				firstName,
 				lastName,

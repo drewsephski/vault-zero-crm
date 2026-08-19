@@ -1,4 +1,5 @@
 import { type Db, EnrichmentStatus } from "@crm/db";
+import { tenantDomainWhere } from "@crm/db/tenancy";
 import { Injectable, Logger } from "@nestjs/common";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
 import { InjectDatabase } from "../database/database.constants";
@@ -21,13 +22,13 @@ export class CompanyDirectoryService {
 		if (!domain) return null;
 
 		const existing = await this.db.company.findUnique({
-			where: { domain },
+			where: tenantDomainWhere(domain),
 			select: { id: true },
 		});
 		if (existing) return existing.id;
 
 		const company = await this.db.company.upsert({
-			where: { domain },
+			where: tenantDomainWhere(domain),
 			create: {
 				name: domain,
 				domain,

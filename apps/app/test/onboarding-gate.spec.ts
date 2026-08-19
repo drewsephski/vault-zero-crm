@@ -245,7 +245,9 @@ describe("proxy", () => {
 		setup({ onboarded: false, canRename: true, website: "acme.com" });
 
 		expect(
-			redirectedTo(await proxy(request(`/${SLUG}/companies`, [SESSION_COOKIE]))),
+			redirectedTo(
+				await proxy(request(`/${SLUG}/companies`, [SESSION_COOKIE])),
+			),
 		).toBe(`/${SLUG}/companies`);
 	});
 

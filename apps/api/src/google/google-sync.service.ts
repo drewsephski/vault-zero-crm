@@ -1,3 +1,5 @@
+import { organizationIdForUser } from "@crm/auth";
+import { runInOrganization } from "@crm/db/tenancy";
 import { syncError } from "@crm/telemetry";
 import { Injectable, Logger } from "@nestjs/common";
 import { CalendarSyncService } from "./calendar-sync.service";
@@ -99,12 +101,15 @@ export class GoogleSyncService {
 	}
 
 	async runOne(userId: string, source: SyncSource) {
+		const organizationId = await organizationIdForUser(userId);
+		if (!organizationId) return null;
+
 		const row = await this.state.get(userId, source);
 		if (!row) return null;
 
-		return source === "calendar"
-			? this.calendar.sync(row)
-			: this.gmail.sync(row);
+		return runInOrganization(organizationId, () =>
+			source === "calendar" ? this.calendar.sync(row) : this.gmail.sync(row),
+		);
 	}
 
 	async runForUser(userId: string): Promise<void> {

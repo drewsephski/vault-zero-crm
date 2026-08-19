@@ -9,7 +9,6 @@ import {
 } from "@crm/db";
 import { RETIRED_OUTCOME } from "@crm/db/agent-tasks";
 import { readAgentModel } from "@crm/db/settings";
-import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
 	bucket,
 	claimRollup,
@@ -136,7 +135,7 @@ export class RollupService {
 		const [model, members, ssoProviders, postgres, contextKey] =
 			await Promise.all([
 				readAgentModel(this.db).catch(() => null),
-				this.db.member.count({ where: { organizationId: WORKSPACE_ID } }),
+				this.db.member.count(),
 				this.db.ssoProvider.count(),
 				this.postgresMajor(),
 				this.db.appSetting.findFirst({ select: { contextDevApiKey: true } }),

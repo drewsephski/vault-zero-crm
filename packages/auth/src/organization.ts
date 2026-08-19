@@ -1,9 +1,13 @@
-import { db } from "@crm/db";
-import { WORKSPACE_ID, workspaceSlug } from "@crm/db/workspace";
+import { db, type Prisma } from "@crm/db";
+import {
+	uniqueWorkspaceSlug,
+	WORKSPACE_ID,
+	workspaceSlug,
+} from "@crm/db/workspace";
 
 export { WORKSPACE_ID };
 
-export const DEFAULT_WORKSPACE_NAME = "Vault Zero";
+export const DEFAULT_WORKSPACE_NAME = "My workspace";
 
 export const WORKSPACE_ROLES = ["owner", "admin", "member"] as const;
 
@@ -29,95 +33,127 @@ export function canManageCurrency(role: WorkspaceRole | null): boolean {
 	return isWorkspaceAdmin(role);
 }
 
+export async function organizationIdForUser(
+	userId: string,
+): Promise<string | undefined> {
+	const member = await db.member.findFirst({
+		where: { userId },
+		orderBy: { createdAt: "asc" },
+		select: { organizationId: true },
+	});
+
+	if (member) return member.organizationId;
+
+	return ensureWorkspaceMembership(userId);
+}
+
 export async function ensureWorkspaceMembership(
 	userId: string,
 ): Promise<string | undefined> {
 	try {
 		return await db.$transaction(async (tx) => {
-			const workspace = await tx.organization.upsert({
-				where: { id: WORKSPACE_ID },
-				create: {
-					id: WORKSPACE_ID,
-					name: DEFAULT_WORKSPACE_NAME,
-					slug: workspaceSlug(DEFAULT_WORKSPACE_NAME),
-					createdAt: new Date(),
-				},
-				update: {},
-				select: { id: true, name: true, slug: true },
+			const existing = await tx.member.findFirst({
+				where: { userId },
+				orderBy: { createdAt: "asc" },
+				select: { organizationId: true },
 			});
 
-			const slug = workspaceSlug(workspace.name);
-
-			if (workspace.slug !== slug) {
-				await tx.organization.update({
-					where: { id: workspace.id },
-					data: { slug },
+			if (existing) {
+				await repairOwner(tx, existing.organizationId);
+				const workspace = await tx.organization.findUnique({
+					where: { id: existing.organizationId },
+					select: { id: true, name: true, slug: true },
 				});
+
+				if (workspace) {
+					const slug = workspaceSlug(workspace.name);
+					if (workspace.slug !== slug) {
+						const taken = await tx.organization.findFirst({
+							where: { slug, id: { not: workspace.id } },
+							select: { id: true },
+						});
+						if (!taken) {
+							await tx.organization.update({
+								where: { id: workspace.id },
+								data: { slug },
+							});
+						}
+					}
+				}
+
+				return existing.organizationId;
 			}
 
-			const enrolled = await tx.member.count({
-				where: { organizationId: workspace.id },
+			const user = await tx.user.findUnique({
+				where: { id: userId },
+				select: { name: true },
 			});
 
-			if (enrolled === 0) {
-				const existing = await tx.user.findMany({
-					select: { id: true },
-					orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-				});
+			const name = user?.name.trim() || DEFAULT_WORKSPACE_NAME;
+			const slug = await uniqueWorkspaceSlug(
+				async (candidate) =>
+					Boolean(
+						await tx.organization.findUnique({
+							where: { slug: candidate },
+							select: { id: true },
+						}),
+					),
+				name,
+				userId,
+			);
 
-				await tx.member.createMany({
-					data: existing.map((user, index) => ({
-						id: crypto.randomUUID(),
-						organizationId: workspace.id,
-						userId: user.id,
-						role: index === 0 ? "owner" : "member",
-						createdAt: new Date(),
-					})),
-					skipDuplicates: true,
-				});
-			}
-
-			await tx.member.upsert({
-				where: {
-					organizationId_userId: { organizationId: workspace.id, userId },
-				},
-				create: {
+			const organization = await tx.organization.create({
+				data: {
 					id: crypto.randomUUID(),
-					organizationId: workspace.id,
-					userId,
-					role: "member",
+					name,
+					slug,
 					createdAt: new Date(),
 				},
-				update: {},
-			});
-
-			const owner = await tx.member.findFirst({
-				where: { organizationId: workspace.id, role: "owner" },
 				select: { id: true },
 			});
 
-			if (!owner) {
-				const earliest = await tx.member.findFirst({
-					where: { organizationId: workspace.id },
-					orderBy: [{ user: { createdAt: "asc" } }, { userId: "asc" }],
-					select: { id: true },
-				});
+			await tx.member.create({
+				data: {
+					id: crypto.randomUUID(),
+					organizationId: organization.id,
+					userId,
+					role: "owner",
+					createdAt: new Date(),
+				},
+			});
 
-				if (earliest) {
-					await tx.member.update({
-						where: { id: earliest.id },
-						data: { role: "owner" },
-					});
-				}
-			}
-
-			return workspace.id;
+			return organization.id;
 		});
 	} catch (error) {
 		console.error(
-			`[auth] could not enrol user ${userId} in workspace ${WORKSPACE_ID}; the next sign-in will retry`,
+			`[auth] could not create a workspace for user ${userId}; the next sign-in will retry`,
 			error,
 		);
 		return undefined;
+	}
+}
+
+async function repairOwner(
+	tx: Prisma.TransactionClient,
+	organizationId: string,
+): Promise<void> {
+	const owner = await tx.member.findFirst({
+		where: { organizationId, role: "owner" },
+		select: { id: true },
+	});
+
+	if (owner) return;
+
+	const earliest = await tx.member.findFirst({
+		where: { organizationId },
+		orderBy: [{ user: { createdAt: "asc" } }, { userId: "asc" }],
+		select: { id: true },
+	});
+
+	if (earliest) {
+		await tx.member.update({
+			where: { id: earliest.id },
+			data: { role: "owner" },
+		});
 	}
 }
