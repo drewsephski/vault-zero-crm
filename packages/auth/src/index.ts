@@ -1,6 +1,6 @@
 export { type Auth, auth, type Session, type SessionUser } from "./auth";
 export { AUTH_COOKIE_PREFIX } from "./cookies";
-export { isGoogleConfigured } from "./env";
+export { isGoogleConfigured, isMicrosoftConfigured } from "./env";
 export {
 	canChangeRole,
 	canManageCurrency,
@@ -17,6 +17,7 @@ export {
 	CALENDAR_SCOPE,
 	GMAIL_SCOPE,
 	GOOGLE_PROVIDER_ID,
+	MICROSOFT_PROVIDER_ID,
 	hasSyncScopes,
 	IDENTITY_SCOPES,
 	needsGoogleGrant,

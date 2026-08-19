@@ -7,7 +7,7 @@ import { organization } from "better-auth/plugins/organization";
 import { AUTH_COOKIE_PREFIX } from "./cookies";
 import { env } from "./env";
 import { ensureWorkspaceMembership } from "./organization";
-import { SYNC_SCOPES } from "./scopes";
+import { IDENTITY_SCOPES, MICROSOFT_PROVIDER_ID, SYNC_SCOPES } from "./scopes";
 import { notifySignedIn } from "./signed-in";
 import {
 	hasSignInAllowList,
@@ -29,6 +29,18 @@ if (env.google) {
 	};
 }
 
+if (env.microsoft) {
+	socialProviders.microsoft = {
+		...env.microsoft,
+		scope: [...IDENTITY_SCOPES],
+	};
+}
+
+const trustedProviders: string[] = [];
+
+if (env.google) trustedProviders.push("google");
+if (env.microsoft) trustedProviders.push(MICROSOFT_PROVIDER_ID);
+
 export const auth = betterAuth({
 	appName: "Vault Zero CRM",
 	baseURL: env.baseUrl,
@@ -46,7 +58,7 @@ export const auth = betterAuth({
 	account: {
 		accountLinking: {
 			enabled: true,
-			trustedProviders: ["google"],
+			trustedProviders,
 		},
 	},
 

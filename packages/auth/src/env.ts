@@ -8,7 +8,7 @@ const optional = (key: string): string | undefined => {
 	return value && value.length > 0 ? value : undefined;
 };
 
-const googleCredentials = ():
+const googleCredentials = (): 
 	| { clientId: string; clientSecret: string }
 	| undefined => {
 	const clientId = optional("GOOGLE_CLIENT_ID");
@@ -26,6 +26,29 @@ const googleCredentials = ():
 	return { clientId, clientSecret };
 };
 
+const microsoftCredentials = ():
+	| {
+		clientId: string;
+		clientSecret: string;
+		tenantId?: string;
+	}
+	| undefined => {
+	const clientId = optional("MICROSOFT_CLIENT_ID");
+	const clientSecret = optional("MICROSOFT_CLIENT_SECRET");
+	const tenantId = optional("MICROSOFT_TENANT_ID");
+
+	if (!clientId || !clientSecret) {
+		if (clientId || clientSecret) {
+			throw new Error(
+				"MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET must be set together.",
+			);
+		}
+		return undefined;
+	}
+
+	return tenantId ? { clientId, clientSecret, tenantId } : { clientId, clientSecret };
+};
+
 const apiUrl =
 	optional("API_URL") ?? optional("BETTER_AUTH_URL") ?? DEFAULT_API_URL;
 
@@ -39,6 +62,7 @@ const appUrl = appUrls[0] ?? DEFAULT_APP_URL;
 export const env = {
 	baseUrl: apiUrl,
 	google: googleCredentials(),
+	microsoft: microsoftCredentials(),
 	cookieDomain: optional("AUTH_COOKIE_DOMAIN"),
 	trustedOrigins: [...new Set([...appUrls, apiUrl])],
 	isProduction: process.env.NODE_ENV === "production",
@@ -46,6 +70,10 @@ export const env = {
 
 export function isGoogleConfigured(): boolean {
 	return env.google !== undefined;
+}
+
+export function isMicrosoftConfigured(): boolean {
+	return env.microsoft !== undefined;
 }
 
 export { apiUrl, appUrl };

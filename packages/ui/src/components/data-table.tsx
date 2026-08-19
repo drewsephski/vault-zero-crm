@@ -91,6 +91,8 @@ export type DataTableProps<TRow, TSub> = {
 	total: number;
 	facetCounts?: Record<string, Record<string, number>>;
 	loading?: boolean;
+	error?: string | null;
+	onRetry?: () => void;
 	facets?: DataTableFacet[];
 	tabs?: DataTableTabs;
 	onRowClick?: (row: TRow) => void;
@@ -153,6 +155,8 @@ export function DataTable<TRow, TSub = unknown>({
 	total,
 	facetCounts,
 	loading,
+	error,
+	onRetry,
 	facets,
 	tabs,
 	onRowClick,
@@ -519,13 +523,53 @@ export function DataTable<TRow, TSub = unknown>({
 					</TableRow>
 				</TableHeader>
 				<TableBody>
+					{error && deferredRows.length > 0 && (
+						<TableRow className="border-b border-destructive/20 bg-destructive/5">
+							<TableCell
+								colSpan={colCount}
+								className="px-3 py-2 text-destructive"
+							>
+								<div className="flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+									<div>
+										<p className="font-medium">Could not refresh records.</p>
+										<p>{error}</p>
+									</div>
+									{onRetry ? (
+										<Button
+											variant="outline"
+											size="xs"
+											onClick={() => onRetry()}
+										>
+											Try again
+										</Button>
+									) : null}
+								</div>
+							</TableCell>
+						</TableRow>
+					)}
 					{deferredRows.length === 0 ? (
 						<TableRow className="hover:bg-transparent">
 							<TableCell
 								colSpan={colCount}
 								className="h-32 whitespace-normal py-8 text-center align-middle text-muted-foreground"
 							>
-								{loading ? <Spinner /> : (empty ?? "No results found.")}
+								{loading ? (
+									<Spinner />
+								) : error ? (
+									<div className="space-y-2">
+										<div className="font-medium text-destructive">
+											Could not load records.
+										</div>
+										<div>{error}</div>
+										{onRetry ? (
+											<Button size="sm" variant="outline" onClick={() => onRetry()}>
+												Try again
+											</Button>
+										) : null}
+									</div>
+								) : (
+									empty ?? "No results found."
+								)}
 							</TableCell>
 						</TableRow>
 					) : (

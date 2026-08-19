@@ -11,6 +11,44 @@ import { toast } from "sonner";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_DEAL_AMOUNT_CENTS = 99_999_999_999_999;
+
+function clean(value: string): string {
+	return value.trim();
+}
+
+function parseAmountCents(input: string): { cents: number | null; error: string | null } {
+	if (input === "") {
+		return { cents: null, error: null };
+	}
+
+	const parsed = Number.parseFloat(input);
+	if (!Number.isFinite(parsed) || parsed < 0) {
+		return {
+			cents: null,
+			error: "Amount has to be a non-negative number.",
+		};
+	}
+
+	const cents = Math.round(parsed * 100);
+	if (!Number.isSafeInteger(cents) || cents < 0) {
+		return {
+			cents: null,
+			error: "Amount has to be a valid number.",
+		};
+	}
+
+	if (cents > MAX_DEAL_AMOUNT_CENTS) {
+		return {
+			cents: null,
+			error: "That amount is too large to record.",
+		};
+	}
+
+	return { cents, error: null };
+}
+
 function QuickAddForm({
 	submitLabel,
 	pending,
@@ -70,11 +108,22 @@ export function QuickAddContact({
 	const [lastName, setLastName] = useState("");
 	const [email, setEmail] = useState("");
 	const [title, setTitle] = useState("");
+	const [touchedName, setTouchedName] = useState(false);
+	const [touchedEmail, setTouchedEmail] = useState(false);
 
 	const firstNameId = useId();
 	const lastNameId = useId();
 	const emailId = useId();
 	const titleId = useId();
+
+	const nextFirstName = clean(firstName);
+	const nextEmail = clean(email);
+	const emailError =
+		touchedEmail && nextEmail !== "" && !EMAIL_PATTERN.test(nextEmail)
+			? "Use a valid email address."
+			: null;
+
+	const canSubmit = nextFirstName !== "" && emailError === null;
 
 	const create = useMutation(
 		trpc.contacts.create.mutationOptions({
@@ -91,18 +140,28 @@ export function QuickAddContact({
 		<QuickAddForm
 			submitLabel="Add contact"
 			pending={create.isPending}
-			ready={firstName.trim() !== ""}
+			ready={canSubmit}
 			onCancel={onDone}
-			onSubmit={() =>
+			onSubmit={() => {
+				if (nextFirstName === "") {
+					setTouchedName(true);
+					return;
+				}
+
+				if (emailError) {
+					setTouchedEmail(true);
+					return;
+				}
+
 				create.mutate({
-					firstName,
-					lastName: lastName || undefined,
-					email: email || undefined,
-					title: title || undefined,
+					firstName: nextFirstName,
+					lastName: clean(lastName) || undefined,
+					email: nextEmail || undefined,
+					title: clean(title) || undefined,
 					companyId,
 					ownerId,
-				})
-			}
+				});
+			}}
 		>
 			<Field>
 				<FieldLabel htmlFor={firstNameId}>First name</FieldLabel>
@@ -110,17 +169,28 @@ export function QuickAddContact({
 					id={firstNameId}
 					autoFocus
 					value={firstName}
-					onChange={(event) => setFirstName(event.target.value)}
+					disabled={create.isPending}
 					autoComplete="off"
+					onBlur={() => setTouchedName(true)}
+					onChange={(event) => {
+						setFirstName(event.target.value);
+						if (touchedName) {
+							setTouchedName(false);
+						}
+					}}
 				/>
+				{touchedName && nextFirstName === "" ? (
+					<p className="text-destructive text-xs">First name is required.</p>
+				) : null}
 			</Field>
 			<Field>
 				<FieldLabel htmlFor={lastNameId}>Last name</FieldLabel>
 				<Input
 					id={lastNameId}
 					value={lastName}
-					onChange={(event) => setLastName(event.target.value)}
+					disabled={create.isPending}
 					autoComplete="off"
+					onChange={(event) => setLastName(event.target.value)}
 				/>
 			</Field>
 			<Field>
@@ -129,18 +199,29 @@ export function QuickAddContact({
 					id={emailId}
 					type="email"
 					value={email}
-					onChange={(event) => setEmail(event.target.value)}
+					disabled={create.isPending}
 					autoComplete="off"
+					onBlur={() => setTouchedEmail(true)}
+					onChange={(event) => {
+						setEmail(event.target.value);
+						if (touchedEmail) {
+							setTouchedEmail(false);
+						}
+					}}
 				/>
+				{emailError ? (
+					<p className="text-destructive text-xs">{emailError}</p>
+				) : null}
 			</Field>
 			<Field>
 				<FieldLabel htmlFor={titleId}>Title</FieldLabel>
 				<Input
 					id={titleId}
 					value={title}
+					disabled={create.isPending}
+					autoComplete="off"
 					onChange={(event) => setTitle(event.target.value)}
 					placeholder="Head of Security"
-					autoComplete="off"
 				/>
 			</Field>
 		</QuickAddForm>
@@ -164,6 +245,8 @@ export function QuickAddDeal({
 	const [name, setName] = useState("");
 	const [amount, setAmount] = useState("");
 	const [closeDate, setCloseDate] = useState("");
+	const [touchedName, setTouchedName] = useState(false);
+	const [touchedAmount, setTouchedAmount] = useState(false);
 
 	const nameId = useId();
 	const amountId = useId();
@@ -172,79 +255,110 @@ export function QuickAddDeal({
 	const me = useQuery(trpc.users.me.queryOptions());
 	const owner = ownerId ?? me.data?.id ?? null;
 
+	const nextName = clean(name);
+	const nextAmount = clean(amount);
+	const nextAmountParse = parseAmountCents(nextAmount);
+	const amountError =
+		touchedAmount || nextAmount !== ""
+			? nextAmountParse.error
+			: null;
+	const isOwnerResolving = ownerId === null && me.isLoading;
+	const canSubmit =
+		nextName !== "" &&
+			amountError === null &&
+			owner !== null &&
+			!isOwnerResolving;
+
 	const create = useMutation(
 		trpc.deals.create.mutationOptions({
 			onSuccess: async (deal) => {
 				await cache.deal(deal.id);
-				toast.success(`${deal.name} created.`);
+				toast.success(`${companyName} deal ${deal.name} created.`);
 				onDone();
 			},
 			onError: (error) => toast.error(error.message),
 		}),
 	);
 
-	const submit = () => {
-		if (!owner) {
-			toast.error("Could not work out who should own this deal.");
-			return;
-		}
-
-		let amountCents: number | null = null;
-		if (amount.trim() !== "") {
-			const parsed = Number.parseFloat(amount);
-			if (!Number.isFinite(parsed) || parsed < 0) {
-				toast.error("Amount has to be a number.");
-				return;
-			}
-			amountCents = Math.round(parsed * 100);
-		}
-
-		create.mutate({
-			name,
-			companyId,
-			ownerId: owner,
-			amountCents,
-			expectedCloseDate: closeDate || null,
-		});
-	};
-
 	return (
 		<QuickAddForm
-			submitLabel="Create deal"
+			submitLabel="Add deal"
 			pending={create.isPending}
-			ready={name.trim() !== ""}
+			ready={canSubmit}
 			onCancel={onDone}
-			onSubmit={submit}
+			onSubmit={() => {
+				if (nextName === "") {
+					setTouchedName(true);
+					return;
+				}
+
+				if (nextAmountParse.error) {
+					setTouchedAmount(true);
+					return;
+				}
+
+				if (owner === null) {
+					toast.error("Could not determine who should own this deal.");
+					return;
+				}
+
+				create.mutate({
+					name: nextName,
+					companyId,
+					ownerId: owner,
+					amountCents: nextAmountParse.cents,
+					expectedCloseDate: closeDate || null,
+				});
+			}}
 		>
-			<Field className="sm:col-span-2">
-				<FieldLabel htmlFor={nameId}>Name</FieldLabel>
+			<Field>
+				<FieldLabel htmlFor={nameId}>Deal name</FieldLabel>
 				<Input
 					id={nameId}
 					autoFocus
 					value={name}
-					onChange={(event) => setName(event.target.value)}
-					placeholder={`${companyName} — Vault Zero`}
+					disabled={create.isPending}
 					autoComplete="off"
+					onBlur={() => setTouchedName(true)}
+					onChange={(event) => {
+						setName(event.target.value);
+						if (touchedName) {
+							setTouchedName(false);
+						}
+					}}
 				/>
+				{touchedName && nextName === "" ? (
+					<p className="text-destructive text-xs">Deal name is required.</p>
+				) : null}
 			</Field>
 			<Field>
 				<FieldLabel htmlFor={amountId}>Amount</FieldLabel>
 				<Input
 					id={amountId}
 					value={amount}
-					onChange={(event) => setAmount(event.target.value)}
-					placeholder="24000"
+					disabled={create.isPending}
 					autoComplete="off"
+					onBlur={() => setTouchedAmount(true)}
+					onChange={(event) => {
+						setAmount(event.target.value);
+						if (touchedAmount) {
+							setTouchedAmount(false);
+						}
+					}}
+					placeholder="25000"
 				/>
+				{amountError ? (
+					<p className="text-destructive text-xs">{amountError}</p>
+				) : null}
 			</Field>
 			<Field>
-				<FieldLabel htmlFor={closeId}>Expected close</FieldLabel>
-				<DatePicker
-					id={closeId}
-					value={closeDate}
-					onChange={setCloseDate}
-					placeholder="No date yet"
-				/>
+				<FieldLabel htmlFor={closeId}>Close date</FieldLabel>
+					<DatePicker
+						id={closeId}
+						value={closeDate || null}
+						onChange={(next) => setCloseDate(next)}
+						placeholder="Optional"
+					/>
 			</Field>
 		</QuickAddForm>
 	);

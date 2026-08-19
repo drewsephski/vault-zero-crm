@@ -373,6 +373,8 @@ export function CompaniesTable() {
 			}
 			getRowId={(row) => row.id}
 			loading={companies.isFetching}
+			error={companies.error?.message ?? null}
+			onRetry={() => void companies.refetch()}
 			onRowHover={(row) => prefetchRecord({ kind: "company", id: row.id })}
 			onRowClick={(row) => openRecord({ kind: "company", id: row.id })}
 			empty={`No ${labels.companiesLower} match this view.`}

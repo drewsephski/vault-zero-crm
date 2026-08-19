@@ -222,6 +222,8 @@ export function OutreachTable() {
 			facets={facets}
 			getRowId={(row) => row.id}
 			loading={outreach.isFetching}
+			error={outreach.error?.message ?? null}
+			onRetry={() => void outreach.refetch()}
 			onRowClick={(row) => {
 				if (row.contact) openRecord({ kind: "contact", id: row.contact.id });
 				else if (row.company)

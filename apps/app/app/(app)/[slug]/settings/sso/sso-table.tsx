@@ -159,6 +159,8 @@ export function SsoTable() {
 			total={providers.data?.total ?? 0}
 			getRowId={(row) => row.providerId}
 			loading={providers.isFetching}
+			error={providers.error?.message ?? null}
+			onRetry={() => void providers.refetch()}
 			empty="No identity provider yet — everyone signs in with Google."
 		/>
 	);

@@ -201,6 +201,8 @@ export function DealsTable() {
 			}}
 			getRowId={(row) => row.id}
 			loading={deals.isFetching}
+			error={deals.error?.message ?? null}
+			onRetry={() => void deals.refetch()}
 			onRowHover={(row) => prefetchRecord({ kind: "deal", id: row.id })}
 			onRowClick={(row) => openRecord({ kind: "deal", id: row.id })}
 			empty={`No ${labels.dealsLower} match this view.`}

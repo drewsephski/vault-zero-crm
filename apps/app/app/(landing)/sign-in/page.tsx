@@ -6,13 +6,14 @@ import { getSession } from "@/lib/session";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { EmailPasswordAuth } from "./email-password-auth";
 import { GoogleSignIn } from "./google-sign-in";
+import { MicrosoftSignIn } from "./microsoft-sign-in";
 import { type SsoProvider, SsoSignIn } from "./sso-sign-in";
 
 export const metadata: Metadata = {
 	title: "Sign in",
 };
 
-type SignInOptions = { google: boolean; providers: SsoProvider[] };
+type SignInOptions = { google: boolean; microsoft: boolean; providers: SsoProvider[] };
 
 async function signInOptions(): Promise<SignInOptions | null> {
 	try {
@@ -61,13 +62,19 @@ async function SignIn({
 	}
 
 	const google = options?.google ?? true;
+	const microsoft = options?.microsoft ?? true;
 	const providers = options?.providers ?? [];
 
 	const insistOnGoogle = method === "google" && google;
-	const showSso = providers.length > 0 && !insistOnGoogle;
+	const insistOnMicrosoft = method === "microsoft" && microsoft;
+	const showSso =
+		providers.length > 0 && !insistOnGoogle && !insistOnMicrosoft;
 	const showGoogle = google && (providers.length === 0 || insistOnGoogle);
+	const showMicrosoft =
+		microsoft && (providers.length === 0 || insistOnMicrosoft);
 	const showEmailPassword = true;
-	const showOnlyEmailPassword = showEmailPassword && !showSso && !showGoogle;
+	const showOnlyEmailPassword =
+		showEmailPassword && !showSso && !showGoogle && !showMicrosoft;
 
 	return (
 		<>
@@ -77,13 +84,14 @@ async function SignIn({
 			/>
 			{showOnlyEmailPassword ? (
 				<p className="text-sm text-muted-foreground">
-					This install currently has no Google or identity-provider sign-in configured.
+					This install currently has no Google, Microsoft, or identity-provider sign-in configured.
 				</p>
 			) : null}
 			<EmailPasswordAuth />
 
 			{showSso ? <SsoSignIn providers={providers} /> : null}
 			{showGoogle ? <GoogleSignIn /> : null}
+			{showMicrosoft ? <MicrosoftSignIn /> : null}
 		</>
 	);
 }

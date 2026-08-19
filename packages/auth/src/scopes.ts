@@ -1,4 +1,5 @@
 export const GOOGLE_PROVIDER_ID = "google";
+export const MICROSOFT_PROVIDER_ID = "microsoft";
 
 export const IDENTITY_SCOPES = ["openid", "email", "profile"] as const;
 

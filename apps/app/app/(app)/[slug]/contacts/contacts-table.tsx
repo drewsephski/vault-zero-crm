@@ -209,6 +209,8 @@ export function ContactsTable() {
 			}
 			getRowId={(row) => row.id}
 			loading={contacts.isFetching}
+			error={contacts.error?.message ?? null}
+			onRetry={() => void contacts.refetch()}
 			onRowHover={(row) => prefetchRecord({ kind: "contact", id: row.id })}
 			onRowClick={(row) => openRecord({ kind: "contact", id: row.id })}
 			empty="No contacts match this view."

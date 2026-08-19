@@ -180,6 +180,8 @@ export function MembersTable() {
 			facets={facets}
 			getRowId={(row) => row.id}
 			loading={members.isFetching}
+			error={members.error?.message ?? null}
+			onRetry={() => void members.refetch()}
 			empty="Nobody matches this view."
 		/>
 	);
