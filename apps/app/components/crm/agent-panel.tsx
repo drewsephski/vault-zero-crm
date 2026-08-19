@@ -524,7 +524,7 @@ function Idle({
 				<EmptyDescription>{copy.blurb}</EmptyDescription>
 			</EmptyHeader>
 
-			<EmptyContent layout={density === "compact" ? "stack" : "grid"}>
+			<EmptyContent layout={density === "compact" ? "gridCompact" : "grid"}>
 				{copy.suggestions.map((suggestion) => (
 					<Button
 						key={suggestion}
