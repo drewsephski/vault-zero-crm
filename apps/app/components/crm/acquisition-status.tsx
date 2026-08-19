@@ -1,18 +1,14 @@
 import { type AcquisitionFit, AcquisitionStage } from "@crm/db/enums";
 import {
+	TARGET_LIFECYCLE_STAGES,
+	type TargetLifecycleStage,
+} from "@crm/db/acquisition";
+import {
 	StatusIndicator,
 	type StatusTone,
 } from "@crm/ui/components/status-indicator";
 
-export const TARGET_LIFECYCLE_STAGES = [
-	AcquisitionStage.DISCOVERED,
-	AcquisitionStage.QUALIFIED,
-	AcquisitionStage.WATCHLIST,
-	AcquisitionStage.REJECTED,
-	AcquisitionStage.ACQUIRED,
-] as const;
-
-export type TargetLifecycleStage = (typeof TARGET_LIFECYCLE_STAGES)[number];
+export { TARGET_LIFECYCLE_STAGES, type TargetLifecycleStage };
 
 export const ACQUISITION_STAGES = TARGET_LIFECYCLE_STAGES;
 

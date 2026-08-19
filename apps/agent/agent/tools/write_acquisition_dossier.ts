@@ -1,6 +1,5 @@
 import {
 	AcquisitionFit,
-	AcquisitionStage,
 	ActivityType,
 	db,
 	getOrganizationId,
@@ -9,6 +8,7 @@ import {
 import {
 	expectedAcquisitionCriterionIds,
 	isAcquisitionEvidenceUrl,
+	TARGET_LIFECYCLE_STAGES,
 } from "@crm/db/acquisition";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
@@ -45,15 +45,7 @@ export default defineTool({
 		concerns: z.array(finding).max(8),
 		missingInformation: z.array(z.string().trim().min(3).max(240)).max(12),
 		recommendedAction: z.string().trim().min(5).max(500),
-		recommendedStage: z
-			.enum([
-				AcquisitionStage.DISCOVERED,
-				AcquisitionStage.QUALIFIED,
-				AcquisitionStage.WATCHLIST,
-				AcquisitionStage.REJECTED,
-				AcquisitionStage.ACQUIRED,
-			])
-			.nullable(),
+		recommendedStage: z.enum(TARGET_LIFECYCLE_STAGES).nullable(),
 	}),
 	async execute(input, ctx) {
 		const [company, profile] = await Promise.all([

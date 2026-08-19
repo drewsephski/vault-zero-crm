@@ -12,6 +12,7 @@ describe("proposeAcquisitionCandidates", () => {
 		const domain = `propose-revive-${crypto.randomUUID()}.test`;
 		const candidate = await db.acquisitionCandidate.create({
 			data: {
+				organizationId: WORKSPACE_ID,
 				name: "Propose Revive",
 				domain,
 				website: `https://${domain}`,

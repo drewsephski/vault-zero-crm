@@ -1,7 +1,10 @@
 "use client";
 
 import Partnership from "@carbon/icons-react/es/Partnership";
-import type { AcquisitionCriterionAssessment } from "@crm/db/acquisition";
+import {
+	type AcquisitionCriterionAssessment,
+	isTargetLifecycleStage,
+} from "@crm/db/acquisition";
 import type { AcquisitionStage } from "@crm/db/enums";
 import {
 	Alert,
@@ -50,6 +53,7 @@ import {
 } from "@/components/detail-sheet";
 import {
 	acquisitionCriterionLabel,
+	acquisitionProfileDossierReady,
 	criterionGroups,
 	safeAcquisitionEvidence,
 	targetResearchCopy,
@@ -140,8 +144,7 @@ export function AcquisitionDossier({
 	if (!target) return null;
 
 	const buyBoxReady = acquisitionProfile.data
-		? acquisitionProfile.data.preferredIndustries.length > 0 ||
-			acquisitionProfile.data.geographies.length > 0
+		? acquisitionProfileDossierReady(acquisitionProfile.data)
 		: null;
 	const readinessState = !company.domain
 		? ({ status: "blocked", blocker: "missing-domain" } as const)
@@ -154,7 +157,9 @@ export function AcquisitionDossier({
 		: null;
 	const groups = criterionGroups(target.criteria);
 	const pendingStageRecommendation =
-		target.recommendedStage && target.recommendedStage !== target.stage
+		target.recommendedStage &&
+		target.recommendedStage !== target.stage &&
+		isTargetLifecycleStage(target.recommendedStage)
 			? target.recommendedStage
 			: null;
 	const recommendationPending =

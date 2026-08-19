@@ -1,4 +1,5 @@
 import { AcquisitionStage } from "@crm/db";
+import { TARGET_LIFECYCLE_STAGES } from "@crm/db/acquisition";
 import { z } from "zod";
 import { companyCreateInput } from "../companies/companies.contracts";
 
@@ -34,13 +35,7 @@ export const acquisitionCandidateIdInput = z.object({ id: z.string().min(1) });
 
 export const updateAcquisitionTargetInput = z.object({
 	companyId: z.string().min(1),
-	stage: z.enum([
-		AcquisitionStage.DISCOVERED,
-		AcquisitionStage.QUALIFIED,
-		AcquisitionStage.WATCHLIST,
-		AcquisitionStage.REJECTED,
-		AcquisitionStage.ACQUIRED,
-	]),
+	stage: z.enum(TARGET_LIFECYCLE_STAGES),
 });
 
 export const acquisitionCompanyIdInput = z.object({

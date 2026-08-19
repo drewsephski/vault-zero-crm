@@ -1234,7 +1234,7 @@ describe("acquisition candidate review", () => {
 
 		await expect(
 			companies.research("unfocused-target", "reviewer-1"),
-		).rejects.toThrow("Add at least one preferred industry or geography");
+		).rejects.toThrow("Complete at least one buy-box criterion");
 		expect(requested).toBe(false);
 	});
 });

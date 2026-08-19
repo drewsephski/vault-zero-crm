@@ -31,6 +31,24 @@ export const ACQUISITION_TASK_INTERVAL_MS = {
 	"acquisition-refresh": 30 * 24 * 60 * 60 * 1000,
 } as const;
 
+export const TARGET_LIFECYCLE_STAGES = [
+	AcquisitionStage.DISCOVERED,
+	AcquisitionStage.QUALIFIED,
+	AcquisitionStage.WATCHLIST,
+	AcquisitionStage.REJECTED,
+	AcquisitionStage.ACQUIRED,
+] as const;
+
+export type TargetLifecycleStage = (typeof TARGET_LIFECYCLE_STAGES)[number];
+
+const TARGET_LIFECYCLE_STAGE_SET = new Set<AcquisitionStage>(
+	TARGET_LIFECYCLE_STAGES,
+);
+
+export function isTargetLifecycleStage(stage: AcquisitionStage): boolean {
+	return TARGET_LIFECYCLE_STAGE_SET.has(stage);
+}
+
 export const ACTIVE_ACQUISITION_STAGES = [
 	AcquisitionStage.DISCOVERED,
 	AcquisitionStage.QUALIFIED,

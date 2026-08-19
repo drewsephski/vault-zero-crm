@@ -44,11 +44,11 @@ export async function proposeAcquisitionCandidates(
 			select: { buyBoxRevision: true },
 		}),
 		db.company.findMany({
-			where: { domain: { in: domains } },
+			where: { organizationId, domain: { in: domains } },
 			select: { domain: true },
 		}),
 		db.acquisitionCandidate.findMany({
-			where: { domain: { in: domains } },
+			where: { organizationId, domain: { in: domains } },
 			select: {
 				id: true,
 				domain: true,

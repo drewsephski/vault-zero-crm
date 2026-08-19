@@ -7,7 +7,7 @@ import {
 	type Prisma,
 	WorkspaceMode,
 } from "@crm/db";
-import { ACTIVE_ACQUISITION_STAGES } from "@crm/db/acquisition";
+import { ACTIVE_ACQUISITION_STAGES, TARGET_LIFECYCLE_STAGES } from "@crm/db/acquisition";
 import { runInOrganization } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
@@ -148,14 +148,31 @@ describe("acquisition operating contracts", () => {
 		).toBe(false);
 	});
 
-	it("accepts every acquisition lifecycle stage", () => {
-		for (const stage of Object.values(AcquisitionStage)) {
+	it("accepts every supported target lifecycle stage", () => {
+		for (const stage of TARGET_LIFECYCLE_STAGES) {
 			expect(
 				updateAcquisitionTargetInput.safeParse({
 					companyId: "company-1",
 					stage,
 				}).success,
 			).toBe(true);
+		}
+	});
+
+	it("rejects legacy transaction lifecycle stages on targets", () => {
+		for (const stage of [
+			AcquisitionStage.RESEARCHING,
+			AcquisitionStage.CONTACTED,
+			AcquisitionStage.INTERESTED,
+			AcquisitionStage.OPPORTUNITY,
+			AcquisitionStage.DILIGENCE,
+		]) {
+			expect(
+				updateAcquisitionTargetInput.safeParse({
+					companyId: "company-1",
+					stage,
+				}).success,
+			).toBe(false);
 		}
 	});
 

@@ -9,7 +9,7 @@ import {
 	type Prisma,
 	RecordSource,
 } from "@crm/db";
-import { isDossierReady } from "@crm/db/acquisition";
+import { isDossierReady, isTargetLifecycleStage } from "@crm/db/acquisition";
 import { getOrganizationId } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
@@ -344,7 +344,11 @@ export class AcquisitionService {
 		const buyBoxRevision = profile?.buyBoxRevision ?? 0;
 
 		const result = await this.db.acquisitionCandidate.updateMany({
-			where: { id, status: AcquisitionCandidateStatus.PROPOSED },
+			where: {
+				id,
+				organizationId,
+				status: AcquisitionCandidateStatus.PROPOSED,
+			},
 			data: {
 				status: AcquisitionCandidateStatus.DISMISSED,
 				dismissedAt: new Date(),
@@ -475,6 +479,11 @@ export class AcquisitionService {
 			const recommended = target.recommendedStage;
 			if (!recommended) {
 				throw new BadRequestException("No stage recommendation is pending.");
+			}
+			if (!isTargetLifecycleStage(recommended)) {
+				throw new BadRequestException(
+					"This stage recommendation is no longer supported. Dismiss it and set the lifecycle manually.",
+				);
 			}
 
 			const previousStage = target.stage;
@@ -715,10 +724,12 @@ export class AcquisitionService {
 			);
 		}
 
+		const organizationId = getOrganizationId() ?? WORKSPACE_ID;
 		const stage = input.stage ?? AcquisitionEngagementStage.OUTREACH;
 		const engagement = await this.db.$transaction(async (tx) => {
 			const created = await tx.acquisitionEngagement.create({
 				data: {
+					organizationId,
 					companyId: input.companyId,
 					ownerId: actingUserId,
 					stage,
@@ -743,8 +754,10 @@ export class AcquisitionService {
 	}
 
 	async listEngagements(input: ListAcquisitionEngagementsInput) {
+		const organizationId = getOrganizationId() ?? WORKSPACE_ID;
 		const rows = await this.db.acquisitionEngagement.findMany({
 			where: {
+				organizationId,
 				...(input.companyId ? { companyId: input.companyId } : {}),
 				...(input.status ? { status: input.status } : {}),
 			},

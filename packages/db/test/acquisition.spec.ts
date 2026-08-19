@@ -4,7 +4,9 @@ import {
 	expectedAcquisitionCriterionIds,
 	isDiscoveryReady,
 	isDossierReady,
+	isTargetLifecycleStage,
 	acquisitionAttentionScore,
+	TARGET_LIFECYCLE_STAGES,
 	targetStages,
 } from "../src/acquisition";
 import { AcquisitionFit, AcquisitionStage } from "@crm/db/enums";
@@ -111,6 +113,18 @@ describe("acquisition domain", () => {
 		expect(targetStages("rejected")).toEqual([AcquisitionStage.REJECTED]);
 		expect(targetStages("acquired")).toEqual([AcquisitionStage.ACQUIRED]);
 		expect(targetStages("history")).toBeNull();
+	});
+
+	it("defines supported target lifecycle stages", () => {
+		expect(TARGET_LIFECYCLE_STAGES).toEqual([
+			AcquisitionStage.DISCOVERED,
+			AcquisitionStage.QUALIFIED,
+			AcquisitionStage.WATCHLIST,
+			AcquisitionStage.REJECTED,
+			AcquisitionStage.ACQUIRED,
+		]);
+		expect(isTargetLifecycleStage(AcquisitionStage.RESEARCHING)).toBe(false);
+		expect(isTargetLifecycleStage(AcquisitionStage.QUALIFIED)).toBe(true);
 	});
 
 	it("scores attention from fit, blockers, staleness, tasks, and engagement", () => {

@@ -1,6 +1,7 @@
 import {
 	type AcquisitionCriterionAssessment,
 	isAcquisitionEvidenceUrl,
+	isDossierReady,
 } from "@crm/db/acquisition";
 import type { StatusTone } from "@crm/ui/components/status-indicator";
 
@@ -84,6 +85,44 @@ export function criterionGroups<T extends AcquisitionCriterionAssessment>(
 	}
 
 	return { blockers, assessments, unknowns };
+}
+
+export type AcquisitionProfileDossierFields = {
+	preferredIndustries: readonly string[];
+	geographies: readonly string[];
+	excludedCategories: readonly string[];
+	revenueMinCents: number | null;
+	revenueMaxCents: number | null;
+	ebitdaMinCents: number | null;
+	ebitdaMaxCents: number | null;
+	purchasePriceMinCents: number | null;
+	purchasePriceMaxCents: number | null;
+	ownerInvolvement: unknown | null;
+	recurringRevenuePreference: unknown | null;
+	customerConcentrationMax: number | null;
+	assetPreference: unknown | null;
+	financingAssumptions: string | null;
+};
+
+export function acquisitionProfileDossierReady(
+	profile: AcquisitionProfileDossierFields,
+): boolean {
+	return isDossierReady({
+		preferredIndustries: profile.preferredIndustries,
+		geographies: profile.geographies,
+		excludedCategories: profile.excludedCategories,
+		revenueMin: profile.revenueMinCents,
+		revenueMax: profile.revenueMaxCents,
+		ebitdaMin: profile.ebitdaMinCents,
+		ebitdaMax: profile.ebitdaMaxCents,
+		purchasePriceMin: profile.purchasePriceMinCents,
+		purchasePriceMax: profile.purchasePriceMaxCents,
+		ownerInvolvement: profile.ownerInvolvement,
+		recurringRevenuePreference: profile.recurringRevenuePreference,
+		customerConcentrationMax: profile.customerConcentrationMax,
+		assetPreference: profile.assetPreference,
+		financingAssumptions: profile.financingAssumptions,
+	});
 }
 
 type TargetResearchState =
