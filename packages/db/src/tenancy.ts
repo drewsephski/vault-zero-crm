@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { PrismaClient } from "./generated/prisma/client";
+import { WORKSPACE_ID } from "./workspace";
 
 const storage = new AsyncLocalStorage<string>();
 
@@ -45,7 +46,7 @@ function assertTenantScope(
 
 	const scoped = TENANT_MODELS.has(model) || PROFILE_MODELS.has(model);
 	if (!scoped) return undefined;
-	if (process.env.NODE_ENV === "test") return undefined;
+	if (process.env.NODE_ENV === "test") return WORKSPACE_ID;
 
 	throw new Error(
 		`Refusing ${operation} on ${model} without a workspace scope.`,
