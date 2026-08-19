@@ -702,7 +702,9 @@ function Question({
 			<AgentAvatar />
 			<MessageContent>
 				<Bubble variant="tinted">
-					<BubbleContent>{question.prompt}</BubbleContent>
+					<BubbleContent>
+						<Markdown>{question.prompt}</Markdown>
+					</BubbleContent>
 				</Bubble>
 
 				{freeform ? (
@@ -805,7 +807,9 @@ function LinkedInFallback({
 			<AgentAvatar />
 			<MessageContent>
 				<Bubble variant="tinted">
-					<BubbleContent>{fallback.prompt}</BubbleContent>
+					<BubbleContent>
+						<Markdown>{fallback.prompt}</Markdown>
+					</BubbleContent>
 				</Bubble>
 
 				<form className="space-y-2" onSubmit={submit}>
