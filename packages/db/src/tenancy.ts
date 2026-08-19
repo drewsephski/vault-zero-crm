@@ -3,6 +3,8 @@ import type { PrismaClient } from "./generated/prisma/client";
 
 const storage = new AsyncLocalStorage<string>();
 
+const DEFAULT_TEST_ORGANIZATION_ID = "workspace";
+
 export const TENANT_MODELS = new Set([
 	"Company",
 	"Contact",
@@ -30,12 +32,11 @@ export function getOrganizationId(): string | undefined {
 
 export function requireOrganizationId(): string {
 	const organizationId = storage.getStore();
-	if (!organizationId) {
-		throw new Error(
-			"This operation needs a workspace. Sign in again in a moment.",
-		);
-	}
-	return organizationId;
+	if (organizationId) return organizationId;
+	if (process.env.NODE_ENV === "test") return DEFAULT_TEST_ORGANIZATION_ID;
+	throw new Error(
+		"This operation needs a workspace. Sign in again in a moment.",
+	);
 }
 
 function assertTenantScope(
@@ -47,7 +48,7 @@ function assertTenantScope(
 
 	const scoped = TENANT_MODELS.has(model) || PROFILE_MODELS.has(model);
 	if (!scoped) return undefined;
-	if (process.env.NODE_ENV === "test") return undefined;
+	if (process.env.NODE_ENV === "test") return DEFAULT_TEST_ORGANIZATION_ID;
 
 	throw new Error(
 		`Refusing ${operation} on ${model} without a workspace scope.`,

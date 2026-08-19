@@ -1269,6 +1269,18 @@ describe("acquisition candidate review", () => {
 						mode: WorkspaceMode.ACQUISITION,
 						preferredIndustries: [],
 						geographies: [],
+						excludedCategories: [],
+						revenueMin: null,
+						revenueMax: null,
+						ebitdaMin: null,
+						ebitdaMax: null,
+						purchasePriceMin: null,
+						purchasePriceMax: null,
+						ownerInvolvement: null,
+						recurringRevenuePreference: null,
+						customerConcentrationMax: null,
+						assetPreference: null,
+						financingAssumptions: null,
 					}),
 				},
 			} as never,
@@ -1445,9 +1457,9 @@ describe("eve recommendations and acquisition engagements", () => {
 
 		const listed = await acquisition.listEngagements({
 			companyId: company.id,
-			status: AcquisitionEngagementStatus.ACTIVE,
+			status: "active",
 		});
-		expect(listed).toHaveLength(1);
+		expect(listed.rows).toHaveLength(1);
 
 		const updated = await acquisition.updateEngagementStage(
 			{
@@ -1699,8 +1711,11 @@ describe("eve recommendations and acquisition engagements", () => {
 			expect(second.id).not.toBe(first.id);
 			expect(second.status).toBe(AcquisitionEngagementStatus.ACTIVE);
 
-			const rows = await acquisition.listEngagements({ companyId: company.id });
-			expect(rows).toHaveLength(2);
+			const rows = await acquisition.listEngagements({
+				companyId: company.id,
+				status: "all",
+			});
+			expect(rows.rows).toHaveLength(2);
 		});
 	}
 
@@ -1846,10 +1861,10 @@ describe("eve recommendations and acquisition engagements", () => {
 			});
 
 			const listed = await service().listEngagements({
-				status: AcquisitionEngagementStatus.ACTIVE,
+				status: "active",
 			});
 			expect(
-				listed.some((engagement) => engagement.companyId === isolatedCompanyId),
+				listed.rows.some((engagement) => engagement.companyId === isolatedCompanyId),
 			).toBe(false);
 		} finally {
 			await db.company.deleteMany({ where: { domain: isolatedDomain } });
