@@ -438,8 +438,8 @@ model AcquisitionEngagement {
   organization   Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   companyId      String
   company        Company                     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  ownerId        String
-  owner          User                        @relation("AcquisitionEngagementOwner", fields: [ownerId], references: [id])
+  ownerId        String?
+  owner          User?                       @relation("AcquisitionEngagementOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   stage          AcquisitionEngagementStage  @default(OUTREACH)
   status         AcquisitionEngagementStatus @default(ACTIVE)
   stageChangedAt DateTime                    @default(now())

@@ -7,6 +7,7 @@ import { z } from "zod";
 export const createAcquisitionEngagementInput = z.object({
 	companyId: z.string().min(1),
 	idempotencyKey: z.string().uuid(),
+	ownerId: z.string().min(1).optional(),
 	stage: z
 		.enum([
 			AcquisitionEngagementStage.OUTREACH,

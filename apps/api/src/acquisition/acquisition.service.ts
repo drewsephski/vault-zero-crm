@@ -6,7 +6,8 @@ import {
 	AcquisitionStage,
 	ActivityType,
 	type Db,
-	type Prisma,
+	Prisma,
+	type Prisma as PrismaNamespace,
 	RecordSource,
 } from "@crm/db";
 import { isDossierReady, isTargetLifecycleStage } from "@crm/db/acquisition";
@@ -33,6 +34,15 @@ import type {
 	ListAcquisitionEngagementsInput,
 	UpdateAcquisitionEngagementStageInput,
 } from "./acquisition-engagements.contracts";
+
+const ACTIVE_ENGAGEMENT_CONFLICT =
+	"This target already has an active acquisition opportunity.";
+const IDEMPOTENCY_CONTEXT_CONFLICT =
+	"This request id has already been used for another opportunity.";
+const TERMINAL_ENGAGEMENT_CONFLICT =
+	"This acquisition opportunity is closed and cannot be moved to another stage.";
+const TARGET_REQUIRED_CONFLICT =
+	"Add this company to Targets before opening an acquisition opportunity.";
 
 const TERMINAL_ENGAGEMENT_STAGES = new Set<AcquisitionEngagementStage>([
 	AcquisitionEngagementStage.ACQUIRED,
@@ -690,25 +700,33 @@ export class AcquisitionService {
 		input: CreateAcquisitionEngagementInput,
 		actingUserId: string,
 	) {
+		const organizationId = getOrganizationId() ?? WORKSPACE_ID;
 		const prior = await this.db.acquisitionEngagementCreateRequest.findUnique({
 			where: { idempotencyKey: input.idempotencyKey },
 			select: { engagementId: true },
 		});
 		if (prior) {
-			return this.serializeEngagement(
-				await this.db.acquisitionEngagement.findUniqueOrThrow({
-					where: { id: prior.engagementId },
-					select: ENGAGEMENT_SELECT,
-				}),
+			return this.loadIdempotentEngagement(
+				prior.engagementId,
+				organizationId,
+				input.companyId,
 			);
 		}
 
 		const company = await this.db.company.findUnique({
 			where: { id: input.companyId },
-			select: { id: true, name: true },
+			select: {
+				id: true,
+				name: true,
+				ownerId: true,
+				acquisitionTarget: { select: { companyId: true } },
+			},
 		});
 		if (!company) {
 			throw new NotFoundException("That company no longer exists.");
+		}
+		if (!company.acquisitionTarget) {
+			throw new BadRequestException(TARGET_REQUIRED_CONFLICT);
 		}
 
 		const active = await this.db.acquisitionEngagement.findFirst({
@@ -719,38 +737,48 @@ export class AcquisitionService {
 			select: { id: true },
 		});
 		if (active) {
-			throw new ConflictException(
-				"This company already has an active acquisition engagement.",
-			);
+			throw new ConflictException(ACTIVE_ENGAGEMENT_CONFLICT);
 		}
 
-		const organizationId = getOrganizationId() ?? WORKSPACE_ID;
+		const ownerId = await this.resolveEngagementOwner(
+			input.ownerId,
+			company.ownerId,
+			actingUserId,
+			organizationId,
+		);
 		const stage = input.stage ?? AcquisitionEngagementStage.OUTREACH;
-		const engagement = await this.db.$transaction(async (tx) => {
-			const created = await tx.acquisitionEngagement.create({
-				data: {
-					organizationId,
-					companyId: input.companyId,
-					ownerId: actingUserId,
-					stage,
-					status: AcquisitionEngagementStatus.ACTIVE,
-					createRequest: { create: { idempotencyKey: input.idempotencyKey } },
-				},
-				select: ENGAGEMENT_SELECT,
-			});
-			await tx.activity.create({
-				data: {
-					type: ActivityType.STAGE_CHANGE,
-					subject: `Opened acquisition engagement for ${company.name}`,
-					companyId: input.companyId,
-					engagementId: created.id,
-					createdById: actingUserId,
-				},
-			});
-			return created;
-		});
 
-		return this.serializeEngagement(engagement);
+		try {
+			const engagement = await this.db.$transaction(async (tx) => {
+				const created = await tx.acquisitionEngagement.create({
+					data: {
+						organizationId,
+						companyId: input.companyId,
+						ownerId,
+						stage,
+						status: AcquisitionEngagementStatus.ACTIVE,
+						createRequest: {
+							create: { idempotencyKey: input.idempotencyKey },
+						},
+					},
+					select: ENGAGEMENT_SELECT,
+				});
+				await tx.activity.create({
+					data: {
+						type: ActivityType.STAGE_CHANGE,
+						subject: `Opened acquisition engagement for ${company.name}`,
+						companyId: input.companyId,
+						engagementId: created.id,
+						createdById: actingUserId,
+					},
+				});
+				return created;
+			});
+
+			return this.serializeEngagement(engagement);
+		} catch (error) {
+			return this.recoverCreateEngagement(error, input, organizationId);
+		}
 	}
 
 	async listEngagements(input: ListAcquisitionEngagementsInput) {
@@ -784,6 +812,9 @@ export class AcquisitionService {
 		if (!engagement) {
 			throw new NotFoundException("That engagement no longer exists.");
 		}
+		if (engagement.status === AcquisitionEngagementStatus.TERMINAL) {
+			throw new BadRequestException(TERMINAL_ENGAGEMENT_CONFLICT);
+		}
 
 		const terminal = TERMINAL_ENGAGEMENT_STAGES.has(input.stage);
 		const updated = await this.db.$transaction(async (tx) => {
@@ -816,6 +847,78 @@ export class AcquisitionService {
 		return this.serializeEngagement(updated);
 	}
 
+	private async loadIdempotentEngagement(
+		engagementId: string,
+		organizationId: string,
+		companyId: string,
+	) {
+		const engagement = await this.db.acquisitionEngagement.findUnique({
+			where: { id: engagementId },
+			select: { ...ENGAGEMENT_SELECT, organizationId: true },
+		});
+		if (!engagement) {
+			throw new BadRequestException(IDEMPOTENCY_CONTEXT_CONFLICT);
+		}
+		if (
+			engagement.organizationId !== organizationId ||
+			engagement.companyId !== companyId
+		) {
+			throw new BadRequestException(IDEMPOTENCY_CONTEXT_CONFLICT);
+		}
+		const { organizationId: _organizationId, ...row } = engagement;
+		return this.serializeEngagement(row);
+	}
+
+	private async resolveEngagementOwner(
+		explicitOwnerId: string | undefined,
+		companyOwnerId: string | null,
+		actingUserId: string,
+		organizationId: string,
+	): Promise<string | null> {
+		if (explicitOwnerId !== undefined) {
+			const member = await this.db.member.findFirst({
+				where: { organizationId, userId: explicitOwnerId },
+				select: { id: true },
+			});
+			if (!member) {
+				throw new BadRequestException("That owner is not in this workspace.");
+			}
+			return explicitOwnerId;
+		}
+		if (companyOwnerId) return companyOwnerId;
+		return actingUserId;
+	}
+
+	private async recoverCreateEngagement(
+		error: unknown,
+		input: CreateAcquisitionEngagementInput,
+		organizationId: string,
+	) {
+		if (!isPrismaUniqueViolation(error)) throw error;
+
+		if (isIdempotencyKeyViolation(error)) {
+			const prior = await this.db.acquisitionEngagementCreateRequest.findUnique(
+				{
+					where: { idempotencyKey: input.idempotencyKey },
+					select: { engagementId: true },
+				},
+			);
+			if (prior) {
+				return this.loadIdempotentEngagement(
+					prior.engagementId,
+					organizationId,
+					input.companyId,
+				);
+			}
+		}
+
+		if (isActiveEngagementViolation(error)) {
+			throw new ConflictException(ACTIVE_ENGAGEMENT_CONFLICT);
+		}
+
+		throw error;
+	}
+
 	private serializeEngagement(row: EngagementRow) {
 		return {
 			...row,
@@ -827,4 +930,41 @@ export class AcquisitionService {
 			updatedAt: row.updatedAt.toISOString(),
 		};
 	}
+}
+
+function isPrismaUniqueViolation(
+	error: unknown,
+): error is PrismaNamespace.PrismaClientKnownRequestError {
+	return (
+		error instanceof Prisma.PrismaClientKnownRequestError &&
+		error.code === "P2002"
+	);
+}
+
+function isIdempotencyKeyViolation(
+	error: PrismaNamespace.PrismaClientKnownRequestError,
+): boolean {
+	const target = error.meta?.target;
+	if (Array.isArray(target)) {
+		return target.includes("idempotencyKey");
+	}
+	return error.meta?.modelName === "AcquisitionEngagementCreateRequest";
+}
+
+function isActiveEngagementViolation(
+	error: PrismaNamespace.PrismaClientKnownRequestError,
+): boolean {
+	const constraint = error.meta?.constraint;
+	if (constraint === "acquisitionEngagement_one_active_per_company") {
+		return true;
+	}
+	const target = error.meta?.target;
+	if (Array.isArray(target)) {
+		return (
+			target.includes("organizationId") &&
+			target.includes("companyId") &&
+			!target.includes("idempotencyKey")
+		);
+	}
+	return error.meta?.modelName === "AcquisitionEngagement";
 }

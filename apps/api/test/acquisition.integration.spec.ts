@@ -21,6 +21,7 @@ import {
 } from "@crm/db";
 import type { AcquisitionCriterionAssessment } from "@crm/db/acquisition";
 import { proposeAcquisitionCandidates } from "@crm/db/acquisition-candidates";
+import { runInOrganization } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import { acquireCanonicalWorkspaceFixture } from "../../../packages/db/test/canonical-workspace-fixture";
 import { AcquisitionService } from "../src/acquisition/acquisition.service";
@@ -119,6 +120,58 @@ function companyService() {
 
 function service(agent = new AgentTriggerService(db)) {
 	return new AcquisitionService(db, companyService(), agent);
+}
+
+async function createEngagementTargetCompany(
+	domain: string,
+	ownerId?: string | null,
+) {
+	const company = await db.company.create({
+		data: {
+			name: "Engagement Target Company",
+			domain,
+			ownerId: ownerId ?? undefined,
+			acquisitionTarget: {
+				create: {
+					stage: AcquisitionStage.DISCOVERED,
+					strengths: [],
+					concerns: [],
+					missingInformation: [],
+					sourceUrls: [],
+				},
+			},
+		},
+	});
+	domains.push(domain);
+	companyIds.push(company.id);
+	return company;
+}
+
+async function ensureWorkspaceMember(
+	userId: string,
+	email: string,
+	name: string,
+) {
+	await db.user.upsert({
+		where: { id: userId },
+		create: { id: userId, name, email, emailVerified: true },
+		update: {},
+	});
+	await db.member.upsert({
+		where: {
+			organizationId_userId: {
+				organizationId: WORKSPACE_ID,
+				userId,
+			},
+		},
+		create: {
+			id: `member-${userId}`,
+			organizationId: WORKSPACE_ID,
+			userId,
+			createdAt: new Date(),
+		},
+		update: {},
+	});
 }
 
 const dossierACriteria: AcquisitionCriterionAssessment[] = [
@@ -954,11 +1007,9 @@ describe("acquisition candidate review", () => {
 			sourceUrl: `https://${domain}/services`,
 		};
 
-		const blocked = await proposeAcquisitionCandidates(
-			db,
-			WORKSPACE_ID,
-			[proposal],
-		);
+		const blocked = await proposeAcquisitionCandidates(db, WORKSPACE_ID, [
+			proposal,
+		]);
 		expect(blocked).toMatchObject({ saved: 0, revived: 0, skipped: 1 });
 
 		await db.acquisitionProfile.update({
@@ -1356,13 +1407,14 @@ describe("eve recommendations and acquisition engagements", () => {
 
 	it("creates engagements with idempotency and one active row per company", async () => {
 		const domain = `engagement-${crypto.randomUUID()}.test`;
-		domains.push(domain);
-		const company = await db.company.create({
-			data: { name: "Engagement Target", domain },
-		});
-		companyIds.push(company.id);
+		const company = await createEngagementTargetCompany(domain);
 		const idempotencyKey = crypto.randomUUID();
 		const acquisition = service();
+		await ensureWorkspaceMember(
+			"reviewer-1",
+			"reviewer-1@example.com",
+			"Reviewer",
+		);
 
 		const created = await acquisition.createEngagement(
 			{
@@ -1389,7 +1441,7 @@ describe("eve recommendations and acquisition engagements", () => {
 				{ companyId: company.id, idempotencyKey: crypto.randomUUID() },
 				"reviewer-1",
 			),
-		).rejects.toThrow("already has an active acquisition engagement");
+		).rejects.toThrow("already has an active acquisition opportunity");
 
 		const listed = await acquisition.listEngagements({
 			companyId: company.id,
@@ -1405,5 +1457,404 @@ describe("eve recommendations and acquisition engagements", () => {
 			"reviewer-1",
 		);
 		expect(updated.stage).toBe(AcquisitionEngagementStage.ENGAGED);
+	});
+
+	it("rejects engagement creation for a company without a target", async () => {
+		const domain = `no-target-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const company = await db.company.create({
+			data: { name: "Generic Company", domain },
+		});
+		companyIds.push(company.id);
+		await ensureWorkspaceMember(
+			"reviewer-1",
+			"reviewer-1@example.com",
+			"Reviewer",
+		);
+
+		await expect(
+			service().createEngagement(
+				{ companyId: company.id, idempotencyKey: crypto.randomUUID() },
+				"reviewer-1",
+			),
+		).rejects.toThrow(
+			"Add this company to Targets before opening an acquisition opportunity.",
+		);
+		expect(await db.acquisitionEngagement.count()).toBe(0);
+	});
+
+	it("resolves engagement owners from explicit, company, and acting user", async () => {
+		const suffix = crypto.randomUUID();
+		const actingUserId = `acting-${suffix}`;
+		const explicitOwnerId = `explicit-${suffix}`;
+		const companyOwnerId = `company-owner-${suffix}`;
+		await ensureWorkspaceMember(
+			actingUserId,
+			`acting-${suffix}@example.com`,
+			"Acting User",
+		);
+		await ensureWorkspaceMember(
+			explicitOwnerId,
+			`explicit-${suffix}@example.com`,
+			"Explicit Owner",
+		);
+		await ensureWorkspaceMember(
+			companyOwnerId,
+			`company-owner-${suffix}@example.com`,
+			"Company Owner",
+		);
+
+		const explicitCompany = await createEngagementTargetCompany(
+			`explicit-owner-${suffix}.test`,
+			companyOwnerId,
+		);
+		const explicit = await service().createEngagement(
+			{
+				companyId: explicitCompany.id,
+				idempotencyKey: crypto.randomUUID(),
+				ownerId: explicitOwnerId,
+			},
+			actingUserId,
+		);
+		expect(explicit.ownerId).toBe(explicitOwnerId);
+
+		const companyOwned = await createEngagementTargetCompany(
+			`company-owner-${suffix}.test`,
+			companyOwnerId,
+		);
+		const fromCompany = await service().createEngagement(
+			{
+				companyId: companyOwned.id,
+				idempotencyKey: crypto.randomUUID(),
+			},
+			actingUserId,
+		);
+		expect(fromCompany.ownerId).toBe(companyOwnerId);
+
+		const unassigned = await createEngagementTargetCompany(
+			`acting-owner-${suffix}.test`,
+			null,
+		);
+		const fromActing = await service().createEngagement(
+			{
+				companyId: unassigned.id,
+				idempotencyKey: crypto.randomUUID(),
+			},
+			actingUserId,
+		);
+		expect(fromActing.ownerId).toBe(actingUserId);
+
+		const outsideOwnerCompany = await createEngagementTargetCompany(
+			`outside-owner-${suffix}.test`,
+			null,
+		);
+		await expect(
+			service().createEngagement(
+				{
+					companyId: outsideOwnerCompany.id,
+					idempotencyKey: crypto.randomUUID(),
+					ownerId: `outside-${suffix}`,
+				},
+				actingUserId,
+			),
+		).rejects.toThrow("That owner is not in this workspace.");
+	});
+
+	it("rejects idempotent replay for a different company or workspace", async () => {
+		const suffix = crypto.randomUUID();
+		const actingUserId = `acting-${suffix}`;
+		await ensureWorkspaceMember(
+			actingUserId,
+			`acting-${suffix}@example.com`,
+			"Acting User",
+		);
+		const idempotencyKey = crypto.randomUUID();
+		const companyA = await createEngagementTargetCompany(
+			`idempotent-a-${suffix}.test`,
+		);
+		const companyB = await createEngagementTargetCompany(
+			`idempotent-b-${suffix}.test`,
+		);
+		const acquisition = service();
+		await acquisition.createEngagement(
+			{ companyId: companyA.id, idempotencyKey },
+			actingUserId,
+		);
+
+		await expect(
+			acquisition.createEngagement(
+				{ companyId: companyB.id, idempotencyKey },
+				actingUserId,
+			),
+		).rejects.toThrow(
+			"This request id has already been used for another opportunity.",
+		);
+
+		const isolatedOrgId = crypto.randomUUID();
+		const isolatedDomain = `isolated-idempotent-${suffix}.test`;
+		await db.organization.create({
+			data: {
+				id: isolatedOrgId,
+				name: "Isolated Engagement Org",
+				slug: `iso-eng-${suffix}`,
+				createdAt: new Date(),
+			},
+		});
+		await db.acquisitionProfile.create({
+			data: {
+				id: isolatedOrgId,
+				mode: WorkspaceMode.ACQUISITION,
+				preferredIndustries: ["Services"],
+				geographies: [],
+				excludedCategories: [],
+				currency: "USD",
+			},
+		});
+		try {
+			await runInOrganization(isolatedOrgId, async () => {
+				const isolatedCompany = await db.company.create({
+					data: {
+						name: "Isolated Engagement Target",
+						domain: isolatedDomain,
+						acquisitionTarget: {
+							create: {
+								stage: AcquisitionStage.QUALIFIED,
+								strengths: [],
+								concerns: [],
+								missingInformation: [],
+								sourceUrls: [],
+							},
+						},
+					},
+					select: { id: true },
+				});
+				await expect(
+					acquisition.createEngagement(
+						{
+							companyId: isolatedCompany.id,
+							idempotencyKey,
+						},
+						actingUserId,
+					),
+				).rejects.toThrow(
+					"This request id has already been used for another opportunity.",
+				);
+			});
+		} finally {
+			await db.company.deleteMany({ where: { domain: isolatedDomain } });
+			await db.acquisitionProfile.delete({ where: { id: isolatedOrgId } });
+			await db.organization.delete({ where: { id: isolatedOrgId } });
+		}
+	});
+
+	for (const terminalStage of [
+		AcquisitionEngagementStage.PASSED,
+		AcquisitionEngagementStage.ACQUIRED,
+	] as const) {
+		it(`keeps ${terminalStage} engagements terminal and allows a later pursuit`, async () => {
+			const suffix = crypto.randomUUID();
+			const actingUserId = `acting-${suffix}`;
+			await ensureWorkspaceMember(
+				actingUserId,
+				`acting-${suffix}@example.com`,
+				"Acting User",
+			);
+			const company = await createEngagementTargetCompany(
+				`terminal-${terminalStage.toLowerCase()}-${suffix}.test`,
+			);
+			const acquisition = service();
+			const first = await acquisition.createEngagement(
+				{
+					companyId: company.id,
+					idempotencyKey: crypto.randomUUID(),
+				},
+				actingUserId,
+			);
+			const closed = await acquisition.updateEngagementStage(
+				{ engagementId: first.id, stage: terminalStage },
+				actingUserId,
+			);
+			expect(closed.status).toBe(AcquisitionEngagementStatus.TERMINAL);
+			expect(closed.closedAt).not.toBeNull();
+
+			await expect(
+				acquisition.updateEngagementStage(
+					{
+						engagementId: first.id,
+						stage: AcquisitionEngagementStage.OUTREACH,
+					},
+					actingUserId,
+				),
+			).rejects.toThrow(
+				"This acquisition opportunity is closed and cannot be moved to another stage.",
+			);
+
+			const second = await acquisition.createEngagement(
+				{
+					companyId: company.id,
+					idempotencyKey: crypto.randomUUID(),
+				},
+				actingUserId,
+			);
+			expect(second.id).not.toBe(first.id);
+			expect(second.status).toBe(AcquisitionEngagementStatus.ACTIVE);
+
+			const rows = await acquisition.listEngagements({ companyId: company.id });
+			expect(rows).toHaveLength(2);
+		});
+	}
+
+	it("converges concurrent engagement creation on one active row", async () => {
+		const suffix = crypto.randomUUID();
+		const actingUserId = `acting-${suffix}`;
+		await ensureWorkspaceMember(
+			actingUserId,
+			`acting-${suffix}@example.com`,
+			"Acting User",
+		);
+		const company = await createEngagementTargetCompany(
+			`concurrent-engagement-${suffix}.test`,
+		);
+		const acquisition = service();
+		const sharedKey = crypto.randomUUID();
+
+		const differentKeyResults = await Promise.allSettled(
+			Array.from({ length: 20 }, () =>
+				acquisition.createEngagement(
+					{
+						companyId: company.id,
+						idempotencyKey: crypto.randomUUID(),
+					},
+					actingUserId,
+				),
+			),
+		);
+		const differentKeySuccesses = differentKeyResults.flatMap((result) =>
+			result.status === "fulfilled" ? [result.value] : [],
+		);
+		const differentKeyConflicts = differentKeyResults.filter(
+			(result) =>
+				result.status === "rejected" &&
+				result.reason instanceof Error &&
+				result.reason.message.includes(
+					"already has an active acquisition opportunity",
+				),
+		);
+		expect(differentKeySuccesses).toHaveLength(1);
+		expect(differentKeyConflicts.length).toBeGreaterThan(0);
+		const firstSuccess = differentKeySuccesses[0];
+		if (!firstSuccess) {
+			throw new Error("Expected one concurrent engagement create to succeed.");
+		}
+		expect(
+			await db.acquisitionEngagement.count({
+				where: {
+					companyId: company.id,
+					status: AcquisitionEngagementStatus.ACTIVE,
+				},
+			}),
+		).toBe(1);
+
+		await acquisition.updateEngagementStage(
+			{
+				engagementId: firstSuccess.id,
+				stage: AcquisitionEngagementStage.PASSED,
+			},
+			actingUserId,
+		);
+
+		const sameKeyResults = await Promise.allSettled(
+			Array.from({ length: 20 }, () =>
+				acquisition.createEngagement(
+					{ companyId: company.id, idempotencyKey: sharedKey },
+					actingUserId,
+				),
+			),
+		);
+		const sameKeySuccesses = sameKeyResults.flatMap((result) =>
+			result.status === "fulfilled" ? [result.value] : [],
+		);
+		expect(sameKeySuccesses.length).toBeGreaterThan(0);
+		expect(new Set(sameKeySuccesses.map((row) => row.id)).size).toBe(1);
+		expect(
+			await db.acquisitionEngagement.count({
+				where: {
+					companyId: company.id,
+					status: AcquisitionEngagementStatus.ACTIVE,
+				},
+			}),
+		).toBe(1);
+	});
+
+	it("lists engagements only for the current workspace", async () => {
+		const suffix = crypto.randomUUID();
+		const actingUserId = `acting-${suffix}`;
+		await ensureWorkspaceMember(
+			actingUserId,
+			`acting-${suffix}@example.com`,
+			"Acting User",
+		);
+		const isolatedOrgId = crypto.randomUUID();
+		const isolatedDomain = `isolated-engagement-${suffix}.test`;
+		let isolatedCompanyId = "";
+
+		await db.organization.create({
+			data: {
+				id: isolatedOrgId,
+				name: "Isolated Engagement Org",
+				slug: `iso-list-${suffix}`,
+				createdAt: new Date(),
+			},
+		});
+		await db.acquisitionProfile.create({
+			data: {
+				id: isolatedOrgId,
+				mode: WorkspaceMode.ACQUISITION,
+				preferredIndustries: ["Services"],
+				geographies: [],
+				excludedCategories: [],
+				currency: "USD",
+			},
+		});
+
+		try {
+			await runInOrganization(isolatedOrgId, async () => {
+				const created = await db.company.create({
+					data: {
+						name: "Isolated Engagement Target",
+						domain: isolatedDomain,
+						acquisitionTarget: {
+							create: {
+								stage: AcquisitionStage.QUALIFIED,
+								strengths: [],
+								concerns: [],
+								missingInformation: [],
+								sourceUrls: [],
+							},
+						},
+					},
+					select: { id: true },
+				});
+				isolatedCompanyId = created.id;
+				await service().createEngagement(
+					{
+						companyId: created.id,
+						idempotencyKey: crypto.randomUUID(),
+					},
+					actingUserId,
+				);
+			});
+
+			const listed = await service().listEngagements({
+				status: AcquisitionEngagementStatus.ACTIVE,
+			});
+			expect(
+				listed.some((engagement) => engagement.companyId === isolatedCompanyId),
+			).toBe(false);
+		} finally {
+			await db.company.deleteMany({ where: { domain: isolatedDomain } });
+			await db.acquisitionProfile.delete({ where: { id: isolatedOrgId } });
+			await db.organization.delete({ where: { id: isolatedOrgId } });
+		}
 	});
 });

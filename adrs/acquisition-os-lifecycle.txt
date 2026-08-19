@@ -70,7 +70,24 @@ Migration policy
 Additive schema first. No heuristic Deal-to-engagement backfill. Explicit deterministic
 tables for target stage migration. Unmigrated Deal rows remain until manual tooling.
 No destructive enum drops until backfill completes and code no longer references removed
-values.
+values. Applied migrations must never be edited or renamed.
+
+AcquisitionEngagement.ownerId is nullable (forward migration 20260820160000). The
+historical backfill in 20260820140000 required a non-null company owner when copying
+co."ownerId" into engagements; the product model no longer requires assigned ownership.
+Environments stuck on 20260820140000 because legacy targets had unassigned companies
+need operator remediation (assign owners or skip those rows) before prisma migrate
+resolve and re-run deploy.
+
+The one-active-engagement rule is enforced by partial unique index
+acquisitionEngagement_one_active_per_company in migration SQL. Prisma schema cannot
+represent that index faithfully; it remains intentional database infrastructure. Do not
+db push in a way that drops it.
+
+AcquisitionEngagement.closedReason is schema foundation only; no workflow populates it
+yet. Engagement economics columns (SDE, EBITDA multiple, equity, SBA, DSCR, working
+capital) and AcquisitionProfile.criterionWeights are schema foundation, not implemented
+product surfaces.
 
 Phase map
 

@@ -7,7 +7,10 @@ import {
 	type Prisma,
 	WorkspaceMode,
 } from "@crm/db";
-import { ACTIVE_ACQUISITION_STAGES, TARGET_LIFECYCLE_STAGES } from "@crm/db/acquisition";
+import {
+	ACTIVE_ACQUISITION_STAGES,
+	TARGET_LIFECYCLE_STAGES,
+} from "@crm/db/acquisition";
 import { runInOrganization } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
@@ -228,6 +231,8 @@ describe("visible buy-box criteria", () => {
 		customerConcentrationMax: null,
 		assetPreference: null,
 		financingAssumptions: null,
+		buyBoxRevision: 0,
+		criterionWeights: null,
 		createdAt: new Date("2026-08-08T00:00:00.000Z"),
 		updatedAt: new Date("2026-08-08T00:00:00.000Z"),
 	} satisfies Prisma.AcquisitionProfileGetPayload<object>;

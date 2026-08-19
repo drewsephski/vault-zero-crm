@@ -114,6 +114,11 @@ the live database. On 2026-08-01 eleven migrations landed on Neon from a laptop.
    auto-loads the working directory's `.env` while Prisma's CLI only sees
    `@crm/env/load`.
 
+If `20260820140000_acquisition_target_engagement_backfill` fails because legacy
+targets have unassigned companies (`company.ownerId IS NULL`), fix or exclude those rows
+before `prisma migrate resolve`. Do not edit applied migration files. Engagement
+ownership is nullable after `20260820160000_acquisition_engagement_owner_nullable`.
+
 ## Secrets hygiene
 
 `.gitignore` ignores `.env` and `.env.*` with one negation for `.env.example`, so
