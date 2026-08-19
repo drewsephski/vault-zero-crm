@@ -1,10 +1,10 @@
 import { EnrichmentStatus } from "@crm/db";
+import { runInOrganization } from "@crm/db/tenancy";
 import { APP_AUTH, type AppAuth } from "./app-auth";
 import { brandOutcome, runBrand } from "./brand";
 import { markRunning, settle } from "./enrichment";
 import { collapsing, runLimited } from "./pool";
 import { runPortrait } from "./portrait";
-import { runInOrganization } from "@crm/db/tenancy";
 import {
 	claimDue,
 	completeTask,
