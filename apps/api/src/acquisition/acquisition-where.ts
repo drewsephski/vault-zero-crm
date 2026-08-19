@@ -1,5 +1,6 @@
 import type { Prisma } from "@crm/db";
 import { type AcquisitionTargetView, targetStages } from "@crm/db/acquisition";
+import { requireOrganizationId } from "@crm/db/tenancy";
 
 function targetStageWhere(
 	view: AcquisitionTargetView,
@@ -14,9 +15,10 @@ export function companyTargetWhere(
 	view: AcquisitionTargetView,
 	baseCompanyWhere: Prisma.CompanyWhereInput,
 ): Prisma.CompanyWhereInput {
+	const organizationId = requireOrganizationId();
 	return {
 		AND: [
-			baseCompanyWhere,
+			{ ...baseCompanyWhere, organizationId },
 			{ acquisitionTarget: { is: targetStageWhere(view) } },
 		],
 	};
@@ -26,8 +28,9 @@ export function acquisitionTargetWhere(
 	view: AcquisitionTargetView,
 	companyWhere: Prisma.CompanyWhereInput,
 ): Prisma.AcquisitionTargetWhereInput {
+	const organizationId = requireOrganizationId();
 	return {
 		...targetStageWhere(view),
-		company: { is: companyWhere },
+		company: { is: { ...companyWhere, organizationId } },
 	};
 }

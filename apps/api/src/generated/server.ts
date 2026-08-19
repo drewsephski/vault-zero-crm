@@ -13,7 +13,8 @@ import { z } from "zod";
 
 const t = initTRPC.create();
 const publicProcedure = t.procedure;
-import { createAcquisitionTargetInput, addAcquisitionTargetInput, acquisitionCandidateIdInput, updateAcquisitionTargetInput } from "../acquisition/acquisition.contracts";
+import { createAcquisitionTargetInput, addAcquisitionTargetInput, acquisitionCandidateIdInput, updateAcquisitionTargetInput, acceptRecommendedStageInput, dismissRecommendedStageInput, acceptRecommendedActionInput, dismissRecommendedActionInput } from "../acquisition/acquisition.contracts";
+import { createAcquisitionEngagementInput, listAcquisitionEngagementsInput, updateAcquisitionEngagementStageInput } from "../acquisition/acquisition-engagements.contracts";
 import { timelineInput, timelineCountsInput, myTasksInput, taskCountsInput, activityCreateInput, completeInput } from "../activities/activities.contracts";
 import { companyListInput, companyIdInput, companyOptionsInput, companyCreateInput, companyUpdateArgs, companyBulkDeleteInput, companyBulkUpdateArgs, setPrimaryContactInput } from "../companies/companies.contracts";
 import { contactListInput, contactIdInput, contactCreateInput, contactUpdateArgs, contactBulkDeleteInput, contactBulkUpdateArgs, factDecisionInput } from "../contacts/contacts.contracts";
@@ -58,7 +59,28 @@ const appRouter = t.router({
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["dismissCandidate"]>>),
     updateTarget: publicProcedure
       .input(updateAcquisitionTargetInput)
-      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["updateTarget"]>>)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["updateTarget"]>>),
+    acceptRecommendedStage: publicProcedure
+      .input(acceptRecommendedStageInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["acceptRecommendedStage"]>>),
+    dismissRecommendedStage: publicProcedure
+      .input(dismissRecommendedStageInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["dismissRecommendedStage"]>>),
+    acceptRecommendedAction: publicProcedure
+      .input(acceptRecommendedActionInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["acceptRecommendedAction"]>>),
+    dismissRecommendedAction: publicProcedure
+      .input(dismissRecommendedActionInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["dismissRecommendedAction"]>>),
+    createEngagement: publicProcedure
+      .input(createAcquisitionEngagementInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["createEngagement"]>>),
+    listEngagements: publicProcedure
+      .input(listAcquisitionEngagementsInput)
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["listEngagements"]>>),
+    updateEngagementStage: publicProcedure
+      .input(updateAcquisitionEngagementStageInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["updateEngagementStage"]>>)
     }),
   activities: t.router({
     timeline: publicProcedure

@@ -1,12 +1,15 @@
 import {
 	AcquisitionCandidateStatus,
+	AcquisitionEngagementStage,
+	AcquisitionEngagementStatus,
 	AcquisitionFit,
 	AcquisitionStage,
 	ActivityType,
 	type Db,
+	type Prisma,
 	RecordSource,
 } from "@crm/db";
-import { hasAcquisitionFocus } from "@crm/db/acquisition";
+import { isDossierReady } from "@crm/db/acquisition";
 import { getOrganizationId } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
@@ -25,6 +28,47 @@ import type {
 	TargetMutationResult,
 	TargetResearchResult,
 } from "./acquisition.contracts";
+import type {
+	CreateAcquisitionEngagementInput,
+	ListAcquisitionEngagementsInput,
+	UpdateAcquisitionEngagementStageInput,
+} from "./acquisition-engagements.contracts";
+
+const TERMINAL_ENGAGEMENT_STAGES = new Set<AcquisitionEngagementStage>([
+	AcquisitionEngagementStage.ACQUIRED,
+	AcquisitionEngagementStage.PASSED,
+]);
+
+const ENGAGEMENT_SELECT = {
+	id: true,
+	companyId: true,
+	ownerId: true,
+	stage: true,
+	status: true,
+	stageChangedAt: true,
+	amount: true,
+	currency: true,
+	expectedCloseDate: true,
+	closedAt: true,
+	closedReason: true,
+	baseAmount: true,
+	baseCurrency: true,
+	fxRate: true,
+	fxRateAt: true,
+	createdAt: true,
+	updatedAt: true,
+	company: {
+		select: {
+			id: true,
+			name: true,
+			domain: true,
+		},
+	},
+} satisfies Prisma.AcquisitionEngagementSelect;
+
+type EngagementRow = Prisma.AcquisitionEngagementGetPayload<{
+	select: typeof ENGAGEMENT_SELECT;
+}>;
 
 function acquisitionTargetData(sourceUrls: string[]) {
 	return {
@@ -251,11 +295,6 @@ export class AcquisitionService {
 		}
 		if (!queued) return { status: "failed", blocker: "queue-unavailable" };
 
-		await this.db.acquisitionTarget.updateMany({
-			where: { companyId, stage: AcquisitionStage.DISCOVERED },
-			data: { stage: AcquisitionStage.RESEARCHING },
-		});
-
 		return { status: "queued", taskId: queued.taskId };
 	}
 
@@ -269,22 +308,48 @@ export class AcquisitionService {
 			}),
 			this.db.acquisitionProfile.findUnique({
 				where: { id: getOrganizationId() ?? WORKSPACE_ID },
-				select: { preferredIndustries: true, geographies: true },
+				select: {
+					preferredIndustries: true,
+					geographies: true,
+					excludedCategories: true,
+					revenueMin: true,
+					revenueMax: true,
+					ebitdaMin: true,
+					ebitdaMax: true,
+					purchasePriceMin: true,
+					purchasePriceMax: true,
+					ownerInvolvement: true,
+					recurringRevenuePreference: true,
+					customerConcentrationMax: true,
+					assetPreference: true,
+					financingAssumptions: true,
+				},
 			}),
 		]);
 
 		if (!company) throw new NotFoundException("That company no longer exists.");
 		if (!normalizeDomain(company.domain)) return { blocker: "missing-domain" };
-		if (!profile || !hasAcquisitionFocus(profile)) {
+		if (!profile || !isDossierReady(profile)) {
 			return { blocker: "missing-buy-box" };
 		}
 		return {};
 	}
 
 	async dismissCandidate(id: string) {
+		const organizationId = getOrganizationId() ?? WORKSPACE_ID;
+		const profile = await this.db.acquisitionProfile.findUnique({
+			where: { id: organizationId },
+			select: { buyBoxRevision: true },
+		});
+		const buyBoxRevision = profile?.buyBoxRevision ?? 0;
+
 		const result = await this.db.acquisitionCandidate.updateMany({
 			where: { id, status: AcquisitionCandidateStatus.PROPOSED },
-			data: { status: AcquisitionCandidateStatus.DISMISSED },
+			data: {
+				status: AcquisitionCandidateStatus.DISMISSED,
+				dismissedAt: new Date(),
+				dismissedBuyBoxRevision: buyBoxRevision,
+			},
 		});
 
 		if (result.count === 0) {
@@ -360,5 +425,393 @@ export class AcquisitionService {
 		});
 
 		return { ...target, updatedAt: target.updatedAt.toISOString() };
+	}
+
+	async acceptRecommendedStage(
+		companyId: string,
+		actingUserId: string,
+		idempotencyKey?: string,
+	) {
+		return this.db.$transaction(async (tx) => {
+			if (idempotencyKey) {
+				const prior = await tx.activity.findFirst({
+					where: {
+						companyId,
+						type: ActivityType.STAGE_CHANGE,
+						meta: { path: ["idempotencyKey"], equals: idempotencyKey },
+					},
+					select: { id: true },
+				});
+				if (prior) {
+					const current = await tx.acquisitionTarget.findUniqueOrThrow({
+						where: { companyId },
+						select: {
+							stage: true,
+							recommendedStage: true,
+							updatedAt: true,
+						},
+					});
+					return {
+						companyId,
+						stage: current.stage,
+						recommendedStage: current.recommendedStage,
+						updatedAt: current.updatedAt.toISOString(),
+					};
+				}
+			}
+
+			const target = await tx.acquisitionTarget.findUnique({
+				where: { companyId },
+				select: {
+					stage: true,
+					recommendedStage: true,
+					company: { select: { name: true } },
+				},
+			});
+			if (!target) {
+				throw new NotFoundException("That target no longer exists.");
+			}
+
+			const recommended = target.recommendedStage;
+			if (!recommended) {
+				throw new BadRequestException("No stage recommendation is pending.");
+			}
+
+			const previousStage = target.stage;
+			if (previousStage === recommended) {
+				await tx.acquisitionTarget.update({
+					where: { companyId },
+					data: { recommendedStage: null },
+				});
+			} else {
+				await tx.acquisitionTarget.update({
+					where: { companyId },
+					data: { stage: recommended, recommendedStage: null },
+				});
+				await tx.activity.create({
+					data: {
+						type: ActivityType.STAGE_CHANGE,
+						subject: `Moved ${target.company.name} to ${recommended.toLowerCase()}`,
+						companyId,
+						createdById: actingUserId,
+						meta: {
+							source: "eve-recommendation",
+							previousStage,
+							acceptedStage: recommended,
+							...(idempotencyKey ? { idempotencyKey } : {}),
+						},
+					},
+				});
+			}
+
+			const updated = await tx.acquisitionTarget.findUniqueOrThrow({
+				where: { companyId },
+				select: {
+					stage: true,
+					recommendedStage: true,
+					updatedAt: true,
+				},
+			});
+
+			return {
+				companyId,
+				stage: updated.stage,
+				recommendedStage: updated.recommendedStage,
+				updatedAt: updated.updatedAt.toISOString(),
+			};
+		});
+	}
+
+	async dismissRecommendedStage(companyId: string, actingUserId: string) {
+		return this.db.$transaction(async (tx) => {
+			const target = await tx.acquisitionTarget.findUnique({
+				where: { companyId },
+				select: { recommendedStage: true },
+			});
+			if (!target) {
+				throw new NotFoundException("That target no longer exists.");
+			}
+			if (!target.recommendedStage) {
+				throw new BadRequestException("No stage recommendation is pending.");
+			}
+
+			const dismissedStage = target.recommendedStage;
+			await tx.acquisitionTarget.update({
+				where: { companyId },
+				data: { recommendedStage: null },
+			});
+			await tx.activity.create({
+				data: {
+					type: ActivityType.NOTE,
+					subject: "Dismissed Eve stage recommendation",
+					companyId,
+					createdById: actingUserId,
+					meta: {
+						source: "eve-recommendation-dismissed",
+						recommendedStage: dismissedStage,
+						dismissedAt: new Date().toISOString(),
+					},
+				},
+			});
+
+			const updated = await tx.acquisitionTarget.findUniqueOrThrow({
+				where: { companyId },
+				select: {
+					stage: true,
+					recommendedStage: true,
+					updatedAt: true,
+				},
+			});
+
+			return {
+				companyId,
+				stage: updated.stage,
+				recommendedStage: updated.recommendedStage,
+				updatedAt: updated.updatedAt.toISOString(),
+			};
+		});
+	}
+
+	async acceptRecommendedAction(
+		companyId: string,
+		actingUserId: string,
+		idempotencyKey?: string,
+		dueAt?: string,
+	) {
+		return this.db.$transaction(async (tx) => {
+			if (idempotencyKey) {
+				const prior = await tx.activity.findFirst({
+					where: {
+						companyId,
+						type: ActivityType.TASK,
+						meta: { path: ["idempotencyKey"], equals: idempotencyKey },
+					},
+					select: { id: true },
+				});
+				if (prior) {
+					const target = await tx.acquisitionTarget.findUniqueOrThrow({
+						where: { companyId },
+						select: { recommendedAction: true },
+					});
+					return {
+						companyId,
+						taskId: prior.id,
+						recommendedAction: target.recommendedAction,
+					};
+				}
+			}
+
+			const target = await tx.acquisitionTarget.findUnique({
+				where: { companyId },
+				select: { recommendedAction: true },
+			});
+			if (!target) {
+				throw new NotFoundException("That target no longer exists.");
+			}
+			if (!target.recommendedAction) {
+				throw new BadRequestException("No action recommendation is pending.");
+			}
+
+			const actionText = target.recommendedAction;
+			const task = await tx.activity.create({
+				data: {
+					type: ActivityType.TASK,
+					subject: actionText,
+					companyId,
+					createdById: actingUserId,
+					dueAt: dueAt ? new Date(dueAt) : null,
+					meta: {
+						source: "eve-recommendation",
+						...(idempotencyKey ? { idempotencyKey } : {}),
+					},
+				},
+				select: { id: true },
+			});
+
+			await tx.acquisitionTarget.update({
+				where: { companyId },
+				data: { recommendedAction: null },
+			});
+
+			return {
+				companyId,
+				taskId: task.id,
+				recommendedAction: null,
+			};
+		});
+	}
+
+	async dismissRecommendedAction(companyId: string, actingUserId: string) {
+		return this.db.$transaction(async (tx) => {
+			const target = await tx.acquisitionTarget.findUnique({
+				where: { companyId },
+				select: { recommendedAction: true },
+			});
+			if (!target) {
+				throw new NotFoundException("That target no longer exists.");
+			}
+			if (!target.recommendedAction) {
+				throw new BadRequestException("No action recommendation is pending.");
+			}
+
+			const dismissedAction = target.recommendedAction;
+			await tx.acquisitionTarget.update({
+				where: { companyId },
+				data: { recommendedAction: null },
+			});
+			await tx.activity.create({
+				data: {
+					type: ActivityType.NOTE,
+					subject: "Dismissed Eve action recommendation",
+					companyId,
+					createdById: actingUserId,
+					meta: {
+						source: "eve-recommendation-dismissed",
+						recommendedAction: dismissedAction,
+						dismissedAt: new Date().toISOString(),
+					},
+				},
+			});
+
+			return { companyId, recommendedAction: null };
+		});
+	}
+
+	async createEngagement(
+		input: CreateAcquisitionEngagementInput,
+		actingUserId: string,
+	) {
+		const prior = await this.db.acquisitionEngagementCreateRequest.findUnique({
+			where: { idempotencyKey: input.idempotencyKey },
+			select: { engagementId: true },
+		});
+		if (prior) {
+			return this.serializeEngagement(
+				await this.db.acquisitionEngagement.findUniqueOrThrow({
+					where: { id: prior.engagementId },
+					select: ENGAGEMENT_SELECT,
+				}),
+			);
+		}
+
+		const company = await this.db.company.findUnique({
+			where: { id: input.companyId },
+			select: { id: true, name: true },
+		});
+		if (!company) {
+			throw new NotFoundException("That company no longer exists.");
+		}
+
+		const active = await this.db.acquisitionEngagement.findFirst({
+			where: {
+				companyId: input.companyId,
+				status: AcquisitionEngagementStatus.ACTIVE,
+			},
+			select: { id: true },
+		});
+		if (active) {
+			throw new ConflictException(
+				"This company already has an active acquisition engagement.",
+			);
+		}
+
+		const stage = input.stage ?? AcquisitionEngagementStage.OUTREACH;
+		const engagement = await this.db.$transaction(async (tx) => {
+			const created = await tx.acquisitionEngagement.create({
+				data: {
+					companyId: input.companyId,
+					ownerId: actingUserId,
+					stage,
+					status: AcquisitionEngagementStatus.ACTIVE,
+					createRequest: { create: { idempotencyKey: input.idempotencyKey } },
+				},
+				select: ENGAGEMENT_SELECT,
+			});
+			await tx.activity.create({
+				data: {
+					type: ActivityType.STAGE_CHANGE,
+					subject: `Opened acquisition engagement for ${company.name}`,
+					companyId: input.companyId,
+					engagementId: created.id,
+					createdById: actingUserId,
+				},
+			});
+			return created;
+		});
+
+		return this.serializeEngagement(engagement);
+	}
+
+	async listEngagements(input: ListAcquisitionEngagementsInput) {
+		const rows = await this.db.acquisitionEngagement.findMany({
+			where: {
+				...(input.companyId ? { companyId: input.companyId } : {}),
+				...(input.status ? { status: input.status } : {}),
+			},
+			orderBy: [{ stageChangedAt: "desc" }, { createdAt: "desc" }],
+			select: ENGAGEMENT_SELECT,
+		});
+		return rows.map((row) => this.serializeEngagement(row));
+	}
+
+	async updateEngagementStage(
+		input: UpdateAcquisitionEngagementStageInput,
+		actingUserId: string,
+	) {
+		const engagement = await this.db.acquisitionEngagement.findUnique({
+			where: { id: input.engagementId },
+			select: {
+				id: true,
+				stage: true,
+				status: true,
+				companyId: true,
+				company: { select: { name: true } },
+			},
+		});
+		if (!engagement) {
+			throw new NotFoundException("That engagement no longer exists.");
+		}
+
+		const terminal = TERMINAL_ENGAGEMENT_STAGES.has(input.stage);
+		const updated = await this.db.$transaction(async (tx) => {
+			const row = await tx.acquisitionEngagement.update({
+				where: { id: input.engagementId },
+				data: {
+					stage: input.stage,
+					status: terminal
+						? AcquisitionEngagementStatus.TERMINAL
+						: AcquisitionEngagementStatus.ACTIVE,
+					stageChangedAt: new Date(),
+					closedAt: terminal ? new Date() : null,
+				},
+				select: ENGAGEMENT_SELECT,
+			});
+			if (engagement.stage !== input.stage) {
+				await tx.activity.create({
+					data: {
+						type: ActivityType.STAGE_CHANGE,
+						subject: `Moved ${engagement.company.name} engagement to ${input.stage.toLowerCase()}`,
+						companyId: engagement.companyId,
+						engagementId: engagement.id,
+						createdById: actingUserId,
+					},
+				});
+			}
+			return row;
+		});
+
+		return this.serializeEngagement(updated);
+	}
+
+	private serializeEngagement(row: EngagementRow) {
+		return {
+			...row,
+			stageChangedAt: row.stageChangedAt.toISOString(),
+			expectedCloseDate: row.expectedCloseDate?.toISOString() ?? null,
+			closedAt: row.closedAt?.toISOString() ?? null,
+			fxRateAt: row.fxRateAt?.toISOString() ?? null,
+			createdAt: row.createdAt.toISOString(),
+			updatedAt: row.updatedAt.toISOString(),
+		};
 	}
 }

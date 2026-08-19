@@ -25,6 +25,8 @@ model User {
   ownedCompanies Company[]           @relation("CompanyOwner")
   ownedContacts  Contact[]           @relation("ContactOwner")
   ownedDeals     Deal[]              @relation("DealOwner")
+  ownedAcquisitionEngagements AcquisitionEngagement[] @relation("AcquisitionEngagementOwner")
+  acquisitionResearchRuns AcquisitionResearchRun[] @relation("AcquisitionResearchRunTrigger")
   activities     Activity[]          @relation("ActivityAuthor")
   mailboxSyncs   MailboxSync[]
   factDecisions  ContactFact[]       @relation("FactDecider")
@@ -193,6 +195,25 @@ enum AcquisitionFit {
   DISQUALIFIED
 }
 
+enum AcquisitionEngagementStage {
+  OUTREACH
+  ENGAGED
+  NDA
+  MATERIALS_RECEIVED
+  UNDERWRITING
+  LOI
+  DILIGENCE
+  FINANCING
+  CLOSING
+  ACQUIRED
+  PASSED
+}
+
+enum AcquisitionEngagementStatus {
+  ACTIVE
+  TERMINAL
+}
+
 enum AcquisitionCandidateStatus {
   PROPOSED
   APPROVED
@@ -223,6 +244,10 @@ model AcquisitionProfile {
   assetPreference            AcquisitionAssetPreference?
   financingAssumptions       String?
 
+  buyBoxRevision Int @default(0)
+
+  criterionWeights Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -239,6 +264,10 @@ model AcquisitionCandidate {
   sourceUrl   String
   sourceTitle String?
   status      AcquisitionCandidateStatus @default(PROPOSED)
+
+  dismissedAt              DateTime?
+  dismissedBuyBoxRevision  Int?
+  dismissedReason          String?
 
 	organizationId String @default("workspace")
 	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -342,6 +371,8 @@ model Company {
   acquisitionTarget   AcquisitionTarget?
   targetCreateRequest AcquisitionTargetCreateRequest?
   discoveryCandidate  AcquisitionCandidate?
+  acquisitionEngagements AcquisitionEngagement[]
+  acquisitionResearchRuns AcquisitionResearchRun[]
 
   source RecordSource @default(MANUAL)
 
@@ -399,6 +430,73 @@ model AcquisitionTargetCreateRequest {
   createdAt DateTime @default(now())
 
   @@map("acquisitionTargetCreateRequest")
+}
+
+model AcquisitionEngagement {
+  id             String                      @id @default(cuid())
+  organizationId String                      @default("workspace")
+  organization   Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId      String
+  company        Company                     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ownerId        String
+  owner          User                        @relation("AcquisitionEngagementOwner", fields: [ownerId], references: [id])
+  stage          AcquisitionEngagementStage  @default(OUTREACH)
+  status         AcquisitionEngagementStatus @default(ACTIVE)
+  stageChangedAt DateTime                    @default(now())
+
+  amount            Decimal?  @db.Decimal(14, 2)
+  currency          String    @default("USD")
+  expectedCloseDate DateTime?
+  closedAt          DateTime?
+  closedReason      String?
+  baseAmount        Decimal?  @db.Decimal(24, 4)
+  baseCurrency      String?
+  fxRate            Decimal?  @db.Decimal(20, 10)
+  fxRateAt          DateTime?
+
+  sellerDiscretionaryEarnings Decimal? @db.Decimal(18, 2)
+  ebitdaMultiple              Decimal? @db.Decimal(8, 2)
+  equityInjection             Decimal? @db.Decimal(18, 2)
+  sbaLoanAmount               Decimal? @db.Decimal(18, 2)
+  dscr                        Decimal? @db.Decimal(8, 4)
+  workingCapitalNeed          Decimal? @db.Decimal(18, 2)
+
+  activities     Activity[]
+  createRequest  AcquisitionEngagementCreateRequest?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, companyId, status])
+  @@index([organizationId, status, stageChangedAt])
+  @@index([ownerId])
+  @@map("acquisitionEngagement")
+}
+
+model AcquisitionEngagementCreateRequest {
+  idempotencyKey String              @id @db.Uuid
+  engagementId   String              @unique
+  engagement     AcquisitionEngagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  createdAt      DateTime            @default(now())
+
+  @@map("acquisitionEngagementCreateRequest")
+}
+
+model AcquisitionResearchRun {
+  id             String       @id @default(cuid())
+  organizationId String       @default("workspace")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId      String
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  kind           String
+  triggeredById  String?
+  triggeredBy    User?        @relation("AcquisitionResearchRunTrigger", fields: [triggeredById], references: [id], onDelete: SetNull)
+  startedAt      DateTime     @default(now())
+  finishedAt     DateTime?
+  dossierSnapshot Json?
+
+  @@index([organizationId, companyId, startedAt])
+  @@map("acquisitionResearchRun")
 }
 
 model CompanyEnrichment {
@@ -752,6 +850,8 @@ model Activity {
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
   dealId    String?
   deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  engagementId String?
+  engagement   AcquisitionEngagement? @relation(fields: [engagementId], references: [id], onDelete: Cascade)
 
   createdById String
   createdBy   User   @relation("ActivityAuthor", fields: [createdById], references: [id])
@@ -986,6 +1086,8 @@ model Organization {
   deals                  Deal[]
   agentTasks             AgentTask[]
   acquisitionCandidates  AcquisitionCandidate[]
+  acquisitionEngagements AcquisitionEngagement[]
+  acquisitionResearchRuns AcquisitionResearchRun[]
   outreachLeads          OutreachLead[]
   conversations          AgentConversation[]
 

@@ -9,6 +9,8 @@ export const TENANT_MODELS = new Set([
 	"Deal",
 	"AgentTask",
 	"AcquisitionCandidate",
+	"AcquisitionEngagement",
+	"AcquisitionResearchRun",
 	"OutreachLead",
 	"AgentConversation",
 ]);

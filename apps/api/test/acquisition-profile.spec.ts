@@ -8,6 +8,8 @@ import {
 	WorkspaceMode,
 } from "@crm/db";
 import { ACTIVE_ACQUISITION_STAGES } from "@crm/db/acquisition";
+import { runInOrganization } from "@crm/db/tenancy";
+import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
 	acquisitionCandidateIdInput,
 	createAcquisitionTargetInput,
@@ -96,9 +98,12 @@ describe("acquisition profile contracts", () => {
 
 describe("acquisition operating contracts", () => {
 	it("builds the canonical active company target scope", () => {
-		expect(companyTargetWhere("active", { ownerId: "viewer" })).toEqual({
+		const scope = runInOrganization(WORKSPACE_ID, () =>
+			companyTargetWhere("active", { ownerId: "viewer" }),
+		);
+		expect(scope).toEqual({
 			AND: [
-				{ ownerId: "viewer" },
+				{ ownerId: "viewer", organizationId: WORKSPACE_ID },
 				{
 					acquisitionTarget: {
 						is: { stage: { in: [...ACTIVE_ACQUISITION_STAGES] } },
@@ -109,9 +114,12 @@ describe("acquisition operating contracts", () => {
 	});
 
 	it("builds the canonical rejected target scope through company ownership", () => {
-		expect(acquisitionTargetWhere("rejected", { ownerId: "viewer" })).toEqual({
+		const scope = runInOrganization(WORKSPACE_ID, () =>
+			acquisitionTargetWhere("rejected", { ownerId: "viewer" }),
+		);
+		expect(scope).toEqual({
 			stage: AcquisitionStage.REJECTED,
-			company: { is: { ownerId: "viewer" } },
+			company: { is: { ownerId: "viewer", organizationId: WORKSPACE_ID } },
 		});
 	});
 
@@ -207,7 +215,7 @@ describe("visible buy-box criteria", () => {
 		updatedAt: new Date("2026-08-08T00:00:00.000Z"),
 	} satisfies Prisma.AcquisitionProfileGetPayload<object>;
 
-	it("counts only criteria represented on company records", () => {
+	it("counts every configured buy-box criterion", () => {
 		expect(visibleCriteriaCount(profile)).toBe(3);
 	});
 });

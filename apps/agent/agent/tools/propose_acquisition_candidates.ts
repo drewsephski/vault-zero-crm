@@ -1,10 +1,6 @@
-import {
-	AcquisitionCandidateStatus,
-	db,
-	getOrganizationId,
-	WorkspaceMode,
-} from "@crm/db";
+import { db, getOrganizationId, WorkspaceMode } from "@crm/db";
 import { isAcquisitionEvidenceUrl } from "@crm/db/acquisition";
+import { proposeAcquisitionCandidates } from "@crm/db/acquisition-candidates";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { normalizeDomain } from "../lib/record-writes";
@@ -56,39 +52,17 @@ export default defineTool({
 				},
 			];
 		});
-		const unique = [
-			...new Map(normalized.map((item) => [item.domain, item])).values(),
-		];
-		const domains = unique.map((item) => item.domain);
-		const [companies, existingCandidates] = await Promise.all([
-			db.company.findMany({
-				where: { domain: { in: domains } },
-				select: { domain: true },
-			}),
-			db.acquisitionCandidate.findMany({
-				where: { domain: { in: domains } },
-				select: { domain: true, status: true },
-			}),
-		]);
-		const blocked = new Set([
-			...companies.flatMap((item) => (item.domain ? [item.domain] : [])),
-			...existingCandidates.map((item) => item.domain),
-		]);
-		const fresh = unique.filter((item) => !blocked.has(item.domain));
 
-		if (fresh.length > 0) {
-			await db.acquisitionCandidate.createMany({
-				data: fresh.map((item) => ({
-					...item,
-					status: AcquisitionCandidateStatus.PROPOSED,
-				})),
-				skipDuplicates: true,
-			});
-		}
+		const { saved, revived, skipped } = await proposeAcquisitionCandidates(
+			db,
+			organizationId,
+			normalized,
+		);
 
 		return {
-			saved: fresh.length,
-			skipped: candidates.length - fresh.length,
+			saved: saved + revived,
+			revived,
+			skipped,
 		};
 	},
 });

@@ -6,6 +6,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./acquisition": "./src/acquisition.ts",
+		"./acquisition-candidates": "./src/acquisition-candidates.ts",
 		"./agent-tasks": "./src/agent-tasks.ts",
 		"./blob": "./src/blob.ts",
 		"./client": "./src/client.ts",

@@ -1,0 +1,88 @@
+Acquisition OS lifecycle (Vault Zero)
+
+Problem
+
+Vault Zero runs two parallel lifecycles today. AcquisitionTarget.stage spans sourcing
+through diligence while Deal and DealStage carry generic sales pipeline semantics
+relabeled as opportunities in acquisition mode. Eve recommendations can change stage
+and next actions, but humans must own lifecycle commits. Multi-org workspaces need
+defense-in-depth tenancy on target aggregates because AcquisitionTarget rows are not
+tenant-middleware models.
+
+Decision: Option A (refined)
+
+Keep AcquisitionTarget for sourcing and dossier state. Introduce AcquisitionEngagement
+for transaction lifecycle (outreach through closing). Keep Deal for WorkspaceMode.SALES
+and Vault Zero receptionist compatibility. Do not overload Deal with acquisition stages.
+
+Readiness semantics (implemented Phase 1A)
+
+- isDiscoveryReady(profile): industry OR geography configured. Gates discovery tasks.
+- isDossierReady(profile): expectedAcquisitionCriterionIds(profile) has entries.
+  Gates dossier research and targetReadiness. Financial-only buy boxes are valid.
+- Target domain readiness is separate: normalizeDomain(company.domain) required.
+
+RESEARCHING as execution state (Phase 4 intent)
+
+RESEARCHING on AcquisitionTarget is legacy lifecycle pollution. Research progress
+belongs in AgentTask execution state (acquisition-refresh queued/running) and the
+acquisitionResearch read model, not a human lifecycle Select value. Phase 4 removes
+RESEARCHING from the AcquisitionStage enum after code stops writing it.
+
+Long-term AcquisitionTarget stages
+
+DISCOVERED, QUALIFIED, WATCHLIST, REJECTED, ACQUIRED. Transaction stages
+(CONTACTED, INTERESTED, OPPORTUNITY, DILIGENCE) migrate to AcquisitionEngagement.
+
+AcquisitionEngagement stages
+
+OUTREACH, ENGAGED, NDA, MATERIALS_RECEIVED, UNDERWRITING, LOI, DILIGENCE, FINANCING,
+CLOSING, ACQUIRED, PASSED. One active engagement per company; terminal rows preserved.
+Create uses idempotencyKey UUID (not name). Repeat pursuit creates a new engagement row.
+
+Candidate dismissal and revival (Phase 1C)
+
+AcquisitionProfile.buyBoxRevision increments on each successful updateAcquisitionProfile.
+Dismissed candidates store dismissedAt and dismissedBuyBoxRevision. Revival is an atomic
+UPDATE on the existing (organizationId, domain) row when buyBoxRevision advances, never
+createMany with skipDuplicates.
+
+Eve recommendations (Phase 1D)
+
+Humans accept or dismiss recommendedStage and recommendedAction through transactional
+API mutations. Accept stage: set stage, clear recommendation, STAGE_CHANGE activity with
+eve-recommendation meta. Accept action: create TASK and clear recommendedAction in one
+transaction. Optional idempotencyKey prevents duplicate commits on retry.
+
+Tenancy (Phase 1B)
+
+acquisitionTargetWhere and companyTargetWhere always include company.organizationId via
+requireOrganizationId(). Dashboard and list aggregates must not count cross-org targets.
+
+Priority ranking interim (Phase 1E)
+
+Fit-first ranking uses two bounded queries (STRONG then POTENTIAL), merged in application
+code and sorted by acquisitionAttentionScore (Phase 5) before display. No orderBy fit
+enum in SQL.
+
+Migration policy
+
+Additive schema first. No heuristic Deal-to-engagement backfill. Explicit deterministic
+tables for target stage migration. Unmigrated Deal rows remain until manual tooling.
+No destructive enum drops until backfill completes and code no longer references removed
+values.
+
+Phase map
+
+1A readiness, 1B tenancy, 1C candidates, 1D Eve APIs, 1E ranking, 1F CI+this ADR
+2 AcquisitionEngagement schema and API (additive)
+3 Acquisition UI and dashboard read engagements; deterministic target stage backfill
+4 Trim AcquisitionTarget active stages; RESEARCHING is execution-only
+5 Attention ranking via acquisitionAttentionScore on dashboard priority targets
+6 Dossier information architecture (future UI pass; criteria JSON remains source)
+7 criterionWeights JSON on AcquisitionProfile for required/preferred/informational
+8 AcquisitionResearchRun + optional dossierSnapshot per company research execution
+9 Nullable engagement economics: SDE, EBITDA multiple, equity, SBA, DSCR, working capital
+10 Sales mode strategy: retain WorkspaceMode.SALES and Deal for receptionist flows;
+   acquisition mode defaults to AcquisitionEngagement for transaction lifecycle while
+   Deal remains the sales pipeline primitive.

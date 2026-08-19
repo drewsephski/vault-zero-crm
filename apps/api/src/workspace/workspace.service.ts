@@ -15,6 +15,7 @@ import {
 } from "@crm/db";
 import { readReportingCurrency } from "@crm/db/settings";
 import { isOnboarded, markOnboarded, workspaceSlug } from "@crm/db/workspace";
+import { isDiscoveryReady } from "@crm/db/acquisition";
 import {
 	BadRequestException,
 	ForbiddenException,
@@ -115,7 +116,7 @@ export function hasDiscoveryFocus(input: {
 	preferredIndustries: readonly string[];
 	geographies: readonly string[];
 }): boolean {
-	return input.preferredIndustries.length > 0 || input.geographies.length > 0;
+	return isDiscoveryReady(input);
 }
 
 @Injectable()
@@ -258,8 +259,13 @@ export class WorkspaceService {
 
 		await this.db.acquisitionProfile.upsert({
 			where: { id: workspaceId },
-			create: { id: workspaceId, mode: WorkspaceMode.ACQUISITION, ...fields },
-			update: fields,
+			create: {
+				id: workspaceId,
+				mode: WorkspaceMode.ACQUISITION,
+				buyBoxRevision: 0,
+				...fields,
+			},
+			update: { ...fields, buyBoxRevision: { increment: 1 } },
 		});
 
 		const discoveryQueued = hasDiscoveryFocus(fields);

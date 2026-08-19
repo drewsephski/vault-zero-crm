@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import {
+	AcquisitionCandidateStatus,
+	AcquisitionEngagementStage,
+	AcquisitionEngagementStatus,
 	AcquisitionFit,
 	AcquisitionStage,
 	ActivityType,
@@ -9,6 +12,7 @@ import {
 	type WorkspaceMode as WorkspaceModeType,
 } from "@crm/db";
 import { ACQUISITION_TASK_KINDS } from "@crm/db/acquisition";
+import { runInOrganization } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import { acquireCanonicalWorkspaceFixture } from "../../../packages/db/test/canonical-workspace-fixture";
 import { AgentQueueService } from "../src/agent/agent-queue.service";
@@ -80,6 +84,10 @@ async function createCompany(
 	return created.id;
 }
 
+const engagementIds = {
+	active: "",
+};
+
 const ids = {
 	generic: "",
 	active: "",
@@ -147,147 +155,161 @@ beforeAll(async () => {
 		],
 	});
 
-	ids.generic = await createCompany("Generic Company", viewerId);
-	ids.active = await createCompany("Active Target", viewerId, {
-		stage: AcquisitionStage.QUALIFIED,
-		fit: AcquisitionFit.STRONG,
-		researchedAt: new Date(),
-	});
-	ids.rejected = await createCompany("Rejected Target", viewerId, {
-		stage: AcquisitionStage.REJECTED,
-		fit: AcquisitionFit.STRONG,
-		researchedAt: new Date(),
-	});
-	ids.acquired = await createCompany("Acquired Target", viewerId, {
-		stage: AcquisitionStage.ACQUIRED,
-		researchedAt: new Date(),
-	});
-	ids.otherActive = await createCompany("Other Active Target", otherUserId, {
-		stage: AcquisitionStage.WATCHLIST,
-		researchedAt: new Date(),
-	});
-	ids.needsResearch = await createCompany(
-		"Needs Research Target",
-		viewerId,
-		{ stage: AcquisitionStage.RESEARCHING, researchedAt: null },
-		{ enrichmentStatus: EnrichmentStatus.COMPLETE },
-	);
+	await runInOrganization(WORKSPACE_ID, async () => {
+		ids.generic = await createCompany("Generic Company", viewerId);
+		ids.active = await createCompany("Active Target", viewerId, {
+			stage: AcquisitionStage.QUALIFIED,
+			fit: AcquisitionFit.STRONG,
+			researchedAt: new Date(),
+		});
+		ids.rejected = await createCompany("Rejected Target", viewerId, {
+			stage: AcquisitionStage.REJECTED,
+			fit: AcquisitionFit.STRONG,
+			researchedAt: new Date(),
+		});
+		ids.acquired = await createCompany("Acquired Target", viewerId, {
+			stage: AcquisitionStage.ACQUIRED,
+			researchedAt: new Date(),
+		});
+		ids.otherActive = await createCompany("Other Active Target", otherUserId, {
+			stage: AcquisitionStage.WATCHLIST,
+			researchedAt: new Date(),
+		});
+		ids.needsResearch = await createCompany(
+			"Needs Research Target",
+			viewerId,
+			{ stage: AcquisitionStage.DISCOVERED, researchedAt: null },
+			{ enrichmentStatus: EnrichmentStatus.COMPLETE },
+		);
 
-	const activeContact = await db.contact.create({
-		data: {
-			firstName: "Active Target Contact",
-			companyId: ids.active,
-		},
-		select: { id: true },
-	});
-	activeContactId = activeContact.id;
-	const [activeDeal, genericDeal, rejectedDeal, acquiredDeal] =
-		await Promise.all([
-			db.deal.create({
-				data: {
-					name: "Active target opportunity",
-					companyId: ids.active,
-					ownerId: viewerId,
+		const activeEngagement = await db.acquisitionEngagement.create({
+			data: {
+				organizationId: WORKSPACE_ID,
+				companyId: ids.active,
+				ownerId: viewerId,
+				stage: AcquisitionEngagementStage.OUTREACH,
+				status: AcquisitionEngagementStatus.ACTIVE,
+			},
+			select: { id: true },
+		});
+		engagementIds.active = activeEngagement.id;
+
+		const activeContact = await db.contact.create({
+			data: {
+				firstName: "Active Target Contact",
+				companyId: ids.active,
+			},
+			select: { id: true },
+		});
+		activeContactId = activeContact.id;
+		const [activeDeal, genericDeal, rejectedDeal, acquiredDeal] =
+			await Promise.all([
+				db.deal.create({
+					data: {
+						name: "Active target opportunity",
+						companyId: ids.active,
+						ownerId: viewerId,
+					},
+					select: { id: true },
+				}),
+				db.deal.create({
+					data: {
+						name: "Generic company opportunity",
+						companyId: ids.generic,
+						ownerId: viewerId,
+					},
+					select: { id: true },
+				}),
+				db.deal.create({
+					data: {
+						name: "Rejected target opportunity",
+						companyId: ids.rejected,
+						ownerId: viewerId,
+					},
+					select: { id: true },
+				}),
+				db.deal.create({
+					data: {
+						name: "Acquired target opportunity",
+						companyId: ids.acquired,
+						ownerId: viewerId,
+					},
+					select: { id: true },
+				}),
+			]);
+		dealIds.active = activeDeal.id;
+		dealIds.generic = genericDeal.id;
+		dealIds.rejected = rejectedDeal.id;
+		dealIds.acquired = acquiredDeal.id;
+
+		await db.activity.createMany({
+			data: [
+				{
+					type: ActivityType.TASK,
+					subject: activeTaskSubjects[0],
+					companyId: ids.needsResearch,
+					createdById: viewerId,
 				},
-				select: { id: true },
-			}),
-			db.deal.create({
-				data: {
-					name: "Generic company opportunity",
+				{
+					type: ActivityType.TASK,
+					subject: activeTaskSubjects[1],
+					contactId: activeContact.id,
+					createdById: viewerId,
+				},
+				{
+					type: ActivityType.TASK,
+					subject: activeTaskSubjects[2],
+					dealId: activeDeal.id,
+					createdById: viewerId,
+				},
+				{
+					type: ActivityType.TASK,
+					subject: "Generic company task",
 					companyId: ids.generic,
-					ownerId: viewerId,
+					createdById: viewerId,
 				},
-				select: { id: true },
-			}),
-			db.deal.create({
-				data: {
-					name: "Rejected target opportunity",
-					companyId: ids.rejected,
-					ownerId: viewerId,
+				{
+					type: ActivityType.TASK,
+					subject: "Rejected target deal task",
+					dealId: rejectedDeal.id,
+					createdById: viewerId,
 				},
-				select: { id: true },
-			}),
-			db.deal.create({
-				data: {
-					name: "Acquired target opportunity",
-					companyId: ids.acquired,
-					ownerId: viewerId,
+				{
+					type: ActivityType.TASK,
+					subject: "Acquired target deal task",
+					dealId: acquiredDeal.id,
+					createdById: viewerId,
 				},
-				select: { id: true },
-			}),
-		]);
-	dealIds.active = activeDeal.id;
-	dealIds.generic = genericDeal.id;
-	dealIds.rejected = rejectedDeal.id;
-	dealIds.acquired = acquiredDeal.id;
+				{
+					type: ActivityType.TASK,
+					subject: "Recordless task",
+					createdById: viewerId,
+				},
+			],
+		});
 
-	await db.activity.createMany({
-		data: [
-			{
-				type: ActivityType.TASK,
-				subject: activeTaskSubjects[0],
-				companyId: ids.needsResearch,
-				createdById: viewerId,
+		baselineAcquisitionWork = await db.agentTask.count({
+			where: {
+				kind: { in: [...ACQUISITION_TASK_KINDS] },
+				finishedAt: null,
 			},
-			{
-				type: ActivityType.TASK,
-				subject: activeTaskSubjects[1],
-				contactId: activeContact.id,
-				createdById: viewerId,
-			},
-			{
-				type: ActivityType.TASK,
-				subject: activeTaskSubjects[2],
-				dealId: activeDeal.id,
-				createdById: viewerId,
-			},
-			{
-				type: ActivityType.TASK,
-				subject: "Generic company task",
-				companyId: ids.generic,
-				createdById: viewerId,
-			},
-			{
-				type: ActivityType.TASK,
-				subject: "Rejected target deal task",
-				dealId: rejectedDeal.id,
-				createdById: viewerId,
-			},
-			{
-				type: ActivityType.TASK,
-				subject: "Acquired target deal task",
-				dealId: acquiredDeal.id,
-				createdById: viewerId,
-			},
-			{
-				type: ActivityType.TASK,
-				subject: "Recordless task",
-				createdById: viewerId,
-			},
-		],
-	});
-
-	baselineAcquisitionWork = await db.agentTask.count({
-		where: {
-			kind: { in: [...ACQUISITION_TASK_KINDS] },
-			finishedAt: null,
-		},
-	});
-	await db.agentTask.createMany({
-		data: [
-			{
-				companyId: ids.active,
-				kind: "acquisition-refresh",
-				reason: "Integration fixture",
-				dueAt: new Date(),
-			},
-			{
-				companyId: ids.active,
-				kind: "company-details",
-				reason: "Integration fixture",
-				dueAt: new Date(),
-			},
-		],
+		});
+		await db.agentTask.createMany({
+			data: [
+				{
+					companyId: ids.active,
+					kind: "acquisition-refresh",
+					reason: "Integration fixture",
+					dueAt: new Date(),
+				},
+				{
+					companyId: ids.active,
+					kind: "company-details",
+					reason: "Integration fixture",
+					dueAt: new Date(),
+				},
+			],
+		});
 	});
 }, 120_000);
 
@@ -317,8 +339,8 @@ afterAll(async () => {
 
 describe("acquisition target query semantics", () => {
 	it("lists active targets by default and exposes explicit historical views", async () => {
-		const active = await companies.list(
-			companyListInput.parse({ owner: viewerId }),
+		const active = await runInOrganization(WORKSPACE_ID, () =>
+			companies.list(companyListInput.parse({ owner: viewerId })),
 		);
 		expect(active.rows.map((row) => row.id).sort()).toEqual(
 			[ids.active, ids.needsResearch].sort(),
@@ -329,18 +351,24 @@ describe("acquisition target query semantics", () => {
 			[otherUserId]: 1,
 		});
 
-		const rejected = await companies.list(
-			companyListInput.parse({ owner: viewerId, targetView: "rejected" }),
+		const rejected = await runInOrganization(WORKSPACE_ID, () =>
+			companies.list(
+				companyListInput.parse({ owner: viewerId, targetView: "rejected" }),
+			),
 		);
 		expect(rejected.rows.map((row) => row.id)).toEqual([ids.rejected]);
 
-		const acquired = await companies.list(
-			companyListInput.parse({ owner: viewerId, targetView: "acquired" }),
+		const acquired = await runInOrganization(WORKSPACE_ID, () =>
+			companies.list(
+				companyListInput.parse({ owner: viewerId, targetView: "acquired" }),
+			),
 		);
 		expect(acquired.rows.map((row) => row.id)).toEqual([ids.acquired]);
 
-		const history = await companies.list(
-			companyListInput.parse({ owner: viewerId, targetView: "history" }),
+		const history = await runInOrganization(WORKSPACE_ID, () =>
+			companies.list(
+				companyListInput.parse({ owner: viewerId, targetView: "history" }),
+			),
 		);
 		expect(history.rows.map((row) => row.id).sort()).toEqual(
 			[ids.active, ids.rejected, ids.acquired, ids.needsResearch].sort(),
@@ -354,8 +382,10 @@ describe("acquisition target query semantics", () => {
 		});
 
 		try {
-			const result = await companies.list(
-				companyListInput.parse({ owner: viewerId, targetView: "rejected" }),
+			const result = await runInOrganization(WORKSPACE_ID, () =>
+				companies.list(
+					companyListInput.parse({ owner: viewerId, targetView: "rejected" }),
+				),
 			);
 			expect(result.rows.map((row) => row.id).sort()).toEqual(
 				[
@@ -375,7 +405,9 @@ describe("acquisition target query semantics", () => {
 	});
 
 	it("derives scoped dashboard metrics from active target rows", async () => {
-		const summary = await dashboard.summary(viewerId, { scope: "me" });
+		const summary = await runInOrganization(WORKSPACE_ID, () =>
+			dashboard.summary(viewerId, { scope: "me" }),
+		);
 		expect(summary.mode).toBe("ACQUISITION");
 		expect(summary.acquisition).toMatchObject({
 			totalTargets: 2,
@@ -393,9 +425,76 @@ describe("acquisition target query semantics", () => {
 			summary.acquisition?.activeOpportunities.map(
 				(opportunity) => opportunity.id,
 			),
-		).toEqual([dealIds.active]);
+		).toEqual([engagementIds.active]);
 		expect(
 			summary.acquisition?.nextActions.map((task) => task.subject).sort(),
 		).toEqual(activeTaskSubjects.toSorted());
+	});
+
+	it("does not count acquisition targets from another workspace", async () => {
+		const isolatedOrgId = crypto.randomUUID();
+		const isolatedDomain = fixtureDomain("isolated-org-target");
+		let isolatedCompanyId = "";
+
+		await db.organization.create({
+			data: {
+				id: isolatedOrgId,
+				name: "Isolated Acquisition Org",
+				slug: `iso-acq-${suffix}`,
+				createdAt: new Date(),
+			},
+		});
+		await db.acquisitionProfile.create({
+			data: {
+				id: isolatedOrgId,
+				mode: WorkspaceMode.ACQUISITION,
+				preferredIndustries: ["Services"],
+				geographies: [],
+				excludedCategories: [],
+				currency: "USD",
+			},
+		});
+
+		try {
+			await runInOrganization(isolatedOrgId, async () => {
+				const created = await db.company.create({
+					data: {
+						name: "Isolated Org Target",
+						domain: isolatedDomain,
+						ownerId: viewerId,
+						acquisitionTarget: {
+							create: {
+								stage: AcquisitionStage.QUALIFIED,
+								fit: AcquisitionFit.STRONG,
+								strengths: [],
+								concerns: [],
+								missingInformation: [],
+								sourceUrls: [],
+								researchedAt: new Date(),
+							},
+						},
+					},
+					select: { id: true },
+				});
+				isolatedCompanyId = created.id;
+			});
+
+			const summary = await runInOrganization(WORKSPACE_ID, () =>
+				dashboard.summary(viewerId, { scope: "me" }),
+			);
+
+			expect(summary.acquisition?.totalTargets).toBe(2);
+			expect(
+				summary.acquisition?.priorityTargets.some(
+					(target) => target.company.id === isolatedCompanyId,
+				),
+			).toBe(false);
+		} finally {
+			await db.company.deleteMany({
+				where: { domain: isolatedDomain },
+			});
+			await db.acquisitionProfile.delete({ where: { id: isolatedOrgId } });
+			await db.organization.delete({ where: { id: isolatedOrgId } });
+		}
 	});
 });

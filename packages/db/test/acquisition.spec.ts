@@ -1,10 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { AcquisitionStage } from "@crm/db/enums";
 import {
+	configuredCriteriaCount,
 	expectedAcquisitionCriterionIds,
-	hasAcquisitionFocus,
+	isDiscoveryReady,
+	isDossierReady,
+	acquisitionAttentionScore,
 	targetStages,
 } from "../src/acquisition";
+import { AcquisitionFit, AcquisitionStage } from "@crm/db/enums";
 
 const profile = {
 	preferredIndustries: ["HVAC"],
@@ -40,23 +43,95 @@ describe("acquisition domain", () => {
 		]);
 	});
 
-	it("requires an industry or geography for acquisition research", () => {
+	it("requires an industry or geography for discovery", () => {
 		expect(
-			hasAcquisitionFocus({ preferredIndustries: [], geographies: [] }),
+			isDiscoveryReady({ preferredIndustries: [], geographies: [] }),
 		).toBe(false);
 		expect(
-			hasAcquisitionFocus({
+			isDiscoveryReady({
 				preferredIndustries: ["HVAC"],
 				geographies: [],
 			}),
 		).toBe(true);
 	});
 
+	it("allows dossier readiness from financial criteria alone", () => {
+		expect(
+			isDossierReady({
+				preferredIndustries: [],
+				geographies: [],
+				excludedCategories: [],
+				revenueMin: 1,
+				revenueMax: null,
+				ebitdaMin: null,
+				ebitdaMax: null,
+				purchasePriceMin: null,
+				purchasePriceMax: null,
+				ownerInvolvement: null,
+				recurringRevenuePreference: null,
+				customerConcentrationMax: null,
+				assetPreference: null,
+				financingAssumptions: null,
+			}),
+		).toBe(true);
+		expect(
+			isDiscoveryReady({
+				preferredIndustries: [],
+				geographies: [],
+			}),
+		).toBe(false);
+	});
+
+	it("counts configured buy-box criteria for dashboard metrics", () => {
+		expect(configuredCriteriaCount(profile)).toBe(11);
+		expect(
+			configuredCriteriaCount({
+				preferredIndustries: ["HVAC"],
+				geographies: ["TX"],
+				excludedCategories: ["Restaurants"],
+				revenueMin: null,
+				revenueMax: null,
+				ebitdaMin: null,
+				ebitdaMax: null,
+				purchasePriceMin: null,
+				purchasePriceMax: null,
+				ownerInvolvement: null,
+				recurringRevenuePreference: null,
+				customerConcentrationMax: null,
+				assetPreference: null,
+				financingAssumptions: null,
+			}),
+		).toBe(3);
+	});
+
 	it("defines active and historical lifecycle scopes once", () => {
 		expect(targetStages("active")).not.toContain(AcquisitionStage.REJECTED);
 		expect(targetStages("active")).not.toContain(AcquisitionStage.ACQUIRED);
+		expect(targetStages("active")).not.toContain(AcquisitionStage.RESEARCHING);
 		expect(targetStages("rejected")).toEqual([AcquisitionStage.REJECTED]);
 		expect(targetStages("acquired")).toEqual([AcquisitionStage.ACQUIRED]);
 		expect(targetStages("history")).toBeNull();
+	});
+
+	it("scores attention from fit, blockers, staleness, tasks, and engagement", () => {
+		const staleBefore = new Date("2026-01-01T00:00:00.000Z");
+		expect(
+			acquisitionAttentionScore({
+				fit: AcquisitionFit.STRONG,
+				criteria: [
+					{
+						id: "revenue",
+						result: "UNKNOWN",
+						explanation: "Missing",
+						blocksQualification: true,
+						evidence: [],
+					},
+				],
+				researchedAt: null,
+				staleBefore,
+				openTaskCount: 0,
+				hasActiveEngagement: true,
+			}),
+		).toBe(490);
 	});
 });

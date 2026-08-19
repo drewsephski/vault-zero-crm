@@ -460,7 +460,7 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 									<SimpleTableRow key={opportunity.id}>
 										<TableCell className={CELL}>
 											<span className="flex min-w-0 flex-col">
-												<RecordLink kind="deal" id={opportunity.id}>
+												<RecordLink kind="company" id={opportunity.company.id}>
 													{opportunity.name}
 												</RecordLink>
 												<span className="flex min-w-0 gap-1 text-muted-foreground">

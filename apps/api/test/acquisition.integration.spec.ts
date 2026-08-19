@@ -9,14 +9,18 @@ import {
 } from "bun:test";
 import {
 	AcquisitionCandidateStatus,
+	AcquisitionEngagementStage,
+	AcquisitionEngagementStatus,
 	AcquisitionFit,
 	AcquisitionStage,
+	ActivityType,
 	db,
 	EnrichmentStatus,
 	RecordSource,
 	WorkspaceMode,
 } from "@crm/db";
 import type { AcquisitionCriterionAssessment } from "@crm/db/acquisition";
+import { proposeAcquisitionCandidates } from "@crm/db/acquisition-candidates";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import { acquireCanonicalWorkspaceFixture } from "../../../packages/db/test/canonical-workspace-fixture";
 import { AcquisitionService } from "../src/acquisition/acquisition.service";
@@ -455,7 +459,7 @@ describe("acquisition target mutations", () => {
 			companyId: company.id,
 			created: true,
 			targetCreated: true,
-			stage: AcquisitionStage.RESEARCHING,
+			stage: AcquisitionStage.DISCOVERED,
 			research: { status: "queued" },
 		});
 		expect(company).toMatchObject({
@@ -464,7 +468,7 @@ describe("acquisition target mutations", () => {
 			website: `https://${domain}`,
 			source: RecordSource.MANUAL,
 			acquisitionTarget: {
-				stage: AcquisitionStage.RESEARCHING,
+				stage: AcquisitionStage.DISCOVERED,
 				fit: AcquisitionFit.UNKNOWN,
 			},
 		});
@@ -617,7 +621,7 @@ describe("acquisition target mutations", () => {
 			companyId: company.id,
 			created: false,
 			targetCreated: true,
-			stage: AcquisitionStage.RESEARCHING,
+			stage: AcquisitionStage.DISCOVERED,
 			research: { status: "queued" },
 		});
 	});
@@ -648,7 +652,7 @@ describe("acquisition target mutations", () => {
 		).toBe(0);
 	});
 
-	it("blocks target research without a focused buy box", async () => {
+	it("blocks target research without any configured buy-box criteria", async () => {
 		const domain = `unfocused-target-${crypto.randomUUID()}.test`;
 		domains.push(domain);
 		const company = await db.company.create({
@@ -657,7 +661,22 @@ describe("acquisition target mutations", () => {
 		companyIds.push(company.id);
 		await db.acquisitionProfile.update({
 			where: { id: WORKSPACE_ID },
-			data: { preferredIndustries: [], geographies: [] },
+			data: {
+				preferredIndustries: [],
+				geographies: [],
+				excludedCategories: [],
+				revenueMin: null,
+				revenueMax: null,
+				ebitdaMin: null,
+				ebitdaMax: null,
+				purchasePriceMin: null,
+				purchasePriceMax: null,
+				ownerInvolvement: null,
+				recurringRevenuePreference: null,
+				customerConcentrationMax: null,
+				assetPreference: null,
+				financingAssumptions: null,
+			},
 		});
 
 		const result = await service().addTarget(company.id, "reviewer-1");
@@ -674,6 +693,39 @@ describe("acquisition target mutations", () => {
 				where: { companyId: company.id, kind: "acquisition-refresh" },
 			}),
 		).toBe(0);
+	});
+
+	it("queues research for a financial-only buy box without industry or geography", async () => {
+		const domain = `financial-only-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const company = await db.company.create({
+			data: { name: "Financial Only Target", domain },
+		});
+		companyIds.push(company.id);
+		await db.acquisitionProfile.update({
+			where: { id: WORKSPACE_ID },
+			data: {
+				preferredIndustries: [],
+				geographies: [],
+				excludedCategories: [],
+				revenueMin: 1_000_000,
+				revenueMax: null,
+				ebitdaMin: null,
+				ebitdaMax: null,
+				purchasePriceMin: null,
+				purchasePriceMax: null,
+				ownerInvolvement: null,
+				recurringRevenuePreference: null,
+				customerConcentrationMax: null,
+				assetPreference: null,
+				financingAssumptions: null,
+			},
+		});
+
+		const result = await service().addTarget(company.id, "reviewer-1");
+
+		expect(result.research.status).toBe("queued");
+		expect(result.stage).toBe(AcquisitionStage.DISCOVERED);
 	});
 
 	it("reports queue failure and leaves the target discovered", async () => {
@@ -813,7 +865,7 @@ describe("acquisition candidate review", () => {
 
 		expect(approved.created).toBe(true);
 		expect(company.source).toBe(RecordSource.DISCOVERY);
-		expect(company.acquisitionTarget?.stage).toBe(AcquisitionStage.RESEARCHING);
+		expect(company.acquisitionTarget?.stage).toBe(AcquisitionStage.DISCOVERED);
 		expect(company.acquisitionTarget?.fit).toBe(AcquisitionFit.UNKNOWN);
 		expect(company.discoveryCandidate?.status).toBe(
 			AcquisitionCandidateStatus.APPROVED,
@@ -833,7 +885,7 @@ describe("acquisition candidate review", () => {
 			companyId: company.id,
 			created: false,
 			targetCreated: false,
-			stage: AcquisitionStage.RESEARCHING,
+			stage: AcquisitionStage.DISCOVERED,
 			research: { status: "queued" },
 		});
 		expect(
@@ -864,10 +916,74 @@ describe("acquisition candidate review", () => {
 
 		await service().dismissCandidate(candidate.id);
 
-		expect(
-			await db.acquisitionCandidate.findUnique({ where: { id: candidate.id } }),
-		).toMatchObject({ status: AcquisitionCandidateStatus.DISMISSED });
+		const dismissed = await db.acquisitionCandidate.findUnique({
+			where: { id: candidate.id },
+		});
+		expect(dismissed).toMatchObject({
+			status: AcquisitionCandidateStatus.DISMISSED,
+			dismissedAt: expect.any(Date),
+			dismissedBuyBoxRevision: expect.any(Number),
+		});
 		expect(await db.company.findFirst({ where: { domain } })).toBeNull();
+	});
+
+	it("skips reproposing a dismissed candidate until the buy box revision advances", async () => {
+		const domain = `revival-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const candidate = await db.acquisitionCandidate.create({
+			data: {
+				name: "Revival Candidate",
+				domain,
+				website: `https://${domain}`,
+				rationale:
+					"The candidate was dismissed but may return after buy box changes.",
+				evidence: "The source confirms the operating company exists.",
+				sourceUrl: `https://${domain}`,
+			},
+		});
+
+		await service().dismissCandidate(candidate.id);
+
+		const proposal = {
+			name: "Revival Candidate",
+			domain,
+			website: `https://${domain}`,
+			rationale:
+				"Updated thesis still points at the same operating company profile.",
+			evidence: "Fresh evidence from the company website confirms services.",
+			sourceUrl: `https://${domain}/services`,
+		};
+
+		const blocked = await proposeAcquisitionCandidates(
+			db,
+			WORKSPACE_ID,
+			[proposal],
+		);
+		expect(blocked).toMatchObject({ saved: 0, revived: 0, skipped: 1 });
+
+		await db.acquisitionProfile.update({
+			where: { id: WORKSPACE_ID },
+			data: {
+				preferredIndustries: ["Updated industrial services"],
+				buyBoxRevision: { increment: 1 },
+			},
+		});
+
+		const revived = await proposeAcquisitionCandidates(db, WORKSPACE_ID, [
+			proposal,
+		]);
+		expect(revived).toMatchObject({ saved: 0, revived: 1, skipped: 0 });
+
+		const row = await db.acquisitionCandidate.findUnique({
+			where: { id: candidate.id },
+		});
+		expect(row).toMatchObject({
+			id: candidate.id,
+			status: AcquisitionCandidateStatus.PROPOSED,
+			rationale: proposal.rationale,
+			dismissedAt: null,
+			dismissedBuyBoxRevision: null,
+		});
 	});
 
 	it("attaches a candidate to an existing company without duplicating it", async () => {
@@ -899,7 +1015,7 @@ describe("acquisition candidate review", () => {
 			companyId: company.id,
 			created: false,
 			targetCreated: true,
-			stage: AcquisitionStage.RESEARCHING,
+			stage: AcquisitionStage.DISCOVERED,
 			research: { status: "queued" },
 		});
 		expect(await db.company.count({ where: { domain } })).toBe(1);
@@ -907,7 +1023,7 @@ describe("acquisition candidate review", () => {
 			await db.acquisitionTarget.findUnique({
 				where: { companyId: company.id },
 			}),
-		).toMatchObject({ stage: AcquisitionStage.RESEARCHING });
+		).toMatchObject({ stage: AcquisitionStage.DISCOVERED });
 		expect(
 			await db.agentTask.count({
 				where: {
@@ -1120,5 +1236,174 @@ describe("acquisition candidate review", () => {
 			companies.research("unfocused-target", "reviewer-1"),
 		).rejects.toThrow("Add at least one preferred industry or geography");
 		expect(requested).toBe(false);
+	});
+});
+
+describe("eve recommendations and acquisition engagements", () => {
+	it("accepts and dismisses Eve stage recommendations", async () => {
+		const domain = `eve-stage-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const company = await db.company.create({
+			data: {
+				name: "Eve Stage Target",
+				domain,
+				acquisitionTarget: {
+					create: {
+						stage: AcquisitionStage.DISCOVERED,
+						fit: AcquisitionFit.POTENTIAL,
+						strengths: [],
+						concerns: [],
+						missingInformation: [],
+						sourceUrls: [],
+						recommendedStage: AcquisitionStage.QUALIFIED,
+					},
+				},
+			},
+		});
+		companyIds.push(company.id);
+		const idempotencyKey = crypto.randomUUID();
+
+		const accepted = await service().acceptRecommendedStage(
+			company.id,
+			"reviewer-1",
+			idempotencyKey,
+		);
+		expect(accepted).toMatchObject({
+			companyId: company.id,
+			stage: AcquisitionStage.QUALIFIED,
+			recommendedStage: null,
+		});
+		expect(
+			await db.activity.count({
+				where: {
+					companyId: company.id,
+					type: ActivityType.STAGE_CHANGE,
+					meta: { path: ["source"], equals: "eve-recommendation" },
+				},
+			}),
+		).toBe(1);
+
+		const acceptedAgain = await service().acceptRecommendedStage(
+			company.id,
+			"reviewer-1",
+			idempotencyKey,
+		);
+		expect(acceptedAgain.stage).toBe(AcquisitionStage.QUALIFIED);
+
+		await db.acquisitionTarget.update({
+			where: { companyId: company.id },
+			data: { recommendedStage: AcquisitionStage.WATCHLIST },
+		});
+		const dismissed = await service().dismissRecommendedStage(
+			company.id,
+			"reviewer-1",
+		);
+		expect(dismissed).toMatchObject({
+			stage: AcquisitionStage.QUALIFIED,
+			recommendedStage: null,
+		});
+	});
+
+	it("accepts and dismisses Eve action recommendations", async () => {
+		const domain = `eve-action-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const company = await db.company.create({
+			data: {
+				name: "Eve Action Target",
+				domain,
+				acquisitionTarget: {
+					create: {
+						stage: AcquisitionStage.QUALIFIED,
+						fit: AcquisitionFit.STRONG,
+						strengths: [],
+						concerns: [],
+						missingInformation: [],
+						sourceUrls: [],
+						recommendedAction: "Request owner financials",
+					},
+				},
+			},
+		});
+		companyIds.push(company.id);
+		const idempotencyKey = crypto.randomUUID();
+
+		const accepted = await service().acceptRecommendedAction(
+			company.id,
+			"reviewer-1",
+			idempotencyKey,
+		);
+		expect(accepted.taskId).toBeString();
+		expect(
+			await db.acquisitionTarget.findUnique({
+				where: { companyId: company.id },
+				select: { recommendedAction: true },
+			}),
+		).toMatchObject({ recommendedAction: null });
+
+		await db.acquisitionTarget.update({
+			where: { companyId: company.id },
+			data: { recommendedAction: "Schedule diligence call" },
+		});
+		const dismissed = await service().dismissRecommendedAction(
+			company.id,
+			"reviewer-1",
+		);
+		expect(dismissed).toEqual({
+			companyId: company.id,
+			recommendedAction: null,
+		});
+	});
+
+	it("creates engagements with idempotency and one active row per company", async () => {
+		const domain = `engagement-${crypto.randomUUID()}.test`;
+		domains.push(domain);
+		const company = await db.company.create({
+			data: { name: "Engagement Target", domain },
+		});
+		companyIds.push(company.id);
+		const idempotencyKey = crypto.randomUUID();
+		const acquisition = service();
+
+		const created = await acquisition.createEngagement(
+			{
+				companyId: company.id,
+				idempotencyKey,
+				stage: AcquisitionEngagementStage.OUTREACH,
+			},
+			"reviewer-1",
+		);
+		expect(created).toMatchObject({
+			companyId: company.id,
+			stage: AcquisitionEngagementStage.OUTREACH,
+			status: AcquisitionEngagementStatus.ACTIVE,
+		});
+
+		const again = await acquisition.createEngagement(
+			{ companyId: company.id, idempotencyKey },
+			"reviewer-1",
+		);
+		expect(again.id).toBe(created.id);
+
+		await expect(
+			acquisition.createEngagement(
+				{ companyId: company.id, idempotencyKey: crypto.randomUUID() },
+				"reviewer-1",
+			),
+		).rejects.toThrow("already has an active acquisition engagement");
+
+		const listed = await acquisition.listEngagements({
+			companyId: company.id,
+			status: AcquisitionEngagementStatus.ACTIVE,
+		});
+		expect(listed).toHaveLength(1);
+
+		const updated = await acquisition.updateEngagementStage(
+			{
+				engagementId: created.id,
+				stage: AcquisitionEngagementStage.ENGAGED,
+			},
+			"reviewer-1",
+		);
+		expect(updated.stage).toBe(AcquisitionEngagementStage.ENGAGED);
 	});
 });

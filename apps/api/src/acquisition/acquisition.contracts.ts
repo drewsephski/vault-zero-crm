@@ -36,14 +36,26 @@ export const updateAcquisitionTargetInput = z.object({
 	companyId: z.string().min(1),
 	stage: z.enum([
 		AcquisitionStage.DISCOVERED,
-		AcquisitionStage.RESEARCHING,
 		AcquisitionStage.QUALIFIED,
 		AcquisitionStage.WATCHLIST,
-		AcquisitionStage.CONTACTED,
-		AcquisitionStage.INTERESTED,
-		AcquisitionStage.OPPORTUNITY,
-		AcquisitionStage.DILIGENCE,
 		AcquisitionStage.REJECTED,
 		AcquisitionStage.ACQUIRED,
 	]),
 });
+
+export const acquisitionCompanyIdInput = z.object({
+	companyId: z.string().min(1),
+});
+
+export const acceptRecommendedStageInput = acquisitionCompanyIdInput.extend({
+	idempotencyKey: z.string().uuid().optional(),
+});
+
+export const dismissRecommendedStageInput = acquisitionCompanyIdInput;
+
+export const acceptRecommendedActionInput = acquisitionCompanyIdInput.extend({
+	idempotencyKey: z.string().uuid().optional(),
+	dueAt: z.string().datetime().optional(),
+});
+
+export const dismissRecommendedActionInput = acquisitionCompanyIdInput;

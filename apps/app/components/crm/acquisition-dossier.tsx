@@ -90,6 +90,42 @@ export function AcquisitionDossier({
 			onError: (error) => toast.error(error.message),
 		}),
 	);
+	const acceptRecommendedStage = useMutation(
+		trpc.acquisition.acceptRecommendedStage.mutationOptions({
+			onSuccess: () => {
+				cache.acquisition(company.id, { settle: "record" });
+				toast.success("Stage recommendation applied.");
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+	const dismissRecommendedStage = useMutation(
+		trpc.acquisition.dismissRecommendedStage.mutationOptions({
+			onSuccess: () => {
+				cache.acquisition(company.id, { settle: "record" });
+				toast.success("Stage recommendation dismissed.");
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+	const acceptRecommendedAction = useMutation(
+		trpc.acquisition.acceptRecommendedAction.mutationOptions({
+			onSuccess: () => {
+				cache.acquisition(company.id, { settle: "record" });
+				toast.success("Task created from Eve recommendation.");
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+	const dismissRecommendedAction = useMutation(
+		trpc.acquisition.dismissRecommendedAction.mutationOptions({
+			onSuccess: () => {
+				cache.acquisition(company.id, { settle: "record" });
+				toast.success("Action recommendation dismissed.");
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
 	const research = useMutation(
 		trpc.companies.research.mutationOptions({
 			onSuccess: async () => {
@@ -116,6 +152,15 @@ export function AcquisitionDossier({
 		? targetResearchCopy(readinessState)
 		: null;
 	const groups = criterionGroups(target.criteria);
+	const pendingStageRecommendation =
+		target.recommendedStage && target.recommendedStage !== target.stage
+			? target.recommendedStage
+			: null;
+	const recommendationPending =
+		acceptRecommendedStage.isPending ||
+		dismissRecommendedStage.isPending ||
+		acceptRecommendedAction.isPending ||
+		dismissRecommendedAction.isPending;
 
 	return (
 		<DetailSheetBody>
@@ -284,7 +329,63 @@ export function AcquisitionDossier({
 					{target.recommendedAction ??
 						"Research this target before deciding what to do next."}
 				</DetailSheetProse>
+				{target.recommendedAction ? (
+					<div className="mt-3 flex flex-wrap gap-2">
+						<Button
+							size="sm"
+							disabled={recommendationPending}
+							onClick={() =>
+								acceptRecommendedAction.mutate({ companyId: company.id })
+							}
+						>
+							Create task
+						</Button>
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={recommendationPending}
+							onClick={() =>
+								dismissRecommendedAction.mutate({ companyId: company.id })
+							}
+						>
+							Dismiss
+						</Button>
+					</div>
+				) : null}
 			</DetailSheetSection>
+
+			{pendingStageRecommendation ? (
+				<Alert>
+					<AlertTitle>Eve recommends a lifecycle change</AlertTitle>
+					<AlertDescription>
+						Move this target to{" "}
+						{acquisitionStageLabel(pendingStageRecommendation)}.
+					</AlertDescription>
+					<AlertAction>
+						<div className="flex flex-wrap gap-2">
+							<Button
+								size="sm"
+								disabled={recommendationPending}
+								onClick={() =>
+									acceptRecommendedStage.mutate({ companyId: company.id })
+								}
+							>
+								Accept recommendation
+							</Button>
+							<Button
+								size="sm"
+								variant="outline"
+								disabled={recommendationPending}
+								onClick={() =>
+									dismissRecommendedStage.mutate({ companyId: company.id })
+								}
+							>
+								Dismiss
+							</Button>
+						</div>
+					</AlertAction>
+				</Alert>
+			) : null}
 
 			<DetailSheetSection title="Lifecycle">
 				<DetailSheetProperties columns={1}>

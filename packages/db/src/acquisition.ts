@@ -1,4 +1,4 @@
-import { AcquisitionStage } from "./generated/prisma/enums";
+import { AcquisitionFit, AcquisitionStage } from "./generated/prisma/enums";
 
 export const ACQUISITION_CRITERION_IDS = [
 	"industry",
@@ -33,13 +33,8 @@ export const ACQUISITION_TASK_INTERVAL_MS = {
 
 export const ACTIVE_ACQUISITION_STAGES = [
 	AcquisitionStage.DISCOVERED,
-	AcquisitionStage.RESEARCHING,
 	AcquisitionStage.QUALIFIED,
 	AcquisitionStage.WATCHLIST,
-	AcquisitionStage.CONTACTED,
-	AcquisitionStage.INTERESTED,
-	AcquisitionStage.OPPORTUNITY,
-	AcquisitionStage.DILIGENCE,
 ] as const;
 
 export type AcquisitionCriterionId = (typeof ACQUISITION_CRITERION_IDS)[number];
@@ -88,10 +83,24 @@ type AcquisitionCriteriaProfile = AcquisitionFocus & {
 	financingAssumptions: string | null;
 };
 
-export function hasAcquisitionFocus(profile: AcquisitionFocus): boolean {
+export function isDiscoveryReady(profile: AcquisitionFocus): boolean {
 	return (
 		profile.preferredIndustries.length > 0 || profile.geographies.length > 0
 	);
+}
+
+export function isDossierReady(profile: AcquisitionCriteriaProfile): boolean {
+	return expectedAcquisitionCriterionIds(profile).length > 0;
+}
+
+export function configuredCriteriaCount(
+	profile: AcquisitionCriteriaProfile,
+): number {
+	return expectedAcquisitionCriterionIds(profile).length;
+}
+
+export function hasAcquisitionFocus(profile: AcquisitionFocus): boolean {
+	return isDiscoveryReady(profile);
 }
 
 export function expectedAcquisitionCriterionIds(
@@ -133,4 +142,37 @@ export function targetStages(
 	if (view === "rejected") return [AcquisitionStage.REJECTED];
 	if (view === "acquired") return [AcquisitionStage.ACQUIRED];
 	return null;
+}
+
+const FIT_ATTENTION_WEIGHT: Record<AcquisitionFit, number> = {
+	STRONG: 300,
+	POTENTIAL: 200,
+	UNKNOWN: 100,
+	WEAK: 0,
+	DISQUALIFIED: 0,
+};
+
+export function acquisitionAttentionScore(input: {
+	fit: AcquisitionFit;
+	criteria: AcquisitionCriterionAssessment[] | null | undefined;
+	researchedAt: Date | null;
+	staleBefore: Date;
+	openTaskCount: number;
+	hasActiveEngagement: boolean;
+}): number {
+	let score = FIT_ATTENTION_WEIGHT[input.fit] ?? 0;
+	const criteria = input.criteria ?? [];
+	if (
+		criteria.some(
+			(criterion) =>
+				criterion.blocksQualification && criterion.result === "UNKNOWN",
+		)
+	) {
+		score += 80;
+	}
+	if (!input.researchedAt) score += 60;
+	else if (input.researchedAt < input.staleBefore) score += 40;
+	if (input.openTaskCount === 0) score += 30;
+	if (input.hasActiveEngagement) score += 20;
+	return score;
 }

@@ -13,6 +13,7 @@ import {
 	ACQUISITION_CRITERION_RESULTS,
 	type AcquisitionCriterionAssessment,
 	isAcquisitionEvidenceUrl,
+	isDossierReady,
 } from "@crm/db/acquisition";
 import { getOrganizationId } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
@@ -43,7 +44,7 @@ import {
 	paginate,
 	resolveOrderBy,
 } from "../trpc/list-input";
-import { hasDiscoveryFocus } from "../workspace/workspace.service";
+import { isDiscoveryReady } from "@crm/db/acquisition";
 import type {
 	CompanyBulkUpdateInput,
 	CompanyCreateInput,
@@ -617,6 +618,18 @@ export class CompaniesService {
 					mode: true,
 					preferredIndustries: true,
 					geographies: true,
+					excludedCategories: true,
+					revenueMin: true,
+					revenueMax: true,
+					ebitdaMin: true,
+					ebitdaMax: true,
+					purchasePriceMin: true,
+					purchasePriceMax: true,
+					ownerInvolvement: true,
+					recurringRevenuePreference: true,
+					customerConcentrationMax: true,
+					assetPreference: true,
+					financingAssumptions: true,
 				},
 			}),
 		]);
@@ -631,9 +644,9 @@ export class CompaniesService {
 					"Add this company to targets before analyzing fit.",
 				);
 			}
-			if (!hasDiscoveryFocus(profile)) {
+			if (!isDossierReady(profile)) {
 				throw new BadRequestException(
-					"Add at least one preferred industry or geography to the buy box before analyzing fit.",
+					"Complete at least one buy-box criterion before analyzing fit.",
 				);
 			}
 			return this.analyzeAcquisition(id, actingUserId);

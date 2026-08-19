@@ -1,6 +1,7 @@
 import { WORKSPACE_ID } from "@crm/auth";
 import {
 	AcquisitionCandidateStatus,
+	AcquisitionEngagementStatus,
 	AcquisitionFit,
 	ActivityType,
 	type Db,
@@ -8,7 +9,7 @@ import {
 	type Prisma,
 	WorkspaceMode,
 } from "@crm/db";
-import { ACQUISITION_TASK_KINDS } from "@crm/db/acquisition";
+import { ACQUISITION_TASK_KINDS, acquisitionAttentionScore } from "@crm/db/acquisition";
 import { getOrganizationId } from "@crm/db/tenancy";
 import { Injectable } from "@nestjs/common";
 import {
@@ -21,6 +22,8 @@ import { InjectDatabase } from "../database/database.constants";
 import { OPEN_DEAL_STAGES } from "../deals/deal-stage";
 import {
 	ACQUISITION_STALE_DAYS,
+	PRIORITY_TARGET_DISPLAY_LIMIT,
+	PRIORITY_TARGET_QUERY_CAP,
 	visibleCriteriaCount,
 } from "./acquisition-summary";
 import type { DashboardSummaryInput } from "./dashboard.contracts";
@@ -398,14 +401,11 @@ export class DashboardService {
 			? { ownerId: actingUserId }
 			: {};
 		const activeTargetWhere = acquisitionTargetWhere("active", companyWhere);
-		const dealWhere: Prisma.DealWhereInput = mine
-			? { ownerId: actingUserId }
-			: {};
 		const activeCompanyWhere = companyTargetWhere("active", {});
-		const activeDealWhere: Prisma.DealWhereInput = {
+		const activeEngagementWhere: Prisma.AcquisitionEngagementWhereInput = {
 			AND: [
-				dealWhere,
-				{ stage: { in: [...OPEN_DEAL_STAGES] } },
+				{ status: AcquisitionEngagementStatus.ACTIVE },
+				...(mine ? [{ ownerId: actingUserId }] : []),
 				{ company: { is: activeCompanyWhere } },
 			],
 		};
@@ -436,6 +436,42 @@ export class DashboardService {
 		);
 		const hasVisibleCriteria = visibleCriteriaCount(profile) > 0;
 
+		const priorityTargetSelect = {
+			fit: true,
+			stage: true,
+			summary: true,
+			recommendedAction: true,
+			researchedAt: true,
+			criteria: true,
+			company: {
+				select: {
+					id: true,
+					name: true,
+					industry: true,
+					city: true,
+					stateCode: true,
+					iconUrl: true,
+					iconDarkUrl: true,
+					iconTone: true,
+					_count: {
+						select: {
+							activities: {
+								where: {
+									type: ActivityType.TASK,
+									completedAt: null,
+								},
+							},
+							acquisitionEngagements: {
+								where: {
+									status: AcquisitionEngagementStatus.ACTIVE,
+								},
+							},
+						},
+					},
+				},
+			},
+		} as const;
+
 		const [
 			totalTargets,
 			visibleMatches,
@@ -446,7 +482,6 @@ export class DashboardService {
 			activeOpportunities,
 			nextActionCount,
 			nextActions,
-			priorityTargets,
 			candidateCount,
 			candidates,
 			activeAgentWork,
@@ -476,13 +511,13 @@ export class DashboardService {
 					AND: [activeTargetWhere, { researchedAt: { lt: staleBefore } }],
 				},
 			}),
-			this.db.deal.count({
-				where: activeDealWhere,
+			this.db.acquisitionEngagement.count({
+				where: activeEngagementWhere,
 			}),
-			this.db.deal.count({
+			this.db.acquisitionEngagement.count({
 				where: {
 					AND: [
-						activeDealWhere,
+						activeEngagementWhere,
 						{
 							activities: {
 								none: { type: ActivityType.TASK, completedAt: null },
@@ -491,13 +526,13 @@ export class DashboardService {
 					],
 				},
 			}),
-			this.db.deal.findMany({
-				where: activeDealWhere,
+			this.db.acquisitionEngagement.findMany({
+				where: activeEngagementWhere,
 				orderBy: [{ stageChangedAt: "asc" }, { createdAt: "desc" }],
 				take: 6,
 				select: {
 					id: true,
-					name: true,
+					stage: true,
 					stageChangedAt: true,
 					company: { select: { id: true, name: true } },
 					_count: {
@@ -530,39 +565,6 @@ export class DashboardService {
 					deal: { select: { id: true, name: true } },
 				},
 			}),
-			this.db.acquisitionTarget.findMany({
-				where: {
-					AND: [
-						activeTargetWhere,
-						{
-							fit: {
-								in: [AcquisitionFit.STRONG, AcquisitionFit.POTENTIAL],
-							},
-						},
-					],
-				},
-				orderBy: [{ researchedAt: "desc" }, { updatedAt: "desc" }],
-				take: 8,
-				select: {
-					fit: true,
-					stage: true,
-					summary: true,
-					recommendedAction: true,
-					researchedAt: true,
-					company: {
-						select: {
-							id: true,
-							name: true,
-							industry: true,
-							city: true,
-							stateCode: true,
-							iconUrl: true,
-							iconDarkUrl: true,
-							iconTone: true,
-						},
-					},
-				},
-			}),
 			this.db.acquisitionCandidate.count({
 				where: { status: AcquisitionCandidateStatus.PROPOSED },
 			}),
@@ -589,6 +591,51 @@ export class DashboardService {
 			}),
 		]);
 
+		const [strongPriorityTargets, potentialPriorityTargets] = await Promise.all([
+			this.db.acquisitionTarget.findMany({
+				where: {
+					AND: [activeTargetWhere, { fit: AcquisitionFit.STRONG }],
+				},
+				orderBy: [{ researchedAt: "desc" }, { updatedAt: "desc" }],
+				take: PRIORITY_TARGET_QUERY_CAP,
+				select: priorityTargetSelect,
+			}),
+			this.db.acquisitionTarget.findMany({
+				where: {
+					AND: [activeTargetWhere, { fit: AcquisitionFit.POTENTIAL }],
+				},
+				orderBy: [{ researchedAt: "desc" }, { updatedAt: "desc" }],
+				take: PRIORITY_TARGET_QUERY_CAP,
+				select: priorityTargetSelect,
+			}),
+		]);
+		const priorityTargets = [...strongPriorityTargets, ...potentialPriorityTargets]
+			.sort((left, right) => {
+				const leftScore = acquisitionAttentionScore({
+					fit: left.fit,
+					criteria: left.criteria as never,
+					researchedAt: left.researchedAt,
+					staleBefore,
+					openTaskCount: left.company._count.activities,
+					hasActiveEngagement:
+						left.company._count.acquisitionEngagements > 0,
+				});
+				const rightScore = acquisitionAttentionScore({
+					fit: right.fit,
+					criteria: right.criteria as never,
+					researchedAt: right.researchedAt,
+					staleBefore,
+					openTaskCount: right.company._count.activities,
+					hasActiveEngagement:
+						right.company._count.acquisitionEngagements > 0,
+				});
+				if (rightScore !== leftScore) return rightScore - leftScore;
+				const leftResearch = left.researchedAt?.getTime() ?? 0;
+				const rightResearch = right.researchedAt?.getTime() ?? 0;
+				return rightResearch - leftResearch;
+			})
+			.slice(0, PRIORITY_TARGET_DISPLAY_LIMIT);
+
 		return {
 			totalTargets,
 			visibleMatches,
@@ -597,13 +644,22 @@ export class DashboardService {
 			staleTargets,
 			staleAfterDays: ACQUISITION_STALE_DAYS,
 			activeAgentWork,
-			priorityTargets: priorityTargets
-				.sort((left, right) => fitRank(right.fit) - fitRank(left.fit))
-				.slice(0, 6)
-				.map(({ researchedAt, ...target }) => ({
+			priorityTargets: priorityTargets.map(
+				({ researchedAt, criteria: _criteria, company, ...target }) => ({
 					...target,
+					company: {
+						id: company.id,
+						name: company.name,
+						industry: company.industry,
+						city: company.city,
+						stateCode: company.stateCode,
+						iconUrl: company.iconUrl,
+						iconDarkUrl: company.iconDarkUrl,
+						iconTone: company.iconTone,
+					},
 					researchedAt: researchedAt?.toISOString() ?? null,
-				})),
+				}),
+			),
 			discovery: {
 				count: candidateCount,
 				items: candidates.map(({ createdAt, ...candidate }) => ({
@@ -614,8 +670,11 @@ export class DashboardService {
 			activeAcquisitions,
 			missingNextActions,
 			activeOpportunities: activeOpportunities.map(
-				({ stageChangedAt, _count, ...opportunity }) => ({
-					...opportunity,
+				({ stageChangedAt, stage, company, _count, ...opportunity }) => ({
+					id: opportunity.id,
+					name: company.name,
+					stage,
+					company,
 					stageChangedAt: stageChangedAt.toISOString(),
 					hasNextAction: _count.activities > 0,
 				}),
@@ -627,14 +686,6 @@ export class DashboardService {
 			})),
 		};
 	}
-}
-
-function fitRank(fit: AcquisitionFit): number {
-	return fit === AcquisitionFit.STRONG
-		? 2
-		: fit === AcquisitionFit.POTENTIAL
-			? 1
-			: 0;
 }
 
 function payloadText(payload: unknown, key: string): string | null {

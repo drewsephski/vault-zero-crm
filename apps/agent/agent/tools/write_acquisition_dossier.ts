@@ -48,13 +48,8 @@ export default defineTool({
 		recommendedStage: z
 			.enum([
 				AcquisitionStage.DISCOVERED,
-				AcquisitionStage.RESEARCHING,
 				AcquisitionStage.QUALIFIED,
 				AcquisitionStage.WATCHLIST,
-				AcquisitionStage.CONTACTED,
-				AcquisitionStage.INTERESTED,
-				AcquisitionStage.OPPORTUNITY,
-				AcquisitionStage.DILIGENCE,
 				AcquisitionStage.REJECTED,
 				AcquisitionStage.ACQUIRED,
 			])
