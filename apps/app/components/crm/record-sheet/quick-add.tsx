@@ -18,7 +18,10 @@ function clean(value: string): string {
 	return value.trim();
 }
 
-function parseAmountCents(input: string): { cents: number | null; error: string | null } {
+function parseAmountCents(input: string): {
+	cents: number | null;
+	error: string | null;
+} {
 	if (input === "") {
 		return { cents: null, error: null };
 	}
@@ -259,15 +262,13 @@ export function QuickAddDeal({
 	const nextAmount = clean(amount);
 	const nextAmountParse = parseAmountCents(nextAmount);
 	const amountError =
-		touchedAmount || nextAmount !== ""
-			? nextAmountParse.error
-			: null;
+		touchedAmount || nextAmount !== "" ? nextAmountParse.error : null;
 	const isOwnerResolving = ownerId === null && me.isLoading;
 	const canSubmit =
 		nextName !== "" &&
-			amountError === null &&
-			owner !== null &&
-			!isOwnerResolving;
+		amountError === null &&
+		owner !== null &&
+		!isOwnerResolving;
 
 	const create = useMutation(
 		trpc.deals.create.mutationOptions({
@@ -353,12 +354,12 @@ export function QuickAddDeal({
 			</Field>
 			<Field>
 				<FieldLabel htmlFor={closeId}>Close date</FieldLabel>
-					<DatePicker
-						id={closeId}
-						value={closeDate || null}
-						onChange={(next) => setCloseDate(next)}
-						placeholder="Optional"
-					/>
+				<DatePicker
+					id={closeId}
+					value={closeDate || null}
+					onChange={(next) => setCloseDate(next)}
+					placeholder="Optional"
+				/>
 			</Field>
 		</QuickAddForm>
 	);

@@ -8,7 +8,7 @@ const optional = (key: string): string | undefined => {
 	return value && value.length > 0 ? value : undefined;
 };
 
-const googleCredentials = (): 
+const googleCredentials = ():
 	| { clientId: string; clientSecret: string }
 	| undefined => {
 	const clientId = optional("GOOGLE_CLIENT_ID");
@@ -28,10 +28,10 @@ const googleCredentials = ():
 
 const microsoftCredentials = ():
 	| {
-		clientId: string;
-		clientSecret: string;
-		tenantId?: string;
-	}
+			clientId: string;
+			clientSecret: string;
+			tenantId?: string;
+	  }
 	| undefined => {
 	const clientId = optional("MICROSOFT_CLIENT_ID");
 	const clientSecret = optional("MICROSOFT_CLIENT_SECRET");
@@ -46,7 +46,9 @@ const microsoftCredentials = ():
 		return undefined;
 	}
 
-	return tenantId ? { clientId, clientSecret, tenantId } : { clientId, clientSecret };
+	return tenantId
+		? { clientId, clientSecret, tenantId }
+		: { clientId, clientSecret };
 };
 
 const apiUrl =

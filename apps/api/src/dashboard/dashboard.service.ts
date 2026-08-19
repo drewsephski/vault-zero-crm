@@ -9,6 +9,7 @@ import {
 	WorkspaceMode,
 } from "@crm/db";
 import { ACQUISITION_TASK_KINDS } from "@crm/db/acquisition";
+import { getOrganizationId } from "@crm/db/tenancy";
 import { Injectable } from "@nestjs/common";
 import {
 	acquisitionTargetWhere,
@@ -59,7 +60,7 @@ export class DashboardService {
 		const owned = mine ? { ownerId: actingUserId } : {};
 		const now = new Date();
 		const acquisitionProfile = await this.db.acquisitionProfile.findUnique({
-			where: { id: WORKSPACE_ID },
+			where: { id: getOrganizationId() ?? WORKSPACE_ID },
 		});
 
 		if (acquisitionProfile?.mode === WorkspaceMode.ACQUISITION) {

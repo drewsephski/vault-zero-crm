@@ -2,9 +2,9 @@ import { DEFAULT_WORKSPACE_NAME } from "@crm/auth";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AuthHeading, AuthShell } from "@/components/auth-shell";
-import { requireGoogleAccess } from "@/lib/session";
-import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { hasCompletedAcquisitionWorkspace } from "@/lib/onboarding";
+import { requireSession } from "@/lib/session";
+import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { workspaceUrl } from "@/lib/workspace-url";
 import { OnboardingForm } from "./onboarding-form";
 
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export const instant = false;
 
 export default async function OnboardingPage() {
-	await requireGoogleAccess();
+	await requireSession();
 
 	const workspace = await getServerQueryClient()
 		.fetchQuery(getServerTrpc().workspace.get.queryOptions())

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { isGoogleConfigured, WORKSPACE_ID } from "@crm/auth";
+import { isGoogleConfigured } from "@crm/auth";
 import type { Db } from "@crm/db";
 import { ForbiddenException } from "@nestjs/common";
 import { SsoService } from "../src/sso/sso.service";
@@ -25,7 +25,8 @@ function service(role: string | null, rows: Row[] = []) {
 
 	const db = {
 		member: {
-			findUnique: async () => (role === null ? null : { role }),
+			findFirst: async () =>
+				role === null ? null : { role, organizationId: "org-1" },
 		},
 		ssoProvider: {
 			findMany: async ({ where }: { where: unknown }) => {
@@ -87,7 +88,7 @@ describe("who may configure SSO", () => {
 describe("what a provider looks like once it is saved", () => {
 	it("never hands back the client secret", async () => {
 		const { sso } = service("owner", [OKTA]);
-		const [provider] = (await sso.list(LIST)).rows;
+		const [provider] = (await sso.list("u1", LIST)).rows;
 
 		expect(JSON.stringify(provider)).not.toContain("shhh");
 		expect(provider?.clientIdLastFour).toBe("WXYZ");
@@ -95,7 +96,7 @@ describe("what a provider looks like once it is saved", () => {
 
 	it("splits the domains and names the callback the IdP needs", async () => {
 		const { sso } = service("owner", [OKTA]);
-		const [provider] = (await sso.list(LIST)).rows;
+		const [provider] = (await sso.list("u1", LIST)).rows;
 
 		expect(provider?.domains).toEqual(["acme.com", "subsidiary.com"]);
 		expect(provider?.type).toBe("oidc");
@@ -103,19 +104,19 @@ describe("what a provider looks like once it is saved", () => {
 		expect(provider?.callbackURL).toEndWith("/api/auth/sso/callback/okta");
 	});
 
-	it("reads only the one workspace, never an organization it was passed", async () => {
+	it("reads only the caller's workspace", async () => {
 		const { sso, seen } = service("owner", [OKTA]);
-		await sso.list(LIST);
+		await sso.list("u1", LIST);
 
-		expect(seen.providerWhere).toEqual({ organizationId: WORKSPACE_ID });
+		expect(seen.providerWhere).toEqual({ organizationId: "org-1" });
 	});
 
 	it("searches the name, the domain and the issuer", async () => {
 		const { sso, seen } = service("owner", [OKTA]);
-		await sso.list({ ...LIST, q: " acme " });
+		await sso.list("u1", { ...LIST, q: " acme " });
 
 		expect(seen.providerWhere).toEqual({
-			organizationId: WORKSPACE_ID,
+			organizationId: "org-1",
 			OR: [
 				{ providerId: { contains: "acme", mode: "insensitive" } },
 				{ domain: { contains: "acme", mode: "insensitive" } },

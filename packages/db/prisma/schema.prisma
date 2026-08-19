@@ -232,7 +232,7 @@ model AcquisitionProfile {
 model AcquisitionCandidate {
   id          String                     @id @default(cuid())
   name        String
-  domain      String                     @unique
+  domain      String
   website     String
   rationale   String
   evidence    String
@@ -240,13 +240,18 @@ model AcquisitionCandidate {
   sourceTitle String?
   status      AcquisitionCandidateStatus @default(PROPOSED)
 
-  companyId String?  @unique
+	organizationId String @default("workspace")
+	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+	companyId String?  @unique
   company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   sourceSessionId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  @@unique([organizationId, domain])
+  @@index([organizationId, status, createdAt])
   @@index([status, createdAt])
   @@map("acquisitionCandidate")
 }
@@ -254,7 +259,7 @@ model AcquisitionCandidate {
 model OutreachLead {
   id              String         @id @default(cuid())
   companyName     String
-  email           String         @unique
+  email           String
   vertical        String?
   status          OutreachStatus @default(CONTACTED)
   source          String         @default("GMAIL")
@@ -266,7 +271,10 @@ model OutreachLead {
   lastRespondedAt DateTime?
   nextActionAt    DateTime?
 
-  companyId String?
+	organizationId String @default("workspace")
+	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+	companyId String?
   company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   contactId String?  @unique
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
@@ -276,6 +284,8 @@ model OutreachLead {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([organizationId, email])
+  @@index([organizationId, status, lastContactedAt])
   @@index([status, lastContactedAt])
   @@index([companyId, status])
   @@index([ownerId, status])
@@ -291,9 +301,12 @@ enum VaultZeroEventStatus {
 model Company {
   id          String  @id @default(cuid())
   name        String
-  domain      String? @unique
+  domain      String?
   website     String?
   description String?
+
+	organizationId String @default("workspace")
+	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   logoUrl     String?
   logoDarkUrl String?
@@ -344,6 +357,8 @@ model Company {
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
+  @@unique([organizationId, domain])
+  @@index([organizationId])
   @@index([ownerId])
   @@index([name])
   @@index([lastActivityAt])
@@ -400,7 +415,7 @@ model Contact {
   id          String  @id @default(cuid())
   firstName   String
   lastName    String?
-  email       String? @unique
+  email       String?
   phone       String?
   title       String?
   linkedinUrl String?
@@ -428,6 +443,9 @@ model Contact {
 
   lastActivityAt DateTime?
 
+	organizationId String @default("workspace")
+	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   deals           DealContact[]
   activities      Activity[]
   emailThreads    EmailThread[]
@@ -437,6 +455,8 @@ model Contact {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
+  @@unique([organizationId, email])
+  @@index([organizationId])
   @@index([companyId])
   @@index([ownerId])
   @@index([lastActivityAt])
@@ -508,6 +528,9 @@ model AgentTask {
   contactId String?
   companyId String?
 
+	organizationId String @default("workspace")
+	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   kind   String
   reason String
 
@@ -526,6 +549,7 @@ model AgentTask {
 
   createdAt DateTime @default(now())
 
+  @@index([organizationId, dueAt, leasedUntil])
   @@index([dueAt, leasedUntil])
   @@index([contactId])
   @@map("agentTask")
@@ -606,6 +630,9 @@ model VaultZeroEvent {
 model AgentConversation {
   id String @id @default(cuid())
 
+	organizationId String @default("workspace")
+	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   contactId String?
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
   companyId String?
@@ -626,6 +653,7 @@ model AgentConversation {
   createdAt     DateTime @default(now())
   lastMessageAt DateTime @default(now())
 
+  @@index([organizationId, lastMessageAt])
   @@index([contactId, lastMessageAt])
   @@index([companyId, lastMessageAt])
   @@index([dealId, lastMessageAt])
@@ -637,6 +665,8 @@ model Deal {
   conversations AgentConversation[]
   name          String
   description   String?
+  organizationId String @default("workspace")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   companyId     String
   company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   ownerId       String
@@ -662,6 +692,7 @@ model Deal {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
+  @@index([organizationId])
   @@index([companyId])
   @@index([ownerId])
   @@index([stage])
@@ -950,6 +981,13 @@ model Organization {
   website     String?
   members     Member[]
   invitations Invitation[]
+  companies              Company[]
+  contacts               Contact[]
+  deals                  Deal[]
+  agentTasks             AgentTask[]
+  acquisitionCandidates  AcquisitionCandidate[]
+  outreachLeads          OutreachLead[]
+  conversations          AgentConversation[]
 
   @@unique([slug])
   @@map("organization")

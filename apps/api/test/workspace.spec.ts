@@ -41,7 +41,7 @@ describe("isWorkspaceEmail", () => {
 		}
 	});
 
-	it("fails closed when nothing is allowed", () => {
+	it("admits nobody as a teammate when nothing is listed, so an empty list is not an open internal domain", () => {
 		process.env.ALLOWED_SIGN_IN = "";
 		expect(isWorkspaceEmail("lewis@acme.com")).toBe(false);
 	});

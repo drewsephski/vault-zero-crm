@@ -8,6 +8,8 @@ import {
 	RateSource,
 } from "../src/generated/prisma/enums";
 import { readReportingCurrency, SETTINGS_ID } from "../src/settings";
+import { runInOrganization } from "../src/tenancy";
+import { WORKSPACE_ID } from "../src/workspace";
 
 function makeRandom(seed: number): () => number {
 	let a = seed;
@@ -371,7 +373,12 @@ async function seedCompanies(
 
 	for (const company of COMPANIES) {
 		const row = await db.company.upsert({
-			where: { domain: company.domain },
+			where: {
+				organizationId_domain: {
+					organizationId: WORKSPACE_ID,
+					domain: company.domain,
+				},
+			},
 			create: {
 				name: company.name,
 				domain: company.domain,
@@ -438,7 +445,12 @@ async function seedContacts(
 			used.add(email);
 
 			const contact = await db.contact.upsert({
-				where: { email },
+				where: {
+					organizationId_email: {
+						organizationId: WORKSPACE_ID,
+						email,
+					},
+				},
 				create: {
 					firstName,
 					lastName,
@@ -763,17 +775,24 @@ async function seedActivities(
 }
 
 async function main() {
-	const rates = await seedRates();
-	const ownerIds = await seedOwners();
-	const companies = await seedCompanies(ownerIds);
-	const contacts = await seedContacts(companies, ownerIds);
-	const deals = await seedDeals(companies, contacts, ownerIds);
-	const activities = await seedActivities(companies, contacts, deals, ownerIds);
+	await runInOrganization(WORKSPACE_ID, async () => {
+		const rates = await seedRates();
+		const ownerIds = await seedOwners();
+		const companies = await seedCompanies(ownerIds);
+		const contacts = await seedContacts(companies, ownerIds);
+		const deals = await seedDeals(companies, contacts, ownerIds);
+		const activities = await seedActivities(
+			companies,
+			contacts,
+			deals,
+			ownerIds,
+		);
 
-	console.log(
-		`Seeded ${companies.length} companies, ${contacts.length} contacts, ` +
-			`${deals.length} deals, ${activities} activities, ${rates} exchange rates.`,
-	);
+		console.log(
+			`Seeded ${companies.length} companies, ${contacts.length} contacts, ` +
+				`${deals.length} deals, ${activities} activities, ${rates} exchange rates.`,
+		);
+	});
 }
 
 main()

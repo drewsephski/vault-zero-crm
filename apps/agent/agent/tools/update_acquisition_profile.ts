@@ -4,12 +4,12 @@ import {
 	AcquisitionRevenuePreference,
 	type Db,
 	db,
+	getOrganizationId,
 	Prisma,
 	WorkspaceMode,
 } from "@crm/db";
 import { PRIORITY, queueAgentTask } from "@crm/db/agent-tasks";
 import { isCurrencyCode, normalizeCurrency } from "@crm/db/currency";
-import { WORKSPACE_ID } from "@crm/db/workspace";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import {
@@ -114,8 +114,16 @@ export default defineTool({
 		}
 
 		try {
+			const organizationId = getOrganizationId();
+			if (!organizationId) {
+				return {
+					updated: false as const,
+					reason: "This session is not attached to a workspace.",
+				};
+			}
+
 			const current = await db.acquisitionProfile.findUnique({
-				where: { id: WORKSPACE_ID },
+				where: { id: organizationId },
 				select: ACQUISITION_PROFILE_SELECT,
 			});
 			const values = mergeValues(input, acquisitionProfileValues(current));
@@ -143,9 +151,9 @@ export default defineTool({
 			};
 
 			const profile = await db.acquisitionProfile.upsert({
-				where: { id: WORKSPACE_ID },
+				where: { id: organizationId },
 				create: {
-					id: WORKSPACE_ID,
+					id: organizationId,
 					mode: WorkspaceMode.ACQUISITION,
 					...fields,
 				},
@@ -240,9 +248,12 @@ export function mergeValues(
 }
 
 async function canManageAcquisition(userId: string): Promise<boolean> {
+	const organizationId = getOrganizationId();
+	if (!organizationId) return false;
+
 	const membership = await db.member.findUnique({
 		where: {
-			organizationId_userId: { organizationId: WORKSPACE_ID, userId },
+			organizationId_userId: { organizationId, userId },
 		},
 		select: { role: true },
 	});

@@ -1,3 +1,4 @@
+export { WORKSPACE_ID } from "@crm/db/workspace";
 export { type Auth, auth, type Session, type SessionUser } from "./auth";
 export { AUTH_COOKIE_PREFIX } from "./cookies";
 export { isGoogleConfigured, isMicrosoftConfigured } from "./env";
@@ -9,7 +10,7 @@ export {
 	ensureWorkspaceMembership,
 	isWorkspaceAdmin,
 	isWorkspaceRole,
-	WORKSPACE_ID,
+	organizationIdForUser,
 	WORKSPACE_ROLES,
 	type WorkspaceRole,
 } from "./organization";
@@ -17,9 +18,9 @@ export {
 	CALENDAR_SCOPE,
 	GMAIL_SCOPE,
 	GOOGLE_PROVIDER_ID,
-	MICROSOFT_PROVIDER_ID,
 	hasSyncScopes,
 	IDENTITY_SCOPES,
+	MICROSOFT_PROVIDER_ID,
 	needsGoogleGrant,
 	parseScopes,
 	REQUIRED_SCOPES,

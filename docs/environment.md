@@ -18,18 +18,19 @@ and nothing that is not read. `packages/env` walks up to the workspace root and 
 
 ## Required
 
-`DATABASE_URL`, `BETTER_AUTH_SECRET`, `ALLOWED_SIGN_IN`. Everything else has a
+`DATABASE_URL`, `BETTER_AUTH_SECRET`. Everything else has a
 localhost default or is genuinely optional.
 
-**`GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`** are the sign-in button *and* the
-Gmail/Calendar sync — optional, so an SSO-only install needn't create a Google project,
+**`GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`** are the Google sign-in button *and* the
+Gmail/Calendar sync — optional, so an email/password or SSO-only install needn't create a Google project,
 but **set together or not at all** (`packages/auth/src/env.ts` throws on one).
 
-**`ALLOWED_SIGN_IN`** — comma-separated whole domains or single addresses (bare
-addresses exist for a solo self-hoster, where `gmail.com` would be an open door). **One
-list, read by the sign-in guard *and* the sync's "which side is external" decision** —
-if they drifted a colleague would be refused at the door or filed as a lead. **An empty
-list fails closed.** Parsed on demand. `packages/auth/src/workspace.ts`.
+**`ALLOWED_SIGN_IN`** — optional. Empty (the hosted default) lets anyone create an
+account; each person gets their own workspace. When set, comma-separated whole domains
+or single addresses (bare addresses exist for a solo self-hoster, where `gmail.com`
+would be an open door). **The allow-list is only the sign-in guard.** Sync's "which
+side is us" uses workspace members and the workspace website, plus this list when it is
+set. Parsed on demand. `packages/auth/src/workspace.ts`.
 
 ## Where things are
 
@@ -112,8 +113,9 @@ still add or rotate it. It is not required during onboarding.
 ## Gmail and Calendar sync
 
 Always on, on the existing Google provider, so there is no extra redirect URI. Scopes
-are requested at sign-in and gated by `requireGoogleAccess()`, because granular consent
-lets a user untick one and still sign in.
+are requested at Google sign-in. Email/password users skip that; Google users who
+untick a scope can grant later at `/grant-access`. `requireSession()` is the signed-in
+gate. `needsGoogleGrant` only walls a Google-only account that has not granted sync.
 
 **An SSO rep is not gated** — `needsGoogleGrant` (`@crm/auth`) walls only an account
 whose *sole* sign-in row is Google. It cannot be "has the scopes": an SSO rep has no

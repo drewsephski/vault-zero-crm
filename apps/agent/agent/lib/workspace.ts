@@ -1,7 +1,6 @@
-import { db, type Prisma, WorkspaceMode } from "@crm/db";
+import { db, getOrganizationId, type Prisma, WorkspaceMode } from "@crm/db";
 import {
 	readWorkspaceIdentity,
-	WORKSPACE_ID,
 	type WorkspaceIdentity,
 } from "@crm/db/workspace";
 import {
@@ -14,8 +13,11 @@ export type { WorkspaceIdentity };
 export type AcquisitionContext = AcquisitionProfileRecord;
 
 export async function identity(): Promise<WorkspaceIdentity | null> {
+	const organizationId = getOrganizationId();
+	if (!organizationId) return null;
+
 	try {
-		return await readWorkspaceIdentity(db);
+		return await readWorkspaceIdentity(db, organizationId);
 	} catch (error) {
 		console.error("[agent] could not read who we are", error);
 		return null;
@@ -23,9 +25,12 @@ export async function identity(): Promise<WorkspaceIdentity | null> {
 }
 
 export async function acquisitionContext(): Promise<AcquisitionContext | null> {
+	const organizationId = getOrganizationId();
+	if (!organizationId) return null;
+
 	try {
 		return await db.acquisitionProfile.findUnique({
-			where: { id: WORKSPACE_ID },
+			where: { id: organizationId },
 			select: ACQUISITION_PROFILE_SELECT,
 		});
 	} catch (error) {

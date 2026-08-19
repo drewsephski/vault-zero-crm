@@ -1,7 +1,7 @@
 import {
 	canManageCurrency,
 	isWorkspaceRole,
-	WORKSPACE_ID,
+	organizationIdForUser,
 	type WorkspaceRole,
 } from "@crm/auth";
 import type { Db } from "@crm/db";
@@ -138,9 +138,12 @@ export class CurrencyService {
 	}
 
 	private async roleOf(userId: string): Promise<WorkspaceRole | null> {
+		const organizationId = await organizationIdForUser(userId);
+		if (!organizationId) return null;
+
 		const member = await this.db.member.findUnique({
 			where: {
-				organizationId_userId: { organizationId: WORKSPACE_ID, userId },
+				organizationId_userId: { organizationId, userId },
 			},
 			select: { role: true },
 		});

@@ -74,8 +74,8 @@ Create an OAuth client in the Google Cloud console and add
 `<API_URL>/api/auth/callback/google` — `http://localhost:3001/api/auth/callback/google`
 in development — as an authorised redirect URI.
 
-`ALLOWED_SIGN_IN` decides who may sign in, and an empty value admits nobody. It
-is the whole authorisation model: there are no roles and no organizations, so
+`ALLOWED_SIGN_IN` is optional. Empty lets anyone create an account (each person
+gets their own workspace). When set, it is an allow-list of domains or addresses.
 `src/workspace.ts` is worth reading before you change anything here.
 
 ## Changing the schema

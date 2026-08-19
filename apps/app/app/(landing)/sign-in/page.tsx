@@ -13,7 +13,11 @@ export const metadata: Metadata = {
 	title: "Sign in",
 };
 
-type SignInOptions = { google: boolean; microsoft: boolean; providers: SsoProvider[] };
+type SignInOptions = {
+	google: boolean;
+	microsoft: boolean;
+	providers: SsoProvider[];
+};
 
 async function signInOptions(): Promise<SignInOptions | null> {
 	try {
@@ -67,8 +71,7 @@ async function SignIn({
 
 	const insistOnGoogle = method === "google" && google;
 	const insistOnMicrosoft = method === "microsoft" && microsoft;
-	const showSso =
-		providers.length > 0 && !insistOnGoogle && !insistOnMicrosoft;
+	const showSso = providers.length > 0 && !insistOnGoogle && !insistOnMicrosoft;
 	const showGoogle = google && (providers.length === 0 || insistOnGoogle);
 	const showMicrosoft =
 		microsoft && (providers.length === 0 || insistOnMicrosoft);
@@ -84,7 +87,8 @@ async function SignIn({
 			/>
 			{showOnlyEmailPassword ? (
 				<p className="text-sm text-muted-foreground">
-					This install currently has no Google, Microsoft, or identity-provider sign-in configured.
+					This install currently has no Google, Microsoft, or identity-provider
+					sign-in configured.
 				</p>
 			) : null}
 			<EmailPasswordAuth />

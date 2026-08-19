@@ -1,9 +1,8 @@
 import {
 	canChangeRole,
 	canRenameWorkspace,
-	ensureWorkspaceMembership,
 	isWorkspaceRole,
-	WORKSPACE_ID,
+	organizationIdForUser,
 	type WorkspaceRole,
 } from "@crm/auth";
 import {
@@ -129,12 +128,8 @@ export class WorkspaceService {
 	) {}
 
 	async get(userId: string): Promise<Workspace> {
-		let row = await this.readWorkspace();
-
-		if (!row) {
-			await ensureWorkspaceMembership(userId);
-			row = await this.readWorkspace();
-		}
+		const workspaceId = await this.requireWorkspaceId(userId);
+		const row = await this.readWorkspace(workspaceId);
 
 		if (!row) {
 			throw new ServiceUnavailableException(
@@ -143,9 +138,9 @@ export class WorkspaceService {
 		}
 
 		const [role, acquisition] = await Promise.all([
-			this.roleOf(userId),
+			this.roleOf(userId, workspaceId),
 			this.db.acquisitionProfile.findUnique({
-				where: { id: WORKSPACE_ID },
+				where: { id: workspaceId },
 				select: { mode: true },
 			}),
 		]);
@@ -165,11 +160,12 @@ export class WorkspaceService {
 	}
 
 	async acquisitionProfile(userId: string): Promise<AcquisitionProfile> {
+		const workspaceId = await this.requireWorkspaceId(userId);
 		const [row, role, reportingCurrency] = await Promise.all([
 			this.db.acquisitionProfile.findUnique({
-				where: { id: WORKSPACE_ID },
+				where: { id: workspaceId },
 			}),
-			this.roleOf(userId),
+			this.roleOf(userId, workspaceId),
 			readReportingCurrency(this.db),
 		]);
 
@@ -199,14 +195,15 @@ export class WorkspaceService {
 		userId: string,
 		input: SetWorkspaceModeInput,
 	): Promise<Workspace & { discoveryQueued: boolean }> {
-		await this.assertCanManageAcquisition(userId);
+		const workspaceId = await this.requireWorkspaceId(userId);
+		await this.assertCanManageAcquisition(userId, workspaceId);
 
 		const currency = await readReportingCurrency(this.db);
 
 		const profile = await this.db.acquisitionProfile.upsert({
-			where: { id: WORKSPACE_ID },
+			where: { id: workspaceId },
 			create: {
-				id: WORKSPACE_ID,
+				id: workspaceId,
 				mode: input.mode,
 				preferredIndustries: [],
 				geographies: [],
@@ -238,7 +235,8 @@ export class WorkspaceService {
 		userId: string,
 		input: UpdateAcquisitionProfileInput,
 	): Promise<AcquisitionProfile & { discoveryQueued: boolean }> {
-		await this.assertCanManageAcquisition(userId);
+		const workspaceId = await this.requireWorkspaceId(userId);
+		await this.assertCanManageAcquisition(userId, workspaceId);
 
 		const fields = {
 			preferredIndustries: normalizeList(input.preferredIndustries),
@@ -259,8 +257,8 @@ export class WorkspaceService {
 		};
 
 		await this.db.acquisitionProfile.upsert({
-			where: { id: WORKSPACE_ID },
-			create: { id: WORKSPACE_ID, mode: WorkspaceMode.ACQUISITION, ...fields },
+			where: { id: workspaceId },
+			create: { id: workspaceId, mode: WorkspaceMode.ACQUISITION, ...fields },
 			update: fields,
 		});
 
@@ -280,7 +278,8 @@ export class WorkspaceService {
 		userId: string,
 		input: UpdateWorkspaceInput,
 	): Promise<Workspace> {
-		const role = await this.roleOf(userId);
+		const workspaceId = await this.requireWorkspaceId(userId);
+		const role = await this.roleOf(userId, workspaceId);
 
 		if (!canRenameWorkspace(role)) {
 			throw new ForbiddenException(
@@ -289,7 +288,7 @@ export class WorkspaceService {
 		}
 
 		const before = await this.db.organization.findUnique({
-			where: { id: WORKSPACE_ID },
+			where: { id: workspaceId },
 			select: { website: true, metadata: true },
 		});
 
@@ -303,7 +302,7 @@ export class WorkspaceService {
 
 		await this.db.$transaction([
 			this.db.organization.update({
-				where: { id: WORKSPACE_ID },
+				where: { id: workspaceId },
 				data: {
 					name: input.name,
 					slug: workspaceSlug(input.name),
@@ -312,9 +311,9 @@ export class WorkspaceService {
 				},
 			}),
 			this.db.acquisitionProfile.upsert({
-				where: { id: WORKSPACE_ID },
+				where: { id: workspaceId },
 				create: {
-					id: WORKSPACE_ID,
+					id: workspaceId,
 					mode: WorkspaceMode.ACQUISITION,
 					preferredIndustries: [],
 					geographies: [],
@@ -341,7 +340,8 @@ export class WorkspaceService {
 		userId: string,
 		input: MemberListInput,
 	): Promise<ListResult<WorkspaceMember>> {
-		const where = this.buildWhere(input);
+		const workspaceId = await this.requireWorkspaceId(userId);
+		const where = this.buildWhere(input, workspaceId);
 		const { skip, take } = paginate(input);
 
 		const [rows, total, roles] = await Promise.all([
@@ -355,7 +355,7 @@ export class WorkspaceService {
 			this.db.member.count({ where }),
 			this.db.member.groupBy({
 				by: ["role"],
-				where: this.searchWhere(input.q),
+				where: this.searchWhere(input.q, workspaceId),
 				_count: { _all: true },
 			}),
 		]);
@@ -371,7 +371,8 @@ export class WorkspaceService {
 		userId: string,
 		input: SetMemberRoleInput,
 	): Promise<WorkspaceMember> {
-		const role = await this.roleOf(userId);
+		const workspaceId = await this.requireWorkspaceId(userId);
+		const role = await this.roleOf(userId, workspaceId);
 
 		if (!canChangeRole(role)) {
 			throw new ForbiddenException(
@@ -381,7 +382,7 @@ export class WorkspaceService {
 
 		const updated = await this.db.$transaction(async (tx) => {
 			const target = await tx.member.findFirst({
-				where: { id: input.memberId, organizationId: WORKSPACE_ID },
+				where: { id: input.memberId, organizationId: workspaceId },
 				select: { id: true, role: true },
 			});
 
@@ -392,7 +393,7 @@ export class WorkspaceService {
 			if (target.role === "owner" && input.role !== "owner") {
 				const owners = await tx.$queryRaw<{ id: string }[]>`
 					SELECT id FROM "member"
-					WHERE "organizationId" = ${WORKSPACE_ID} AND role = 'owner'
+					WHERE "organizationId" = ${workspaceId} AND role = 'owner'
 					FOR UPDATE
 				`;
 
@@ -433,9 +434,12 @@ export class WorkspaceService {
 		};
 	}
 
-	private searchWhere(q: string): Prisma.MemberWhereInput {
+	private searchWhere(
+		q: string,
+		organizationId: string,
+	): Prisma.MemberWhereInput {
 		const term = q.trim();
-		const where: Prisma.MemberWhereInput = { organizationId: WORKSPACE_ID };
+		const where: Prisma.MemberWhereInput = { organizationId };
 
 		if (term) {
 			where.user = {
@@ -449,8 +453,11 @@ export class WorkspaceService {
 		return where;
 	}
 
-	private buildWhere(input: MemberListInput): Prisma.MemberWhereInput {
-		const where = this.searchWhere(input.q);
+	private buildWhere(
+		input: MemberListInput,
+		organizationId: string,
+	): Prisma.MemberWhereInput {
+		const where = this.searchWhere(input.q, organizationId);
 
 		if (input.role !== FACET_ALL) {
 			where.role = input.role;
@@ -459,9 +466,19 @@ export class WorkspaceService {
 		return where;
 	}
 
-	private async readWorkspace() {
+	private async requireWorkspaceId(userId: string): Promise<string> {
+		const workspaceId = await organizationIdForUser(userId);
+		if (!workspaceId) {
+			throw new ServiceUnavailableException(
+				"The workspace could not be created. Sign in again in a moment.",
+			);
+		}
+		return workspaceId;
+	}
+
+	private async readWorkspace(organizationId: string) {
 		return this.db.organization.findUnique({
-			where: { id: WORKSPACE_ID },
+			where: { id: organizationId },
 			select: {
 				id: true,
 				slug: true,
@@ -472,10 +489,13 @@ export class WorkspaceService {
 		});
 	}
 
-	private async roleOf(userId: string): Promise<WorkspaceRole | null> {
+	private async roleOf(
+		userId: string,
+		organizationId: string,
+	): Promise<WorkspaceRole | null> {
 		const member = await this.db.member.findUnique({
 			where: {
-				organizationId_userId: { organizationId: WORKSPACE_ID, userId },
+				organizationId_userId: { organizationId, userId },
 			},
 			select: { role: true },
 		});
@@ -483,8 +503,11 @@ export class WorkspaceService {
 		return member ? toRole(member.role) : null;
 	}
 
-	private async assertCanManageAcquisition(userId: string): Promise<void> {
-		const role = await this.roleOf(userId);
+	private async assertCanManageAcquisition(
+		userId: string,
+		organizationId: string,
+	): Promise<void> {
+		const role = await this.roleOf(userId, organizationId);
 
 		if (!canRenameWorkspace(role)) {
 			throw new ForbiddenException(

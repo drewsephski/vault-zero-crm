@@ -7,6 +7,7 @@ import {
 	RecordSource,
 } from "@crm/db";
 import { hasAcquisitionFocus } from "@crm/db/acquisition";
+import { getOrganizationId } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
 	BadRequestException,
@@ -87,7 +88,7 @@ export class AcquisitionService {
 		if (request) return { id: request.companyId };
 		if (!domain) return null;
 
-		return this.db.company.findUnique({
+		return this.db.company.findFirst({
 			where: { domain },
 			select: { id: true },
 		});
@@ -120,7 +121,7 @@ export class AcquisitionService {
 			return { candidateId: id, ...result };
 		}
 
-		let existing = await this.db.company.findUnique({
+		let existing = await this.db.company.findFirst({
 			where: { domain: candidate.domain },
 			select: { id: true, source: true },
 		});
@@ -139,7 +140,7 @@ export class AcquisitionService {
 				targetCreated = true;
 			} catch (error) {
 				if (!(error instanceof ConflictException)) throw error;
-				existing = await this.db.company.findUnique({
+				existing = await this.db.company.findFirst({
 					where: { domain: candidate.domain },
 					select: { id: true, source: true },
 				});
@@ -267,7 +268,7 @@ export class AcquisitionService {
 				select: { domain: true },
 			}),
 			this.db.acquisitionProfile.findUnique({
-				where: { id: WORKSPACE_ID },
+				where: { id: getOrganizationId() ?? WORKSPACE_ID },
 				select: { preferredIndustries: true, geographies: true },
 			}),
 		]);

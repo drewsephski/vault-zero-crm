@@ -13,10 +13,17 @@ export interface UserOption {
 export class UsersService {
 	constructor(@InjectDatabase() private readonly db: Db) {}
 
-	async list(): Promise<UserOption[]> {
-		return this.db.user.findMany({
-			select: { id: true, name: true, email: true, image: true },
-			orderBy: [{ name: "asc" }, { email: "asc" }],
+	async list(organizationId: string): Promise<UserOption[]> {
+		const members = await this.db.member.findMany({
+			where: { organizationId },
+			select: {
+				user: {
+					select: { id: true, name: true, email: true, image: true },
+				},
+			},
+			orderBy: [{ user: { name: "asc" } }, { user: { email: "asc" } }],
 		});
+
+		return members.map((member) => member.user);
 	}
 }

@@ -80,7 +80,7 @@ export async function createCompany(input: {
 	}
 
 	const existing = domain
-		? await db.company.findUnique({
+		? await db.company.findFirst({
 				where: { domain },
 				select: { id: true, name: true, domain: true },
 			})

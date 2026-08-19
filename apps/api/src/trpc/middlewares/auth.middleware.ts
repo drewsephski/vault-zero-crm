@@ -1,3 +1,5 @@
+import { organizationIdForUser } from "@crm/auth";
+import { runInOrganization } from "@crm/db/tenancy";
 import { Injectable } from "@nestjs/common";
 import { TRPCError } from "@trpc/server";
 import type {
@@ -18,9 +20,21 @@ export class AuthMiddleware implements TRPCMiddleware {
 			throw new TRPCError({ code: "UNAUTHORIZED" });
 		}
 
+		const organizationId =
+			ctx.session?.session.activeOrganizationId ??
+			(await organizationIdForUser(user.id));
+
+		if (!organizationId) {
+			throw new TRPCError({
+				code: "INTERNAL_SERVER_ERROR",
+				message:
+					"Your workspace could not be created. Sign in again in a moment.",
+			});
+		}
+
 		setRequestUserId(user.id);
 
-		const nextCtx: AuthedTrpcContext = { ...ctx, user };
-		return opts.next({ ctx: nextCtx });
+		const nextCtx: AuthedTrpcContext = { ...ctx, user, organizationId };
+		return runInOrganization(organizationId, () => opts.next({ ctx: nextCtx }));
 	}
 }

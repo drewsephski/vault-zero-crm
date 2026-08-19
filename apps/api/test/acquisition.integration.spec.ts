@@ -867,7 +867,7 @@ describe("acquisition candidate review", () => {
 		expect(
 			await db.acquisitionCandidate.findUnique({ where: { id: candidate.id } }),
 		).toMatchObject({ status: AcquisitionCandidateStatus.DISMISSED });
-		expect(await db.company.findUnique({ where: { domain } })).toBeNull();
+		expect(await db.company.findFirst({ where: { domain } })).toBeNull();
 	});
 
 	it("attaches a candidate to an existing company without duplicating it", async () => {

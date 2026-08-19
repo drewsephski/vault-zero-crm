@@ -1,6 +1,7 @@
-import { onSignedIn } from "@crm/auth";
+import { onSignedIn, organizationIdForUser } from "@crm/auth";
 import { type Db, EnrichmentStatus, type Prisma } from "@crm/db";
 import { PRIORITY } from "@crm/db/agent-tasks";
+import { runInOrganization } from "@crm/db/tenancy";
 import { readWorkspaceIdentity } from "@crm/db/workspace";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Inject, Injectable, Logger, type OnModuleInit } from "@nestjs/common";
@@ -57,30 +58,36 @@ export class BackfillService implements OnModuleInit {
 	) {}
 
 	onModuleInit(): void {
-		onSignedIn(() => {
-			void this.auto();
+		onSignedIn((user) => {
+			void this.auto(user.id);
 		});
 	}
 
-	async auto(): Promise<{ started: boolean }> {
-		if (await this.cache.get(AUTO_KEY)) return { started: false };
-		await this.cache.set(AUTO_KEY, true, AUTO_EVERY_MS);
+	async auto(userId: string): Promise<{ started: boolean }> {
+		const organizationId = await organizationIdForUser(userId);
+		if (!organizationId) return { started: false };
+
+		const cacheKey = `${AUTO_KEY}:${organizationId}`;
+		if (await this.cache.get(cacheKey)) return { started: false };
+		await this.cache.set(cacheKey, true, AUTO_EVERY_MS);
 
 		void (async () => {
 			try {
-				await this.sweepWorkspace();
+				await runInOrganization(organizationId, async () => {
+					await this.sweepWorkspace(organizationId);
 
-				const companies = await this.runCompanies(false);
-				const contacts = await this.runContacts();
+					const companies = await this.runCompanies(false);
+					const contacts = await this.runContacts();
 
-				const mirrored = await this.images.sweep();
+					const mirrored = await this.images.sweep();
 
-				this.logger.log({
-					message: "Automatic backfill swept",
-					queued: companies.queued + contacts.queued,
-					remaining: companies.remaining + contacts.remaining,
-					iconsResolving: companies.iconsResolving,
-					imagesMirrored: mirrored.copied,
+					this.logger.log({
+						message: "Automatic backfill swept",
+						queued: companies.queued + contacts.queued,
+						remaining: companies.remaining + contacts.remaining,
+						iconsResolving: companies.iconsResolving,
+						imagesMirrored: mirrored.copied,
+					});
 				});
 			} catch (error) {
 				this.logger.error(
@@ -93,8 +100,8 @@ export class BackfillService implements OnModuleInit {
 		return { started: true };
 	}
 
-	private async sweepWorkspace(): Promise<void> {
-		const us = await readWorkspaceIdentity(this.db);
+	private async sweepWorkspace(organizationId: string): Promise<void> {
+		const us = await readWorkspaceIdentity(this.db, organizationId);
 
 		if (!us?.website || us.profile) return;
 

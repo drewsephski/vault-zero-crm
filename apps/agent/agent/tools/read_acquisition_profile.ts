@@ -1,5 +1,4 @@
-import { db } from "@crm/db";
-import { WORKSPACE_ID } from "@crm/db/workspace";
+import { db, getOrganizationId } from "@crm/db";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import {
@@ -17,8 +16,16 @@ export default defineTool({
 		if (!(await enabled(CRM))) return unavailableCapability("CRM database");
 
 		try {
+			const organizationId = getOrganizationId();
+			if (!organizationId) {
+				return {
+					available: false as const,
+					reason: "This session is not attached to a workspace.",
+				};
+			}
+
 			const profile = await db.acquisitionProfile.findUnique({
-				where: { id: WORKSPACE_ID },
+				where: { id: organizationId },
 				select: ACQUISITION_PROFILE_SELECT,
 			});
 			const values = acquisitionProfileValues(profile);

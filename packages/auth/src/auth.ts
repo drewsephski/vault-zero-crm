@@ -51,6 +51,8 @@ export const auth = betterAuth({
 
 	emailAndPassword: {
 		enabled: true,
+		minPasswordLength: 8,
+		autoSignIn: true,
 	},
 
 	socialProviders,
@@ -118,14 +120,7 @@ export const auth = betterAuth({
 		user: {
 			create: {
 				before: async (user) => {
-					if (!hasSignInAllowList()) {
-						throw new APIError("FORBIDDEN", {
-							message:
-								'No one can sign in yet: set ALLOWED_SIGN_IN in .env to your email domain (for example ALLOWED_SIGN_IN="acme.com") and restart.',
-						});
-					}
-
-					if (!isWorkspaceEmail(user.email)) {
+					if (hasSignInAllowList() && !isWorkspaceEmail(user.email)) {
 						const domain = primaryWorkspaceDomain();
 						throw new APIError("FORBIDDEN", {
 							message: domain

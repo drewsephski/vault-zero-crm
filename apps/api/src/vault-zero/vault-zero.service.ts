@@ -4,7 +4,9 @@ import {
 	DealStage,
 	Prisma,
 	RecordSource,
+	runInOrganization,
 } from "@crm/db";
+import { WORKSPACE_ID } from "@crm/db/workspace";
 import { ConflictException, Injectable, Logger } from "@nestjs/common";
 import { normalizeDomain } from "../companies/domain";
 import { decimalFromCents, normalizeEmail } from "../crm/values";
@@ -30,6 +32,10 @@ export class VaultZeroService {
 	) {}
 
 	async ingest(input: unknown) {
+		return runInOrganization(WORKSPACE_ID, () => this.ingestInWorkspace(input));
+	}
+
+	private async ingestInWorkspace(input: unknown) {
 		const event = vaultZeroEventSchema.parse(input);
 		const claim = await this.claim(event);
 
@@ -435,7 +441,7 @@ export class VaultZeroService {
 		const name = input.name.trim() || "Unknown company";
 		const domain = normalizeDomain(input.website);
 		const existing = domain
-			? await tx.company.findUnique({ where: { domain } })
+			? await tx.company.findFirst({ where: { domain } })
 			: await tx.company.findFirst({
 					where: { name: { equals: name, mode: "insensitive" } },
 				});
@@ -475,7 +481,7 @@ export class VaultZeroService {
 	) {
 		const email = normalizeEmail(input.email ?? "");
 		const existing = email
-			? await tx.contact.findUnique({ where: { email } })
+			? await tx.contact.findFirst({ where: { email } })
 			: input.companyId
 				? await tx.contact.findFirst({
 						where: {
