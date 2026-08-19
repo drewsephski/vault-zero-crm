@@ -341,7 +341,7 @@ function Thread({
 							)}
 						>
 							{messages.length === 0 && !busy ? (
-								<Idle copy={copy} onAsk={ask} />
+								<Idle copy={copy} density={density} onAsk={ask} />
 							) : null}
 
 							{messages.map((message) => (
@@ -499,13 +499,21 @@ function FollowUpPrompts({
 
 function Idle({
 	copy,
+	density,
 	onAsk,
 }: {
 	copy: ReturnType<typeof recordCopy>;
+	density: AgentChatDensity;
 	onAsk: (question: string) => void;
 }) {
 	return (
-		<Empty className="min-h-full border-0 py-16" width="wide">
+		<Empty
+			className={cn(
+				"min-h-full border-0",
+				density === "compact" ? "py-8" : "py-16",
+			)}
+			width="wide"
+		>
 			<EmptyHeader>
 				<EmptyMedia>
 					<span className="flex size-8 items-center justify-center bg-foreground text-background">
@@ -516,7 +524,7 @@ function Idle({
 				<EmptyDescription>{copy.blurb}</EmptyDescription>
 			</EmptyHeader>
 
-			<EmptyContent layout="grid">
+			<EmptyContent layout={density === "compact" ? "stack" : "grid"}>
 				{copy.suggestions.map((suggestion) => (
 					<Button
 						key={suggestion}

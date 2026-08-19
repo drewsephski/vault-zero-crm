@@ -39,10 +39,10 @@ const ACQUISITION_WORKSPACE_COPY: ScopeCopy = {
 		"Screen targets against the buy box, find research gaps, and decide what needs attention next.",
 	placeholder: "What should I work on next?",
 	suggestions: [
-		"Which targets best fit the buy box?",
-		"Which active opportunities need attention?",
-		"What research is still missing?",
-		"Compare my active opportunities",
+		"Best buy-box fits",
+		"What needs attention?",
+		"Missing research",
+		"Compare opportunities",
 	],
 };
 
