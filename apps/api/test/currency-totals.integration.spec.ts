@@ -99,6 +99,21 @@ beforeAll(async () => {
 		},
 		update: {},
 	});
+	await db.member.upsert({
+		where: {
+			organizationId_userId: {
+				organizationId: WORKSPACE_ID,
+				userId,
+			},
+		},
+		create: {
+			id: `member-${userId}`,
+			organizationId: WORKSPACE_ID,
+			userId,
+			createdAt: new Date(),
+		},
+		update: {},
+	});
 
 	const company = await db.company.upsert({
 		where: { organizationId_domain: { organizationId: WORKSPACE_ID, domain } },
@@ -119,6 +134,7 @@ afterAll(async () => {
 	try {
 		await db.deal.deleteMany({ where: { companyId } });
 		await db.company.deleteMany({ where: { domain } });
+		await db.member.deleteMany({ where: { userId } });
 		await db.user.deleteMany({ where: { id: userId } });
 		await clearRates();
 
@@ -471,10 +487,26 @@ describe("the dashboard only values what it can convert", () => {
 			},
 			update: {},
 		});
+		await db.member.upsert({
+			where: {
+				organizationId_userId: {
+					organizationId: WORKSPACE_ID,
+					userId: analystId,
+				},
+			},
+			create: {
+				id: `member-${analystId}`,
+				organizationId: WORKSPACE_ID,
+				userId: analystId,
+				createdAt: new Date(),
+			},
+			update: {},
+		});
 	});
 
 	afterAll(async () => {
 		await db.deal.deleteMany({ where: { ownerId: analystId } });
+		await db.member.deleteMany({ where: { userId: analystId } });
 		await db.user.deleteMany({ where: { id: analystId } });
 	});
 

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { db, RecordSource } from "@crm/db";
+import { WORKSPACE_ID } from "@crm/db/workspace";
 import { AgentQueueService } from "../src/agent/agent-queue.service";
 import { AgentTriggerService } from "../src/agent/agent-trigger.service";
 import { CompaniesService } from "../src/companies/companies.service";
@@ -109,6 +110,7 @@ async function clean() {
 	await db.contact.deleteMany({ where: ours });
 	await db.company.deleteMany({ where: { domain: { in: domains } } });
 	await db.suppressedContact.deleteMany({ where: ours });
+	await db.member.deleteMany({ where: { userId } });
 	await db.user.deleteMany({ where: { id: userId } });
 }
 
@@ -116,6 +118,14 @@ beforeAll(async () => {
 	await clean();
 	await db.user.create({
 		data: { id: userId, name: "Test Rep", email: `${userId}@example.test` },
+	});
+	await db.member.create({
+		data: {
+			id: `member-${userId}`,
+			organizationId: WORKSPACE_ID,
+			userId,
+			createdAt: new Date(),
+		},
 	});
 });
 
