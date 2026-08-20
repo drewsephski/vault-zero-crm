@@ -64,27 +64,8 @@ export function AskCard() {
 				body="Eve reads the record, the evidence, and your buy box before answering."
 			/>
 
-			<div className="flex grow flex-col justify-end gap-2.5">
-				<p className="select-none font-medium text-[#5A5A5A] text-[11px]/4">
-					SUGGESTED
-				</p>
-				{QUESTIONS.map((question) => (
-					<button
-						key={question}
-						type="button"
-						aria-pressed={asked === question}
-						onClick={() => askQuestion(question)}
-						className={cn(
-							"flex h-[38px] shrink-0 cursor-pointer select-none items-center rounded-md px-3 text-left text-[13px]/[18px] transition-colors",
-							asked === question
-								? "bg-accent text-foreground"
-								: "bg-muted hover:bg-accent",
-						)}
-					>
-						{question}
-					</button>
-				))}
-				{(answer || isStreaming) && (
+			{(answer || isStreaming) && (
+				<div className="flex grow flex-col justify-start">
 					<div
 						aria-live="polite"
 						className="rounded-md bg-muted p-3 text-[13px]/[19px] text-muted-foreground"
@@ -92,8 +73,28 @@ export function AskCard() {
 						{answer}
 						{isStreaming && <span aria-hidden="true">▋</span>}
 					</div>
-				)}
-			</div>
+				</div>
+			)}
+
+			{!asked && (
+				<div className="flex grow flex-col justify-end gap-2.5">
+					<p className="select-none font-medium text-[#5A5A5A] text-[11px]/4">
+						SUGGESTED
+					</p>
+					{QUESTIONS.map((question) => (
+						<button
+							key={question}
+							type="button"
+							onClick={() => void askQuestion(question)}
+							className={cn(
+								"flex h-[38px] shrink-0 cursor-pointer select-none items-center rounded-md px-3 text-left text-[13px]/[18px] transition-colors bg-muted hover:bg-accent",
+							)}
+						>
+							{question}
+						</button>
+					))}
+				</div>
+			)}
 
 			<form
 				onSubmit={(event) => {
