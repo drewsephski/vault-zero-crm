@@ -527,12 +527,12 @@ function Idle({
 			<EmptyContent layout={density === "compact" ? "gridCompact" : "grid"}>
 				{copy.suggestions.map((suggestion) => (
 					<Button
-						key={suggestion}
+						key={suggestion.prompt}
 						variant="outline"
 						size="sm"
-						onClick={() => onAsk(suggestion)}
+						onClick={() => onAsk(suggestion.prompt)}
 					>
-						{suggestion}
+						{suggestion.label}
 					</Button>
 				))}
 			</EmptyContent>

@@ -8,12 +8,21 @@ export type AgentScope = AgentRecord | { kind: "workspace" };
 
 export type AgentScopeKind = AgentScope["kind"];
 
+export type AgentSuggestion = {
+	label: string;
+	prompt: string;
+};
+
 type ScopeCopy = {
 	title: string;
 	blurb: string;
 	placeholder: string;
-	suggestions: string[];
+	suggestions: AgentSuggestion[];
 };
+
+function suggestion(label: string, prompt = label): AgentSuggestion {
+	return { label, prompt };
+}
 
 type RecordCopy = ScopeCopy & {
 	header: string;
@@ -26,10 +35,10 @@ const WORKSPACE_COPY: ScopeCopy = {
 		"Find any contact, company or deal, and see what research needs attention.",
 	placeholder: "What needs attention?",
 	suggestions: [
-		"What research is waiting?",
-		"Find a company or person",
-		"Research someone outside the CRM",
-		"What can you help me with?",
+		suggestion("What research is waiting?"),
+		suggestion("Find a company or person"),
+		suggestion("Research someone outside the CRM"),
+		suggestion("What can you help me with?"),
 	],
 };
 
@@ -39,10 +48,22 @@ const ACQUISITION_WORKSPACE_COPY: ScopeCopy = {
 		"Screen targets against the buy box, find research gaps, and decide what needs attention next.",
 	placeholder: "What should I work on next?",
 	suggestions: [
-		"Best buy-box fits",
-		"What needs attention?",
-		"Missing research",
-		"Compare opportunities",
+		suggestion(
+			"Best buy-box fits",
+			"Which targets in our pipeline best match the saved buy box, and what evidence supports each fit?",
+		),
+		suggestion(
+			"What needs attention?",
+			"What acquisition targets or opportunities need my attention right now, and what should I do next?",
+		),
+		suggestion(
+			"Missing research",
+			"Which targets are missing research or have incomplete diligence that I should prioritize?",
+		),
+		suggestion(
+			"Compare opportunities",
+			"Compare our top acquisition opportunities and highlight the key differences in fit, risk, and readiness.",
+		),
 	],
 };
 
@@ -55,9 +76,9 @@ const RECORD_COPY: Record<AgentRecordKind, RecordCopy> = {
 			"Every step is shown as it happens — including the leads it throws away.",
 		placeholder: "Are they still there?",
 		suggestions: [
-			"Who is this person?",
-			"Are they still there?",
-			"What should I know before a call?",
+			suggestion("Who is this person?"),
+			suggestion("Are they still there?"),
+			suggestion("What should I know before a call?"),
 		],
 	},
 	company: {
@@ -68,9 +89,9 @@ const RECORD_COPY: Record<AgentRecordKind, RecordCopy> = {
 			"It reads their site and our own history with them, and shows its working.",
 		placeholder: "What do they sell?",
 		suggestions: [
-			"What do they do?",
-			"Who do we know here?",
-			"What has changed recently?",
+			suggestion("What do they do?"),
+			suggestion("Who do we know here?"),
+			suggestion("What has changed recently?"),
 		],
 	},
 	deal: {
@@ -81,9 +102,9 @@ const RECORD_COPY: Record<AgentRecordKind, RecordCopy> = {
 			"It can read the thread, the meetings and the people on both sides of it.",
 		placeholder: "Where has this stalled?",
 		suggestions: [
-			"Where does this stand?",
-			"Who else should be involved?",
-			"What is the risk here?",
+			suggestion("Where does this stand?"),
+			suggestion("Who else should be involved?"),
+			suggestion("What is the risk here?"),
 		],
 	},
 };
@@ -96,10 +117,10 @@ const ACQUISITION_RECORD_COPY: Partial<Record<AgentRecordKind, RecordCopy>> = {
 			"It compares public evidence and CRM history with the saved buy box without filling unknowns with guesses.",
 		placeholder: "Does this fit the buy box?",
 		suggestions: [
-			"Does this target fit the buy box?",
-			"What is verified and still unknown?",
-			"What are the biggest risks?",
-			"Prepare me for an owner call",
+			suggestion("Does this target fit the buy box?"),
+			suggestion("What is verified and still unknown?"),
+			suggestion("What are the biggest risks?"),
+			suggestion("Prepare me for an owner call"),
 		],
 	},
 	deal: {
@@ -109,10 +130,10 @@ const ACQUISITION_RECORD_COPY: Partial<Record<AgentRecordKind, RecordCopy>> = {
 			"It reads the history, people, and evidence behind this acquisition opportunity.",
 		placeholder: "What could stop this acquisition?",
 		suggestions: [
-			"What are the biggest risks?",
-			"What diligence is still missing?",
-			"What should we ask for before an NDA?",
-			"What is the next decision?",
+			suggestion("What are the biggest risks?"),
+			suggestion("What diligence is still missing?"),
+			suggestion("What should we ask for before an NDA?"),
+			suggestion("What is the next decision?"),
 		],
 	},
 };

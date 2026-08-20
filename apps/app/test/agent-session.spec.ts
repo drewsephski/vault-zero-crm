@@ -114,22 +114,46 @@ describe("record context", () => {
 	});
 
 	it("offers questions that suit the record", () => {
-		expect(recordCopy("company").suggestions.join(" ")).not.toContain("person");
-		expect(recordCopy("deal").suggestions.join(" ")).not.toContain("person");
-		expect(recordCopy("contact").suggestions[0]).toBe("Who is this person?");
+		expect(
+			recordCopy("company")
+				.suggestions.map((item) => item.label)
+				.join(" "),
+		).not.toContain("person");
+		expect(
+			recordCopy("deal")
+				.suggestions.map((item) => item.label)
+				.join(" "),
+		).not.toContain("person");
+		expect(recordCopy("contact").suggestions[0]?.prompt).toBe(
+			"Who is this person?",
+		);
 	});
 
 	it("uses acquisition questions when the workspace is screening targets", () => {
 		expect(recordCopy("workspace", true).title).toBe(
 			"Ask across your acquisitions",
 		);
-		expect(recordCopy("company", true).suggestions).toContain(
-			"Does this target fit the buy box?",
-		);
-		expect(recordCopy("deal", true).suggestions).toContain(
-			"What diligence is still missing?",
-		);
+		expect(
+			recordCopy("company", true).suggestions.some(
+				(item) => item.prompt === "Does this target fit the buy box?",
+			),
+		).toBe(true);
+		expect(
+			recordCopy("deal", true).suggestions.some(
+				(item) => item.prompt === "What diligence is still missing?",
+			),
+		).toBe(true);
 		expect(recordCopy("contact", true)).toBe(recordCopy("contact"));
+	});
+
+	it("sends fuller acquisition workspace prompts from compact starter buttons", () => {
+		const missingResearch = recordCopy("workspace", true).suggestions.find(
+			(item) => item.label === "Missing research",
+		);
+		expect(missingResearch?.prompt).toBe(
+			"Which targets are missing research or have incomplete diligence that I should prioritize?",
+		);
+		expect(missingResearch?.prompt).not.toBe(missingResearch?.label);
 	});
 
 	it("tells the agent which record it is on", () => {
