@@ -8,6 +8,18 @@ WHERE "recommendedStage"::text IN (
   'DILIGENCE'
 );
 
+UPDATE "acquisitionTarget"
+SET "stage" = 'DISCOVERED'
+WHERE "stage"::text = 'RESEARCHING';
+
+UPDATE "acquisitionTarget"
+SET "stage" = 'QUALIFIED'
+WHERE "stage"::text IN ('CONTACTED', 'INTERESTED');
+
+UPDATE "acquisitionTarget"
+SET "stage" = 'WATCHLIST'
+WHERE "stage"::text IN ('OPPORTUNITY', 'DILIGENCE');
+
 CREATE TYPE "AcquisitionStage_new" AS ENUM (
   'DISCOVERED',
   'QUALIFIED',

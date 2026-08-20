@@ -128,6 +128,7 @@ export async function completeTask(
 	taskId: string,
 	outcome: string,
 	sessionId?: string,
+	options?: { skipResearchRunFinalization?: boolean },
 ): Promise<TaskSubject | null> {
 	const now = new Date();
 
@@ -159,8 +160,8 @@ export async function completeTask(
 
 		if (!task) return null;
 
-		if (task.kind === "acquisition-refresh") {
-			await finalizeAcquisitionResearchRunOnTaskComplete(taskId);
+		if (task.kind === "acquisition-refresh" && !options?.skipResearchRunFinalization) {
+			await finalizeAcquisitionResearchRunOnTaskComplete(taskId, tx);
 		}
 
 		if (isAcquisitionTaskKind(task.kind)) {

@@ -18,6 +18,7 @@ import {
 import { markRunning } from "../agent/lib/enrichment";
 import {
 	claimDue,
+	completeTask,
 	DIRECT_KINDS,
 	failTask,
 	MAX_ATTEMPTS,
@@ -446,6 +447,37 @@ describe("acquisition research runs", () => {
 		expect(runs[1]?.dossierSnapshot).toMatchObject({
 			summary: "First successful snapshot",
 		});
+	});
+
+	it("keeps a run running when research pauses for a rep answer", async () => {
+		const task = await queueRefresh(
+			`Acquisition analysis requested by a rep (${userId})`,
+		);
+		await ensureAcquisitionResearchRun({
+			id: task.id,
+			contactId: null,
+			companyId,
+			organizationId: WORKSPACE_ID,
+			kind: "acquisition-refresh",
+			reason: task.reason,
+			budget: 12,
+			attempts: 1,
+			priority: 300,
+			dueAt: new Date(Date.now() - 1000),
+		});
+
+		await completeTask(
+			task.id,
+			"Research paused because it needs a rep's answer.",
+			undefined,
+			{ skipResearchRunFinalization: true },
+		);
+
+		const run = await db.acquisitionResearchRun.findUniqueOrThrow({
+			where: { agentTaskId: task.id },
+		});
+		expect(run.status).toBe(AcquisitionResearchRunStatus.RUNNING);
+		expect(run.finishedAt).toBeNull();
 	});
 
 	it("does not mark a run failed on retryable intermediate failures", async () => {

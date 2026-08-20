@@ -108,6 +108,8 @@ export default defineChannel({
 			const subject = await completeTask(
 				taskId,
 				"Research paused because it needs a rep's answer.",
+				undefined,
+				{ skipResearchRunFinalization: true },
 			);
 			if (subject) {
 				await settle(

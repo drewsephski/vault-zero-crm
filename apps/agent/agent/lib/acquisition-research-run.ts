@@ -1,4 +1,4 @@
-import { db, getOrganizationId, Prisma } from "@crm/db";
+import { db, getOrganizationId, Prisma, type PrismaClient } from "@crm/db";
 import type { AcquisitionDossierSnapshot } from "@crm/db/acquisition-research-runs";
 import { parseResearchTriggeredById } from "@crm/db/acquisition-research-runs";
 import { AcquisitionResearchRunStatus } from "@crm/db/enums";
@@ -83,12 +83,15 @@ export async function succeedAcquisitionResearchRun(input: {
 	});
 }
 
+type ResearchRunClient = PrismaClient | Prisma.TransactionClient;
+
 export async function failAcquisitionResearchRun(
 	agentTaskId: string,
 	outcome: string,
+	client: ResearchRunClient = db,
 ): Promise<void> {
 	const now = new Date();
-	await db.acquisitionResearchRun.updateMany({
+	await client.acquisitionResearchRun.updateMany({
 		where: {
 			agentTaskId,
 			status: AcquisitionResearchRunStatus.RUNNING,
@@ -103,10 +106,12 @@ export async function failAcquisitionResearchRun(
 
 export async function finalizeAcquisitionResearchRunOnTaskComplete(
 	agentTaskId: string,
+	client: ResearchRunClient = db,
 ): Promise<void> {
 	await failAcquisitionResearchRun(
 		agentTaskId,
 		"Research finished without updating the dossier.",
+		client,
 	);
 }
 
