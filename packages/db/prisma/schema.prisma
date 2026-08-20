@@ -195,6 +195,12 @@ enum AcquisitionFit {
   DISQUALIFIED
 }
 
+enum AcquisitionResearchRunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
 enum AcquisitionEngagementStage {
   OUTREACH
   ENGAGED
@@ -483,16 +489,20 @@ model AcquisitionEngagementCreateRequest {
 }
 
 model AcquisitionResearchRun {
-  id             String       @id @default(cuid())
-  organizationId String       @default("workspace")
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String                       @id @default(cuid())
+  organizationId String                       @default("workspace")
+  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   companyId      String
-  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company        Company                      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   kind           String
+  agentTaskId    String                       @unique
+  sessionId      String?
   triggeredById  String?
-  triggeredBy    User?        @relation("AcquisitionResearchRunTrigger", fields: [triggeredById], references: [id], onDelete: SetNull)
-  startedAt      DateTime     @default(now())
+  triggeredBy    User?                        @relation("AcquisitionResearchRunTrigger", fields: [triggeredById], references: [id], onDelete: SetNull)
+  status         AcquisitionResearchRunStatus @default(RUNNING)
+  startedAt      DateTime                     @default(now())
   finishedAt     DateTime?
+  outcome        String?
   dossierSnapshot Json?
 
   @@index([organizationId, companyId, startedAt])

@@ -89,6 +89,9 @@ export function useCrmCache(): CrmCache {
 					companyId
 						? trpc.companies.byId.queryKey({ id: companyId })
 						: trpc.companies.byId.queryKey(),
+					trpc.acquisition.listResearchRuns.queryKey(
+						companyId ? { companyId } : undefined,
+					),
 				],
 				[
 					trpc.companies.list.queryKey(),

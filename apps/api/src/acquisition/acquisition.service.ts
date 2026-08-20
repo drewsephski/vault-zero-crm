@@ -11,6 +11,10 @@ import {
 	RecordSource,
 } from "@crm/db";
 import { isDossierReady, isTargetLifecycleStage } from "@crm/db/acquisition";
+import {
+	parseAcquisitionDossierSnapshot,
+	researchRunListSnapshot,
+} from "@crm/db/acquisition-research-runs";
 import { getOrganizationId } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
@@ -56,6 +60,10 @@ import type {
 	TargetMutationResult,
 	TargetResearchResult,
 } from "./acquisition.contracts";
+import {
+	listResearchRunsInput,
+	researchRunIdInput,
+} from "./acquisition-research-runs.contracts";
 
 const ACTIVE_ENGAGEMENT_CONFLICT =
 	"This target already has an active acquisition opportunity.";
@@ -1112,6 +1120,83 @@ export class AcquisitionService {
 			status: { active: activeCount, terminal: terminalCount },
 			owner: countsByKey(owners, "ownerId", FACET_UNASSIGNED),
 			stage: countsByKey(stages, "stage"),
+		};
+	}
+
+	async listResearchRuns(input: z.infer<typeof listResearchRunsInput>) {
+		const company = await this.db.company.findUnique({
+			where: { id: input.companyId },
+			select: { id: true },
+		});
+		if (!company) {
+			throw new NotFoundException("That company no longer exists.");
+		}
+
+		const runs = await this.db.acquisitionResearchRun.findMany({
+			where: { companyId: input.companyId },
+			orderBy: { startedAt: "desc" },
+			take: 50,
+			select: {
+				id: true,
+				startedAt: true,
+				finishedAt: true,
+				status: true,
+				kind: true,
+				outcome: true,
+				dossierSnapshot: true,
+				triggeredBy: {
+					select: { id: true, name: true },
+				},
+			},
+		});
+
+		return runs.map((run) => {
+			const snapshot = researchRunListSnapshot(run.dossierSnapshot);
+			return {
+				id: run.id,
+				startedAt: run.startedAt.toISOString(),
+				finishedAt: run.finishedAt?.toISOString() ?? null,
+				status: run.status,
+				kind: run.kind,
+				outcome: run.outcome,
+				triggeredBy: run.triggeredBy,
+				snapshotFit: snapshot.fit,
+				snapshotSummary: snapshot.summary,
+			};
+		});
+	}
+
+	async getResearchRun(input: z.infer<typeof researchRunIdInput>) {
+		const run = await this.db.acquisitionResearchRun.findUnique({
+			where: { id: input.id },
+			select: {
+				id: true,
+				companyId: true,
+				startedAt: true,
+				finishedAt: true,
+				status: true,
+				kind: true,
+				outcome: true,
+				dossierSnapshot: true,
+				triggeredBy: {
+					select: { id: true, name: true },
+				},
+			},
+		});
+		if (!run) {
+			throw new NotFoundException("That research run no longer exists.");
+		}
+
+		return {
+			id: run.id,
+			companyId: run.companyId,
+			startedAt: run.startedAt.toISOString(),
+			finishedAt: run.finishedAt?.toISOString() ?? null,
+			status: run.status,
+			kind: run.kind,
+			outcome: run.outcome,
+			triggeredBy: run.triggeredBy,
+			snapshot: parseAcquisitionDossierSnapshot(run.dossierSnapshot),
 		};
 	}
 }

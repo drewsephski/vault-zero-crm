@@ -10,6 +10,10 @@ import {
 	RETIRED_OUTCOME,
 	RETRYING_OUTCOME_PREFIX,
 } from "@crm/db/agent-tasks";
+import {
+	failAcquisitionResearchRun,
+	finalizeAcquisitionResearchRunOnTaskComplete,
+} from "./acquisition-research-run";
 
 export type LeasedTask = {
 	id: string;
@@ -100,7 +104,7 @@ export async function claimDue(
 export async function retireExhausted(): Promise<TaskSubject[]> {
 	const now = new Date();
 
-	return db.$queryRaw<TaskSubject[]>`
+	const retired = await db.$queryRaw<TaskSubject[]>`
 		UPDATE "agentTask" AS t
 		SET "finishedAt" = ${now},
 			"outcome" = ${RETIRED_OUTCOME},
@@ -110,6 +114,14 @@ export async function retireExhausted(): Promise<TaskSubject[]> {
 			AND (t."leasedUntil" IS NULL OR t."leasedUntil" < ${now})
 		RETURNING t.id, t."contactId", t."companyId", t.kind;
 	`;
+
+	for (const task of retired) {
+		if (task.kind === "acquisition-refresh") {
+			await failAcquisitionResearchRun(task.id, RETIRED_OUTCOME);
+		}
+	}
+
+	return retired;
 }
 
 export async function completeTask(
@@ -146,6 +158,10 @@ export async function completeTask(
 		});
 
 		if (!task) return null;
+
+		if (task.kind === "acquisition-refresh") {
+			await finalizeAcquisitionResearchRunOnTaskComplete(taskId);
+		}
 
 		if (isAcquisitionTaskKind(task.kind)) {
 			await tx.agentTask.create({
@@ -202,6 +218,10 @@ export async function failTask(
 				lastError: failure,
 			},
 		});
+
+		if (count === 1 && task.kind === "acquisition-refresh") {
+			await failAcquisitionResearchRun(taskId, failure);
+		}
 
 		return count === 1
 			? {

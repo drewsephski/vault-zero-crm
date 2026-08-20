@@ -25,7 +25,7 @@ const STAGE_LABELS: Record<AcquisitionStage, string> = {
 	ACQUIRED: "Acquired",
 };
 
-const FIT_PRESENTATION: Record<
+export const FIT_PRESENTATION: Record<
 	AcquisitionFit,
 	{ label: string; tone: StatusTone }
 > = {

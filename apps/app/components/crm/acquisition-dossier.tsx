@@ -32,11 +32,12 @@ import {
 import { relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 import {
 	AcquisitionFitIndicator,
 	acquisitionStageLabel,
+	FIT_PRESENTATION,
 	TARGET_LIFECYCLE_STAGES,
 	type TargetLifecycleStage,
 } from "@/components/crm/acquisition-status";
@@ -263,6 +264,8 @@ export function AcquisitionDossier({
 				) : null}
 			</DetailSheetSection>
 
+			<ResearchHistory companyId={company.id} />
+
 			{groups.blockers.length > 0 ? (
 				<CriterionGroup
 					title="Qualification blockers"
@@ -408,6 +411,96 @@ export function AcquisitionDossier({
 			</DetailSheetSection>
 		</DetailSheetBody>
 	);
+}
+
+function ResearchHistory({ companyId }: { companyId: string }) {
+	const trpc = useTRPC();
+	const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+	const history = useQuery(
+		trpc.acquisition.listResearchRuns.queryOptions({ companyId }),
+	);
+	const expandedRun = useQuery({
+		...trpc.acquisition.getResearchRun.queryOptions({
+			id: expandedRunId ?? "",
+		}),
+		enabled: expandedRunId !== null,
+	});
+	const runs = history.data?.slice(0, 5) ?? [];
+
+	if (history.isLoading) {
+		return (
+			<DetailSheetSection title="Research history">
+				<DetailSheetProse>Loading research history…</DetailSheetProse>
+			</DetailSheetSection>
+		);
+	}
+
+	if (runs.length === 0) return null;
+
+	return (
+		<DetailSheetSection title="Research history">
+			<DetailSheetProse>
+				The dossier above reflects the last successful research. Earlier
+				attempts are listed here for audit.
+			</DetailSheetProse>
+			<ul className="mt-3 flex flex-col gap-2">
+				{runs.map((run) => {
+					const label = researchRunHistoryLabel(run);
+					const canExpand =
+						run.status === "SUCCEEDED" && run.snapshotSummary !== null;
+					const expanded = expandedRunId === run.id;
+
+					return (
+						<li key={run.id} className="flex flex-col gap-2">
+							<div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+								<span>{label}</span>
+								<span
+									className="text-muted-foreground"
+									suppressHydrationWarning
+								>
+									{relativeTimeFromIso(run.startedAt)}
+								</span>
+							</div>
+							{canExpand ? (
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									className="h-auto justify-start px-0 text-xs"
+									onClick={() => setExpandedRunId(expanded ? null : run.id)}
+								>
+									{expanded ? "Hide snapshot" : "View snapshot"}
+								</Button>
+							) : null}
+							{expanded && expandedRun.data?.snapshot ? (
+								<DetailSheetProse>
+									{expandedRun.data.snapshot.summary}
+								</DetailSheetProse>
+							) : null}
+						</li>
+					);
+				})}
+			</ul>
+		</DetailSheetSection>
+	);
+}
+
+function researchRunHistoryLabel(
+	run: RouterOutputs["acquisition"]["listResearchRuns"][number],
+): string {
+	if (run.status === "SUCCEEDED") {
+		const fitLabel = run.snapshotFit
+			? FIT_PRESENTATION[run.snapshotFit].label
+			: "Succeeded";
+		return `Succeeded · ${fitLabel}`;
+	}
+
+	if (run.status === "FAILED") {
+		const detail = run.outcome?.trim() || "Research failed";
+		return `Failed · ${detail}`;
+	}
+
+	return "Running";
 }
 
 export function LifecycleControl({

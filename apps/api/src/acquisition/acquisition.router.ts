@@ -27,6 +27,10 @@ import {
 	listAcquisitionEngagementsInput,
 	updateAcquisitionEngagementStageInput,
 } from "./acquisition-engagements.contracts";
+import {
+	listResearchRunsInput,
+	researchRunIdInput,
+} from "./acquisition-research-runs.contracts";
 
 @Router({ alias: "acquisition" })
 @UseMiddlewares(AuthMiddleware)
@@ -152,5 +156,17 @@ export class AcquisitionRouter {
 		@Input() input: z.infer<typeof updateAcquisitionEngagementStageInput>,
 	) {
 		return this.acquisition.updateEngagementStage(input, ctx.user.id);
+	}
+
+	@Query({ input: listResearchRunsInput })
+	async listResearchRuns(
+		@Input() input: z.infer<typeof listResearchRunsInput>,
+	) {
+		return this.acquisition.listResearchRuns(input);
+	}
+
+	@Query({ input: researchRunIdInput })
+	async getResearchRun(@Input() input: z.infer<typeof researchRunIdInput>) {
+		return this.acquisition.getResearchRun(input);
 	}
 }

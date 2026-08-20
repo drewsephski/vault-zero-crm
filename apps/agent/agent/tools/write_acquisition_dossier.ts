@@ -10,12 +10,14 @@ import {
 	isAcquisitionEvidenceUrl,
 	TARGET_LIFECYCLE_STAGES,
 } from "@crm/db/acquisition";
+import type { AcquisitionDossierSnapshot } from "@crm/db/acquisition-research-runs";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import {
 	acquisitionCriteriaSchema,
 	validateCriterionAssessments,
 } from "../lib/acquisition-criteria";
+import { succeedAcquisitionResearchRun } from "../lib/acquisition-research-run";
 
 const evidence = z.object({
 	label: z.string().trim().min(5).max(300),
@@ -123,6 +125,19 @@ export default defineTool({
 			return { written: false as const, reason: "No user to attribute to." };
 		}
 		const researchedAt = new Date();
+		const snapshot: AcquisitionDossierSnapshot = {
+			fit: input.fit,
+			summary: input.summary,
+			criteria: input.criteria,
+			strengths: input.strengths,
+			concerns: input.concerns,
+			missingInformation: input.missingInformation,
+			recommendedAction: input.recommendedAction,
+			recommendedStage: input.recommendedStage,
+			sourceUrls,
+			researchedAt: researchedAt.toISOString(),
+			sourceSessionId: ctx.session.id,
+		};
 
 		const written = await db.$transaction(async (tx) => {
 			const { count } = await tx.acquisitionTarget.updateMany({
@@ -173,6 +188,12 @@ export default defineTool({
 					"This company is not an acquisition target. Add it to targets before writing a dossier.",
 			};
 		}
+
+		await succeedAcquisitionResearchRun({
+			sessionId: ctx.session.id,
+			companyId: company.id,
+			snapshot,
+		});
 
 		return {
 			written: true as const,

@@ -1,5 +1,9 @@
 import { EnrichmentStatus } from "@crm/db";
 import { runInOrganization } from "@crm/db/tenancy";
+import {
+	ensureAcquisitionResearchRun,
+	noteAcquisitionResearchSession,
+} from "./acquisition-research-run";
 import { APP_AUTH, type AppAuth } from "./app-auth";
 import { brandOutcome, runBrand } from "./brand";
 import { markRunning, settle } from "./enrichment";
@@ -108,8 +112,14 @@ export async function runResearchLane(
 			try {
 				await runInOrganization(task.organizationId, async () => {
 					await markRunning(task);
+					if (task.kind === "acquisition-refresh") {
+						await ensureAcquisitionResearchRun(task);
+					}
 					const session = await start(task);
 					await noteSession(task.id, session.id);
+					if (task.kind === "acquisition-refresh") {
+						await noteAcquisitionResearchSession(task.id, session.id);
+					}
 				});
 			} catch (error) {
 				const reason = error instanceof Error ? error.message : String(error);
