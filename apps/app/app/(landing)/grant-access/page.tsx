@@ -22,7 +22,7 @@ export default async function GrantAccessPage() {
 		<AuthShell>
 			<AuthHeading
 				title="One more step"
-				description="This CRM reads your Gmail and Calendar so meetings and email threads show up on the right company. It is read-only — nothing is ever sent on your behalf."
+				description="This CRM reads Gmail and Calendar to match activity to companies. It can send a Gmail message only after you review and approve its exact recipients, subject, and body."
 			/>
 
 			<GrantAccess />

@@ -39,12 +39,13 @@ export default function PrivacyPage() {
 					information from that provider.
 				</p>
 				<p>
-					<strong>Google data.</strong> If you connect Google, we request
-					read-only access to Gmail and Google Calendar so meetings and email
+					<strong>Google data.</strong> If you connect Google, we request access
+					to Gmail and read-only access to Google Calendar so meetings and email
 					threads can appear on the right company in your workspace. We store
 					metadata and message content only for conversations tied to companies
 					in your CRM. Personal mail that does not relate to a tracked company
-					is not saved.
+					is not saved. We use Gmail send access only when you explicitly
+					approve a message with its exact recipients, subject, and body.
 				</p>
 				<p>
 					<strong>CRM content.</strong> We store the records you and your

@@ -2,12 +2,13 @@ import { describe, expect, it } from "bun:test";
 import {
 	CALENDAR_SCOPE,
 	GMAIL_SCOPE,
+	GMAIL_SEND_SCOPE,
 	hasSyncScopes,
 	parseScopes,
 	SYNC_SCOPES,
 } from "@crm/auth/scopes";
 
-const BOTH = `openid,email,profile,${GMAIL_SCOPE},${CALENDAR_SCOPE}`;
+const ALL = `openid,email,profile,${GMAIL_SCOPE},${GMAIL_SEND_SCOPE},${CALENDAR_SCOPE}`;
 
 describe("parseScopes", () => {
 	it("handles the comma form Better Auth stores", () => {
@@ -26,12 +27,15 @@ describe("parseScopes", () => {
 });
 
 describe("hasSyncScopes", () => {
-	it("is true only when both scopes are present", () => {
-		expect(hasSyncScopes(BOTH)).toBe(true);
+	it("is true only when every required Google capability is present", () => {
+		expect(hasSyncScopes(ALL)).toBe(true);
 	});
 
 	it("is false when granular consent dropped one of them", () => {
 		expect(hasSyncScopes(`openid,email,profile,${GMAIL_SCOPE}`)).toBe(false);
+		expect(
+			hasSyncScopes(`openid,email,profile,${GMAIL_SCOPE},${CALENDAR_SCOPE}`),
+		).toBe(false);
 		expect(hasSyncScopes(`openid,email,profile,${CALENDAR_SCOPE}`)).toBe(false);
 	});
 

@@ -23,6 +23,27 @@ const client = new GoogleApiClient();
 const call = () => client.get<unknown>("https://example.test/x", "token");
 
 describe("GoogleApiClient", () => {
+	it("posts JSON with bearer authorization", async () => {
+		const captured: { init?: RequestInit } = {};
+		globalThis.fetch = (async (_input, init) => {
+			captured.init = init;
+			return Response.json({ id: "sent-1" });
+		}) as typeof fetch;
+
+		expect(
+			await client.post<{ id: string }>(
+				"https://example.test/messages/send",
+				"secret-token",
+				{ raw: "message" },
+			),
+		).toEqual({ outcome: "ok", data: { id: "sent-1" } });
+		expect(captured.init?.method).toBe("POST");
+		expect(new Headers(captured.init?.headers).get("authorization")).toBe(
+			"Bearer secret-token",
+		);
+		expect(JSON.parse(String(captured.init?.body))).toEqual({ raw: "message" });
+	});
+
 	it("returns the payload on success", async () => {
 		stub(200, { ok: true });
 		expect(await call()).toEqual({ outcome: "ok", data: { ok: true } });

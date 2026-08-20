@@ -130,6 +130,7 @@ export const AGENT_TOOLS = [
 	"schedule_recheck",
 	"search_crm",
 	"search_linkedin_people",
+	"send_email",
 	"set_contact_socials",
 	"update_acquisition_profile",
 	"update_crm_record",

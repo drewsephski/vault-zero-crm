@@ -34,6 +34,12 @@ export type Profile = {
 	historyId?: string;
 };
 
+export type SentMessage = {
+	id?: string;
+	threadId?: string;
+	labelIds?: string[];
+};
+
 export const WORK_MAIL_QUERY =
 	"-in:chats -category:promotions -category:social -category:forums";
 
@@ -82,6 +88,17 @@ export class GmailClient {
 	): Promise<GoogleResult<GmailMessage>> {
 		return this.api.get<GmailMessage>(`${BASE}/messages/${id}`, accessToken, {
 			format: "full",
+		});
+	}
+
+	async sendMessage(
+		accessToken: string,
+		raw: string,
+		threadId?: string,
+	): Promise<GoogleResult<SentMessage>> {
+		return this.api.post<SentMessage>(`${BASE}/messages/send`, accessToken, {
+			raw,
+			...(threadId ? { threadId } : {}),
 		});
 	}
 }

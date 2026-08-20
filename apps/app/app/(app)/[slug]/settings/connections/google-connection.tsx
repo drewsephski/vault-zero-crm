@@ -152,9 +152,9 @@ function ConnectGoogle({ connectError }: { connectError?: string }) {
 			<CardHeader>
 				<CardTitle>Google</CardTitle>
 				<CardDescription>
-					Connect Gmail and Calendar, and new meetings and email threads are
-					added to the matching company as they happen. It is read-only —
-					nothing is ever sent on your behalf.
+					Connect Gmail and Calendar so new activity is added to the matching
+					company. The agent can send one message only after you approve its
+					exact recipients, subject, and body.
 				</CardDescription>
 
 				<CardAction>

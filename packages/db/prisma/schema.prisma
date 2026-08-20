@@ -33,6 +33,7 @@ model User {
   factDecisions  ContactFact[]       @relation("FactDecider")
   conversations  AgentConversation[] @relation("ConversationOwner")
   outreachLeads  OutreachLead[]
+  emailSends     EmailSend[]
 
   members     Member[]
   invitations Invitation[]
@@ -321,6 +322,42 @@ model OutreachLead {
   @@index([companyId, status])
   @@index([ownerId, status])
   @@map("outreachLead")
+}
+
+enum EmailSendStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+}
+
+model EmailSend {
+  id             String          @id @default(cuid())
+  idempotencyKey String          @unique
+  status         EmailSendStatus @default(PENDING)
+  to             Json
+  cc             Json
+  subject        String
+  body           String
+  crmThreadId    String?
+  gmailThreadId  String?
+  gmailMessageId String?
+  rfcMessageId   String
+  error          String?
+  startedAt      DateTime?
+  sentAt         DateTime?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, createdAt])
+  @@index([userId, status, createdAt])
+  @@map("emailSend")
 }
 
 enum VaultZeroEventStatus {
@@ -1100,6 +1137,7 @@ model Organization {
   acquisitionEngagements AcquisitionEngagement[]
   acquisitionResearchRuns AcquisitionResearchRun[]
   outreachLeads          OutreachLead[]
+  emailSends             EmailSend[]
   conversations          AgentConversation[]
 
   @@unique([slug])

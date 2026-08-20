@@ -4,10 +4,15 @@ export const MICROSOFT_PROVIDER_ID = "microsoft";
 export const IDENTITY_SCOPES = ["openid", "email", "profile"] as const;
 
 export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 export const CALENDAR_SCOPE =
 	"https://www.googleapis.com/auth/calendar.readonly";
 
-export const SYNC_SCOPES = [GMAIL_SCOPE, CALENDAR_SCOPE] as const;
+export const SYNC_SCOPES = [
+	GMAIL_SCOPE,
+	GMAIL_SEND_SCOPE,
+	CALENDAR_SCOPE,
+] as const;
 
 export const REQUIRED_SCOPES = [...IDENTITY_SCOPES, ...SYNC_SCOPES] as const;
 

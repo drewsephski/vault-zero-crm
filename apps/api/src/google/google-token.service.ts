@@ -1,8 +1,9 @@
-import { auth, type SignInAccount } from "@crm/auth";
+import { auth, parseScopes, type SignInAccount } from "@crm/auth";
 import { type Db } from "@crm/db";
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectDatabase } from "../database/database.constants";
 import {
+	GMAIL_SEND_SCOPE,
 	GOOGLE_PROVIDER_ID,
 	SCOPE_FOR_SOURCE,
 	type SyncSource,
@@ -26,12 +27,7 @@ export class GoogleTokenService {
 			select: { scope: true },
 		});
 
-		return (
-			account?.scope
-				?.split(",")
-				.map((scope) => scope.trim())
-				.filter(Boolean) ?? []
-		);
+		return [...parseScopes(account?.scope)];
 	}
 
 	async isConnected(userId: string, source: SyncSource): Promise<boolean> {
@@ -84,6 +80,43 @@ export class GoogleTokenService {
 				message: "Google token refresh failed",
 				userId,
 				source,
+				reason: error instanceof Error ? error.message : String(error),
+			});
+
+			return {
+				outcome: "needs-reconnect",
+				reason: "Google would not refresh the access token.",
+			};
+		}
+	}
+
+	async accessTokenForSend(userId: string): Promise<TokenResult> {
+		const scopes = await this.grantedScopes(userId);
+		if (!scopes.includes(GMAIL_SEND_SCOPE)) {
+			return {
+				outcome: "not-connected",
+				reason: "The Gmail send scope has not been granted.",
+			};
+		}
+
+		try {
+			const { accessToken } = await auth.api.getAccessToken({
+				body: { providerId: GOOGLE_PROVIDER_ID, userId },
+			});
+
+			if (!accessToken) {
+				return {
+					outcome: "needs-reconnect",
+					reason: "Google returned no access token.",
+				};
+			}
+
+			return { outcome: "ok", accessToken };
+		} catch (error) {
+			this.logger.warn({
+				message: "Google token refresh failed",
+				userId,
+				source: "gmail-send",
 				reason: error instanceof Error ? error.message : String(error),
 			});
 

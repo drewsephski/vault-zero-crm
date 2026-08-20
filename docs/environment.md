@@ -36,7 +36,8 @@ set. Parsed on demand. `packages/auth/src/workspace.ts`.
 
 - **`API_URL`** (`:3001`) mints session cookies and serves `/api/auth/*`;
   `next.config.ts` republishes it as `NEXT_PUBLIC_API_URL`, so one variable does both
-  sides. `BETTER_AUTH_URL` is a legacy fallback.
+  sides. The agent also calls this origin for an explicitly approved Gmail send.
+  `BETTER_AUTH_URL` is a legacy fallback.
 - **`APP_URL`** (`:3000`) is also the trusted-origin and `callbackURL` allow-list.
 - **`AUTH_COOKIE_DOMAIN`** only for API and app on different subdomains of one parent.
 - **`AGENT_URL`** is the agent's deployment, server-side only, and **must include the

@@ -123,16 +123,17 @@ export class GoogleConnectionService {
 	}
 
 	async purgeSyncedData(userId: string): Promise<{ purged: number }> {
-		const [threads, events] = await this.db.$transaction([
+		const [threads, events, sends] = await this.db.$transaction([
 			this.db.emailThread.deleteMany({
 				where: { messages: { some: { syncedByUserId: userId } } },
 			}),
 			this.db.calendarEvent.deleteMany({ where: { syncedByUserId: userId } }),
+			this.db.emailSend.deleteMany({ where: { userId } }),
 		]);
 
 		await this.stamp.recomputeAll();
 
-		const purged = threads.count + events.count;
+		const purged = threads.count + events.count + sends.count;
 
 		this.logger.log({ message: "Synced data purged", userId, purged });
 

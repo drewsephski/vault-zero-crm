@@ -5,6 +5,8 @@ import { TrpcModule } from "../trpc/trpc.module";
 import { CalendarClient } from "./calendar.client";
 import { CalendarSyncService } from "./calendar-sync.service";
 import { ConversationService } from "./conversation.service";
+import { EmailSendController } from "./email-send.controller";
+import { EmailSendService } from "./email-send.service";
 import { GmailClient } from "./gmail.client";
 import { GmailSyncService } from "./gmail-sync.service";
 import { GoogleRouter } from "./google.router";
@@ -18,7 +20,7 @@ import { SyncStateService } from "./sync-state.service";
 
 @Module({
 	imports: [TrpcModule, AgentModule, CompaniesModule],
-	controllers: [SyncController],
+	controllers: [SyncController, EmailSendController],
 	providers: [
 		GoogleApiClient,
 		GoogleTokenService,
@@ -31,6 +33,7 @@ import { SyncStateService } from "./sync-state.service";
 		GoogleSyncService,
 		GoogleConnectionService,
 		ConversationService,
+		EmailSendService,
 		GoogleRouter,
 	],
 	exports: [GoogleSyncService, GoogleConnectionService],

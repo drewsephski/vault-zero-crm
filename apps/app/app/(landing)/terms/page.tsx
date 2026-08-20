@@ -61,10 +61,11 @@ export default function TermsPage() {
 			<LegalSection title="Connected accounts">
 				<p>
 					If you connect Google or Microsoft, you authorize Vault Zero to access
-					the scopes shown during connection. For Google, that includes
-					read-only Gmail and Calendar access when you grant it. You can revoke
-					access through workspace settings or through the provider&apos;s
-					account permissions page.
+					the scopes shown during connection. For Google, that includes Gmail
+					read and send access and read-only Calendar access when you grant it.
+					An agent-authored email is sent only after you approve its exact
+					recipients, subject, and body. You can revoke access through workspace
+					settings or through the provider&apos;s account permissions page.
 				</p>
 				<p>
 					Your use of Google and Microsoft services remains subject to their

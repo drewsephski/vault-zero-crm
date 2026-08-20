@@ -3,6 +3,7 @@ import { CALENDAR_SCOPE, GMAIL_SCOPE } from "@crm/auth";
 export {
 	CALENDAR_SCOPE,
 	GMAIL_SCOPE,
+	GMAIL_SEND_SCOPE,
 	GOOGLE_PROVIDER_ID,
 	SYNC_SCOPES,
 } from "@crm/auth";
