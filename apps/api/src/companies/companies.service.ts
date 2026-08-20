@@ -456,7 +456,12 @@ export class CompaniesService {
 			const updated = await this.db.company.update({
 				where: { id },
 				data,
-				select: { id: true, name: true, domain: true },
+				select: {
+					id: true,
+					name: true,
+					domain: true,
+					acquisitionTarget: { select: { researchedAt: true } },
+				},
 			});
 
 			if (data.enrichmentStatus === "PENDING") {
@@ -467,7 +472,19 @@ export class CompaniesService {
 				void this.favicon.backfill(id, updated.domain);
 			}
 
-			return updated;
+			if (
+				data.domain !== undefined &&
+				updated.domain &&
+				updated.acquisitionTarget &&
+				!updated.acquisitionTarget.researchedAt
+			) {
+				await this.queueAcquisitionResearchIfReady(
+					id,
+					"Domain added — acquisition research queued",
+				);
+			}
+
+			return { id: updated.id, name: updated.name, domain: updated.domain };
 		} catch (error) {
 			throw this.translate(error, id);
 		}
@@ -801,6 +818,35 @@ export class CompaniesService {
 			enrichment: countsByKey(enrichment, "enrichmentStatus"),
 			source: countsByKey(sources, "source"),
 		};
+	}
+
+	private async queueAcquisitionResearchIfReady(
+		companyId: string,
+		reason: string,
+	): Promise<void> {
+		const profile = await this.db.acquisitionProfile.findUnique({
+			where: { id: getOrganizationId() ?? WORKSPACE_ID },
+			select: {
+				preferredIndustries: true,
+				geographies: true,
+				excludedCategories: true,
+				revenueMin: true,
+				revenueMax: true,
+				ebitdaMin: true,
+				ebitdaMax: true,
+				purchasePriceMin: true,
+				purchasePriceMax: true,
+				ownerInvolvement: true,
+				recurringRevenuePreference: true,
+				customerConcentrationMax: true,
+				assetPreference: true,
+				financingAssumptions: true,
+			},
+		});
+
+		if (!profile || !isDossierReady(profile)) return;
+
+		await this.agent.acquisitionTargetRequested(companyId, reason).catch(() => null);
 	}
 
 	private translate(error: unknown, id: string): unknown {

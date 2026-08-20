@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { companiesSearchParams } from "../app/(app)/[slug]/companies/companies-search-params";
 import {
 	acquisitionCriterionLabel,
+	acquisitionResearchActivity,
 	acquisitionTargetCreateSubmission,
 	criterionGroups,
 	defaultCompanyTab,
@@ -147,6 +148,18 @@ describe("acquisition presentation", () => {
 				"last successful",
 			);
 		}
+
+		expect(targetResearchCopy({ status: "queued" }).busy).toBe(true);
+		expect(targetResearchCopy({ status: "running" }).busy).toBe(true);
+		expect(targetResearchCopy({ status: "retrying" }).busy).toBe(true);
+	});
+
+	it("maps active acquisition research to banner activity", () => {
+		expect(acquisitionResearchActivity({ status: "queued" })).toBe("queued");
+		expect(acquisitionResearchActivity({ status: "running" })).toBe("running");
+		expect(acquisitionResearchActivity({ status: "retrying" })).toBe("running");
+		expect(acquisitionResearchActivity({ status: "idle" })).toBeNull();
+		expect(acquisitionResearchActivity({ status: "failed" })).toBeNull();
 	});
 
 	it("maps blocked target promotion to a corrective action", () => {

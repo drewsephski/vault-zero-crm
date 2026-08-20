@@ -50,12 +50,14 @@ import {
 	DetailSheetProperty,
 	DetailSheetProse,
 	DetailSheetRail,
+	DetailSheetResearchStatus,
 	DetailSheetSection,
 	DetailSheetSplit,
 } from "@/components/detail-sheet";
 import {
 	acquisitionCriterionLabel,
 	acquisitionProfileDossierReady,
+	acquisitionResearchActivity,
 	criterionGroups,
 	safeAcquisitionEvidence,
 	targetResearchCopy,
@@ -154,6 +156,7 @@ export function AcquisitionDossier({
 			? ({ status: "blocked", blocker: "missing-buy-box" } as const)
 			: null;
 	const researchCopy = targetResearchCopy(company.acquisitionResearch);
+	const researchActivity = acquisitionResearchActivity(company.acquisitionResearch);
 	const readinessCopy = readinessState
 		? targetResearchCopy(readinessState)
 		: null;
@@ -172,6 +175,15 @@ export function AcquisitionDossier({
 
 	return (
 		<DetailSheetBody>
+			{researchActivity ? (
+				<DetailSheetResearchStatus
+					subject={company.name}
+					fields={[]}
+					state={researchActivity}
+					mode="acquisition"
+				/>
+			) : null}
+
 			<DetailSheetSplit>
 				<DetailSheetMain>
 					<DetailSheetSection title="Criteria matrix">
@@ -317,8 +329,16 @@ export function AcquisitionDossier({
 			) : (
 				<DetailSheetEmpty
 					icon={Partnership}
-					title="No acquisition assessment yet"
-					description="Research compares this target with the buy box, records supported findings, and names the next decision."
+					title={
+						researchActivity
+							? "Eve is researching this target"
+							: "No acquisition assessment yet"
+					}
+					description={
+						researchActivity
+							? researchCopy.description
+							: "Research compares this target with the buy box, records supported findings, and names the next decision."
+					}
 					action={
 						company.acquisitionResearch.status === "idle" &&
 						readinessState === null &&

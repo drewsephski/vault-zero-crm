@@ -15,7 +15,7 @@ import {
 } from "@crm/db";
 import { readReportingCurrency } from "@crm/db/settings";
 import { isOnboarded, markOnboarded, workspaceSlug } from "@crm/db/workspace";
-import { isDiscoveryReady } from "@crm/db/acquisition";
+import { isDiscoveryReady, isDossierReady } from "@crm/db/acquisition";
 import {
 	BadRequestException,
 	ForbiddenException,
@@ -275,6 +275,12 @@ export class WorkspaceService {
 			);
 		}
 
+		if (isDossierReady(fields)) {
+			await this.queueUnresearchedTargets(
+				"Buy box completed — acquisition research queued",
+			);
+		}
+
 		this.logger.log({ message: "Acquisition profile updated", userId });
 
 		return { ...(await this.acquisitionProfile(userId)), discoveryQueued };
@@ -520,6 +526,26 @@ export class WorkspaceService {
 				"Only an owner or an admin can change the acquisition workflow.",
 			);
 		}
+	}
+
+	private async queueUnresearchedTargets(reason: string): Promise<void> {
+		const targets = await this.db.acquisitionTarget.findMany({
+			where: { researchedAt: null },
+			select: {
+				companyId: true,
+				company: { select: { domain: true } },
+			},
+		});
+
+		await Promise.all(
+			targets
+				.filter((target) => normalizeDomain(target.company.domain))
+				.map((target) =>
+					this.agent
+						.acquisitionTargetRequested(target.companyId, reason)
+						.catch(() => null),
+				),
+		);
 	}
 }
 

@@ -125,7 +125,7 @@ export function acquisitionProfileDossierReady(
 	});
 }
 
-type TargetResearchState =
+export type TargetResearchState =
 	| {
 			status: "idle" | "queued" | "running" | "retrying";
 			error?: string | null;
@@ -155,15 +155,24 @@ export type TargetResearchPresentation = {
 	feedback: { kind: "success" | "error"; message: string } | null;
 };
 
+export function acquisitionResearchActivity(
+	state: TargetResearchState,
+): "queued" | "running" | null {
+	if (state.status === "queued") return "queued";
+	if (state.status === "running" || state.status === "retrying") return "running";
+	return null;
+}
+
 export function targetResearchCopy(
 	state: TargetResearchState,
 ): TargetResearchPresentation {
 	if (state.status === "queued") {
 		return {
 			label: "Research queued",
-			description: "Waiting for Eve to start. This dossier stays available.",
-			tone: "neutral",
-			busy: false,
+			description:
+				"Eve will start shortly. This page updates automatically when research begins.",
+			tone: "info",
+			busy: true,
 			pulse: true,
 			action: null,
 			feedback: { kind: "success", message: "Target added. Research queued." },
@@ -174,7 +183,7 @@ export function targetResearchCopy(
 		return {
 			label: "Research in progress",
 			description:
-				"Eve is refreshing the dossier. This dossier stays available while she works.",
+				"Eve is comparing this target with your buy box and writing the dossier. Updates appear here automatically.",
 			tone: "info",
 			busy: true,
 			pulse: false,
@@ -187,10 +196,10 @@ export function targetResearchCopy(
 		return {
 			label: "Research retrying",
 			description:
-				"Eve will retry after a temporary failure. This dossier stays available.",
+				"Eve hit a temporary issue and will retry shortly. This page updates automatically.",
 			tone: "warning",
 			busy: true,
-			pulse: false,
+			pulse: true,
 			action: null,
 			feedback: null,
 		};

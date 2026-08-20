@@ -37,6 +37,7 @@ import {
 	enrichmentActivity,
 	isEnriching,
 } from "@/components/crm/enrichment-status";
+import { StatusIndicator } from "@crm/ui/components/status-indicator";
 import {
 	InlineField,
 	InlineSelectField,
@@ -61,7 +62,7 @@ import {
 	DetailSheetStats,
 	type DetailSheetTab,
 } from "@/components/detail-sheet";
-import { defaultCompanyTab, targetResearchCopy } from "@/lib/acquisition";
+import { defaultCompanyTab, acquisitionResearchActivity, targetResearchCopy } from "@/lib/acquisition";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
@@ -214,6 +215,12 @@ export function CompanySheet({ companyId }: { companyId: string }) {
 	const researchActivity = company
 		? enrichmentActivity(company.enrichmentStatus, company.queued)
 		: null;
+	const acquisitionActivity = company
+		? acquisitionResearchActivity(company.acquisitionResearch)
+		: null;
+	const acquisitionCopy = company
+		? targetResearchCopy(company.acquisitionResearch)
+		: null;
 
 	const location = company
 		? [company.city, company.stateCode, company.country]
@@ -325,13 +332,21 @@ export function CompanySheet({ companyId }: { companyId: string }) {
 				) : undefined
 			}
 			note={
-				company &&
-				(company.enrichmentStatus !== "COMPLETE" || researchActivity) ? (
-					<EnrichmentIndicator
-						status={company.enrichmentStatus}
-						queued={company.queued}
-						title={company.enrichmentError}
-					/>
+				company ? (
+					labels.acquisition && acquisitionActivity && acquisitionCopy ? (
+						<StatusIndicator
+							tone={acquisitionCopy.tone}
+							busy={acquisitionCopy.busy}
+							pulse={acquisitionCopy.pulse}
+							label={acquisitionCopy.label}
+						/>
+					) : company.enrichmentStatus !== "COMPLETE" || researchActivity ? (
+						<EnrichmentIndicator
+							status={company.enrichmentStatus}
+							queued={company.queued}
+							title={company.enrichmentError}
+						/>
+					) : null
 				) : null
 			}
 			media={
@@ -383,7 +398,15 @@ export function CompanySheet({ companyId }: { companyId: string }) {
 							/>
 						</DetailSheetStat>
 						<DetailSheetStat label="Research freshness">
-							{company.acquisitionTarget.researchedAt ? (
+							{acquisitionActivity && acquisitionCopy ? (
+								<StatusIndicator
+									tone={acquisitionCopy.tone}
+									busy={acquisitionCopy.busy}
+									pulse={acquisitionCopy.pulse}
+									label={acquisitionCopy.label}
+									size="sm"
+								/>
+							) : company.acquisitionTarget.researchedAt ? (
 								<span suppressHydrationWarning>
 									{relativeTimeFromIso(company.acquisitionTarget.researchedAt)}
 								</span>
@@ -466,9 +489,20 @@ function CompanyOverview({
 	)
 		? researchActivity
 		: null;
+	const acquisitionBannerActivity = acquisitionResearchActivity(
+		company.acquisitionResearch,
+	);
 
 	return (
 		<DetailSheetBody>
+			{acquisitionBannerActivity ? (
+				<DetailSheetResearchStatus
+					subject={company.name}
+					fields={[]}
+					state={acquisitionBannerActivity}
+					mode="acquisition"
+				/>
+			) : null}
 			{detailsActivity ? (
 				<DetailSheetResearchStatus
 					subject={company.name}

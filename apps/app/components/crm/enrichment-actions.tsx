@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
+import { acquisitionProfileDossierReady } from "@/lib/acquisition";
 import type { EnrichmentActivity } from "./enrichment-status";
 
 export function EnrichmentActions({
@@ -72,8 +73,7 @@ export function EnrichmentActions({
 	const researchKind = acquisition ? "acquisition-refresh" : "company-profile";
 	const researchBusy = queuedKinds.includes(researchKind);
 	const buyBoxReady = acquisitionProfile.data
-		? acquisitionProfile.data.preferredIndustries.length > 0 ||
-			acquisitionProfile.data.geographies.length > 0
+		? acquisitionProfileDossierReady(acquisitionProfile.data)
 		: null;
 	const researchBlocked = acquisition && buyBoxReady === false;
 	const researchLabel = acquisition ? "Analyze fit" : "Research brief";
@@ -126,7 +126,7 @@ export function EnrichmentActions({
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>
-						Add an industry or geography before Eve analyzes acquisition fit.
+						Add at least one buy-box criterion before Eve analyzes acquisition fit.
 					</TooltipContent>
 				</Tooltip>
 			) : (
@@ -150,7 +150,11 @@ export function EnrichmentActions({
 								<Icon icon={MagicWand} data-icon="inline-start" />
 							)}
 							<span className="hidden sm:inline">
-								{researchBusy ? "Working" : researchLabel}
+								{researchBusy
+									? acquisition
+										? "Analyzing"
+										: "Working"
+									: researchLabel}
 							</span>
 						</Button>
 					</TooltipTrigger>

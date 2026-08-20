@@ -42,7 +42,7 @@ export class AgentQueueService {
 	async acquisitionResearchState(companyId: string) {
 		const now = new Date();
 		const task = await this.db.agentTask.findFirst({
-			where: { companyId, kind: "acquisition-refresh" },
+			where: { companyId, kind: "acquisition-refresh", finishedAt: null },
 			orderBy: { createdAt: "desc" },
 			select: {
 				dueAt: true,

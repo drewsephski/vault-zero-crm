@@ -311,7 +311,7 @@ describe("AgentTriggerService", () => {
 		).toMatchObject({ id: task.id, reason: "Manual acquisition refresh" });
 	});
 
-	it("uses the latest persisted acquisition task", async () => {
+	it("uses the latest open acquisition task", async () => {
 		const now = Date.now();
 		await db.agentTask.createMany({
 			data: [
@@ -323,20 +323,49 @@ describe("AgentTriggerService", () => {
 					startedAt: new Date("2026-07-01T12:00:00.000Z"),
 					finishedAt: new Date("2026-07-01T12:01:00.000Z"),
 					lastError: "prior failure",
-					createdAt: new Date(now - 60_000),
+					createdAt: new Date(now),
 				},
 				{
 					companyId,
 					kind: "acquisition-refresh",
 					reason: "Future recurrence",
 					dueAt: new Date(now + 30 * 24 * 60 * 60 * 1000),
-					createdAt: new Date(now),
+					createdAt: new Date(now - 60_000),
 				},
 			],
 		});
 
 		expect(await queue.acquisitionResearchState(companyId)).toEqual({
 			status: "idle",
+			error: null,
+		});
+	});
+
+	it("ignores a finished acquisition task when a newer one is queued", async () => {
+		const now = Date.now();
+		await db.agentTask.createMany({
+			data: [
+				{
+					companyId,
+					kind: "acquisition-refresh",
+					reason: "Completed refresh",
+					dueAt: new Date(now - 120_000),
+					startedAt: new Date(now - 110_000),
+					finishedAt: new Date(now - 60_000),
+					createdAt: new Date(now),
+				},
+				{
+					companyId,
+					kind: "acquisition-refresh",
+					reason: "Queued refresh",
+					dueAt: new Date(now - 1000),
+					createdAt: new Date(now - 120_000),
+				},
+			],
+		});
+
+		expect(await queue.acquisitionResearchState(companyId)).toEqual({
+			status: "queued",
 			error: null,
 		});
 	});
