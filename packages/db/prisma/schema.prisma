@@ -176,13 +176,8 @@ enum AcquisitionAssetPreference {
 
 enum AcquisitionStage {
   DISCOVERED
-  RESEARCHING
   QUALIFIED
   WATCHLIST
-  CONTACTED
-  INTERESTED
-  OPPORTUNITY
-  DILIGENCE
   REJECTED
   ACQUIRED
 }

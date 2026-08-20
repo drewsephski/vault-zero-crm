@@ -164,11 +164,11 @@ describe("acquisition operating contracts", () => {
 
 	it("rejects legacy transaction lifecycle stages on targets", () => {
 		for (const stage of [
-			AcquisitionStage.RESEARCHING,
-			AcquisitionStage.CONTACTED,
-			AcquisitionStage.INTERESTED,
-			AcquisitionStage.OPPORTUNITY,
-			AcquisitionStage.DILIGENCE,
+			"RESEARCHING",
+			"CONTACTED",
+			"INTERESTED",
+			"OPPORTUNITY",
+			"DILIGENCE",
 		]) {
 			expect(
 				updateAcquisitionTargetInput.safeParse({

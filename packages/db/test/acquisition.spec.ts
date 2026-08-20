@@ -109,7 +109,6 @@ describe("acquisition domain", () => {
 	it("defines active and historical lifecycle scopes once", () => {
 		expect(targetStages("active")).not.toContain(AcquisitionStage.REJECTED);
 		expect(targetStages("active")).not.toContain(AcquisitionStage.ACQUIRED);
-		expect(targetStages("active")).not.toContain(AcquisitionStage.RESEARCHING);
 		expect(targetStages("rejected")).toEqual([AcquisitionStage.REJECTED]);
 		expect(targetStages("acquired")).toEqual([AcquisitionStage.ACQUIRED]);
 		expect(targetStages("history")).toBeNull();
@@ -123,8 +122,8 @@ describe("acquisition domain", () => {
 			AcquisitionStage.REJECTED,
 			AcquisitionStage.ACQUIRED,
 		]);
-		expect(isTargetLifecycleStage(AcquisitionStage.RESEARCHING)).toBe(false);
 		expect(isTargetLifecycleStage(AcquisitionStage.QUALIFIED)).toBe(true);
+		expect(isTargetLifecycleStage(AcquisitionStage.DISCOVERED)).toBe(true);
 	});
 
 	it("scores attention from fit, blockers, staleness, tasks, and engagement", () => {

@@ -14,13 +14,8 @@ export const ACQUISITION_STAGES = TARGET_LIFECYCLE_STAGES;
 
 const STAGE_LABELS: Record<AcquisitionStage, string> = {
 	DISCOVERED: "Discovered",
-	RESEARCHING: "Researching",
 	QUALIFIED: "Qualified",
 	WATCHLIST: "Watchlist",
-	CONTACTED: "Contacted",
-	INTERESTED: "Interested",
-	OPPORTUNITY: "Opportunity",
-	DILIGENCE: "Diligence",
 	REJECTED: "Rejected",
 	ACQUIRED: "Acquired",
 };
@@ -57,8 +52,7 @@ export function AcquisitionStageIndicator({
 			? "success"
 			: stage === AcquisitionStage.REJECTED
 				? "error"
-				: stage === AcquisitionStage.DILIGENCE ||
-						stage === AcquisitionStage.OPPORTUNITY
+				: stage === AcquisitionStage.QUALIFIED
 					? "info"
 					: "neutral";
 	return <StatusIndicator tone={tone} label={STAGE_LABELS[stage]} />;

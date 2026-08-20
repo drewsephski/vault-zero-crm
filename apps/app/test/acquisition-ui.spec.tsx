@@ -34,7 +34,7 @@ describe("acquisition interface accessibility", () => {
 		const markup = renderToStaticMarkup(
 			<TooltipProvider>
 				<LifecycleControl
-					stage={AcquisitionStage.RESEARCHING}
+					stage={AcquisitionStage.QUALIFIED}
 					pending
 					onStageChange={() => undefined}
 				/>
