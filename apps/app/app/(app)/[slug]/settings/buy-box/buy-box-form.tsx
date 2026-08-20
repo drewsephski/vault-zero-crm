@@ -46,7 +46,15 @@ import {
 	validateBuyBoxDraft,
 } from "./buy-box-values";
 
-export function BuyBoxForm() {
+type BuyBoxFormProps = {
+	presentation?: "card" | "inline";
+	onSaved?: () => void;
+};
+
+export function BuyBoxForm({
+	presentation = "card",
+	onSaved,
+}: BuyBoxFormProps = {}) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
 	const workspaceUrl = useWorkspaceUrl();
@@ -62,6 +70,7 @@ export function BuyBoxForm() {
 				setDraft(null);
 				setErrors({});
 				setStep(0);
+				onSaved?.();
 				toast.success(
 					result.discoveryQueued
 						? "Buy box saved. Eve is refreshing the discovery strategy."
@@ -158,26 +167,25 @@ export function BuyBoxForm() {
 		});
 	};
 
-	return (
-		<Card>
-			<form
-				onSubmit={(event) => {
-					event.preventDefault();
-					if (step < BUY_BOX_STEPS.length - 1) {
-						if (validateStep(step)) setStep((current) => current + 1);
-						return;
-					}
-					submit();
-				}}
-			>
-				<CardHeader>
-					<CardTitle>
-						{BUY_BOX_STEPS[step]} · {step + 1} of {BUY_BOX_STEPS.length}
-					</CardTitle>
-					<CardDescription>{stepDescription(step)}</CardDescription>
-				</CardHeader>
+	const form = (
+		<form
+			onSubmit={(event) => {
+				event.preventDefault();
+				if (step < BUY_BOX_STEPS.length - 1) {
+					if (validateStep(step)) setStep((current) => current + 1);
+					return;
+				}
+				submit();
+			}}
+		>
+			<CardHeader className={presentation === "inline" ? "px-0" : undefined}>
+				<CardTitle>
+					{BUY_BOX_STEPS[step]} · {step + 1} of {BUY_BOX_STEPS.length}
+				</CardTitle>
+				<CardDescription>{stepDescription(step)}</CardDescription>
+			</CardHeader>
 
-				<CardContent>
+			<CardContent className={presentation === "inline" ? "px-0" : undefined}>
 					<ol aria-label="Buy box progress" className="grid grid-cols-4 gap-2">
 						{BUY_BOX_STEPS.map((label, index) => (
 							<li
@@ -226,41 +234,46 @@ export function BuyBoxForm() {
 							<FinancingStep values={values} errors={errors} edit={edit} />
 						) : null}
 					</FieldSet>
-				</CardContent>
-				<CardFooter>
-					<div className="flex w-full items-center justify-between gap-3">
+			</CardContent>
+			<CardFooter className={presentation === "inline" ? "px-0" : undefined}>
+				<div className="flex w-full items-center justify-between gap-3">
+					<Button
+						type="button"
+						variant="outline"
+						disabled={step === 0 || save.isPending}
+						onClick={() => setStep((current) => Math.max(0, current - 1))}
+					>
+						Back
+					</Button>
+					<span className="text-muted-foreground text-xs" aria-live="polite">
+						{BUY_BOX_STEPS[step]}
+					</span>
+					{step < BUY_BOX_STEPS.length - 1 ? (
 						<Button
 							type="button"
-							variant="outline"
-							disabled={step === 0 || save.isPending}
-							onClick={() => setStep((current) => Math.max(0, current - 1))}
+							disabled={!canManage}
+							onClick={() => {
+								if (validateStep(step)) {
+									setStep((current) => current + 1);
+								}
+							}}
 						>
-							Back
+							Continue
 						</Button>
-						<span className="text-muted-foreground text-xs" aria-live="polite">
-							{BUY_BOX_STEPS[step]}
-						</span>
-						{step < BUY_BOX_STEPS.length - 1 ? (
-							<Button
-								type="button"
-								disabled={!canManage}
-								onClick={() => {
-									if (validateStep(step)) {
-										setStep((current) => current + 1);
-									}
-								}}
-							>
-								Continue
-							</Button>
-						) : (
-							<Button type="submit" disabled={!canManage}>
-								{save.isPending ? <Spinner data-icon="inline-start" /> : null}
-								Save buy box
-							</Button>
-						)}
-					</div>
-				</CardFooter>
-			</form>
-		</Card>
+					) : (
+						<Button type="submit" disabled={!canManage}>
+							{save.isPending ? <Spinner data-icon="inline-start" /> : null}
+							Save buy box
+						</Button>
+					)}
+				</div>
+			</CardFooter>
+		</form>
 	);
+
+	if (presentation === "inline") {
+		return form;
+	}
+
+	return <Card>{form}</Card>;
 }

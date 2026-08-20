@@ -32,6 +32,7 @@ import { formatCount, relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
+import { BuyBoxSetupButton } from "./settings/buy-box/buy-box-dialog";
 import { AcquisitionEngagementStageIndicator } from "@/components/crm/acquisition-engagement-stage";
 import {
 	AcquisitionFitIndicator,
@@ -188,9 +189,7 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 						screens targets against your criteria.
 					</AlertDescription>
 					<AlertAction>
-						<Button asChild variant="outline" size="sm">
-							<Link href={workspaceUrl("/settings/buy-box")}>Set criteria</Link>
-						</Button>
+						<BuyBoxSetupButton />
 					</AlertAction>
 				</Alert>
 			) : null}

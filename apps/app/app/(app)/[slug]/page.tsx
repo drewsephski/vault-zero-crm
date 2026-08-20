@@ -16,6 +16,10 @@ import {
 	OverviewGreetingFallback,
 } from "./overview-greeting";
 import {
+	OverviewBuyBoxCta,
+	OverviewBuyBoxCtaFallback,
+} from "./overview-buy-box-cta";
+import {
 	OverviewScopeToggle,
 	OverviewScopeToggleFallback,
 } from "./overview-scope";
@@ -31,6 +35,9 @@ export default function OverviewPage({ searchParams }: PageProps<"/[slug]">) {
 					</Suspense>
 				</PageShellHeading>
 				<PageShellActions>
+					<Suspense fallback={<OverviewBuyBoxCtaFallback />}>
+						<OverviewBuyBoxCta />
+					</Suspense>
 					<Suspense fallback={<OverviewScopeToggleFallback />}>
 						<OverviewScopeToggle />
 					</Suspense>
