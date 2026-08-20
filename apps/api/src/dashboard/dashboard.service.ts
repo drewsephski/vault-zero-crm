@@ -417,7 +417,7 @@ export class DashboardService {
 				{
 					type: ActivityType.TASK,
 					completedAt: null,
-					createdById: actingUserId,
+					...(mine ? { createdById: actingUserId } : {}),
 				},
 				{
 					OR: [

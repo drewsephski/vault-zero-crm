@@ -263,6 +263,12 @@ beforeAll(async () => {
 				},
 				{
 					type: ActivityType.TASK,
+					subject: "Other rep active target task",
+					companyId: ids.active,
+					createdById: otherUserId,
+				},
+				{
+					type: ActivityType.TASK,
 					subject: "Generic company task",
 					companyId: ids.generic,
 					createdById: viewerId,
@@ -428,6 +434,16 @@ describe("acquisition target query semantics", () => {
 		expect(
 			summary.acquisition?.nextActions.map((task) => task.subject).sort(),
 		).toEqual(activeTaskSubjects.toSorted());
+	});
+
+	it("includes workspace next actions in Everyone scope", async () => {
+		const summary = await runInOrganization(WORKSPACE_ID, () =>
+			dashboard.summary(viewerId, { scope: "everyone" }),
+		);
+		expect(summary.acquisition?.nextActionCount).toBe(4);
+		expect(
+			summary.acquisition?.nextActions.map((task) => task.subject),
+		).toContain("Other rep active target task");
 	});
 
 	it("does not count acquisition targets from another workspace", async () => {

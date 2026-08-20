@@ -153,6 +153,10 @@ describe("acquisition research run read API", () => {
 		);
 
 		expect(rows.map((row) => row.id)).toEqual([newer.id, older.id]);
+		const limited = await runInOrganization(WORKSPACE_ID, () =>
+			service().listResearchRuns({ companyId, limit: 1 }),
+		);
+		expect(limited.map((row) => row.id)).toEqual([newer.id]);
 		expect(rows[0]).toMatchObject({
 			status: AcquisitionResearchRunStatus.FAILED,
 			outcome: "provider timeout",

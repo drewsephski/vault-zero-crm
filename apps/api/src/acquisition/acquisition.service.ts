@@ -1209,9 +1209,10 @@ export class AcquisitionService {
 		};
 	}
 
-	async listResearchRuns(input: z.infer<typeof listResearchRunsInput>) {
+	async listResearchRuns(input: z.input<typeof listResearchRunsInput>) {
+		const parsed = listResearchRunsInput.parse(input);
 		const company = await this.db.company.findUnique({
-			where: { id: input.companyId },
+			where: { id: parsed.companyId },
 			select: { id: true },
 		});
 		if (!company) {
@@ -1219,9 +1220,9 @@ export class AcquisitionService {
 		}
 
 		const runs = await this.db.acquisitionResearchRun.findMany({
-			where: { companyId: input.companyId },
+			where: { companyId: parsed.companyId },
 			orderBy: { startedAt: "desc" },
-			take: 50,
+			take: parsed.limit,
 			select: {
 				id: true,
 				startedAt: true,

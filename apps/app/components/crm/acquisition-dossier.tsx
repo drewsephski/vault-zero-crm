@@ -444,7 +444,7 @@ function ResearchHistory({ companyId }: { companyId: string }) {
 	const trpc = useTRPC();
 	const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
 	const history = useQuery(
-		trpc.acquisition.listResearchRuns.queryOptions({ companyId }),
+		trpc.acquisition.listResearchRuns.queryOptions({ companyId, limit: 5 }),
 	);
 	const expandedRun = useQuery({
 		...trpc.acquisition.getResearchRun.queryOptions({
@@ -452,7 +452,7 @@ function ResearchHistory({ companyId }: { companyId: string }) {
 		}),
 		enabled: expandedRunId !== null,
 	});
-	const runs = history.data?.slice(0, 5) ?? [];
+	const runs = history.data ?? [];
 
 	if (history.isLoading) {
 		return (
@@ -500,15 +500,64 @@ function ResearchHistory({ companyId }: { companyId: string }) {
 								</Button>
 							) : null}
 							{expanded && expandedRun.data?.snapshot ? (
-								<DetailSheetProse>
-									{expandedRun.data.snapshot.summary}
-								</DetailSheetProse>
+								<ResearchSnapshot snapshot={expandedRun.data.snapshot} />
 							) : null}
 						</li>
 					);
 				})}
 			</ul>
 		</DetailSheetSection>
+	);
+}
+
+function ResearchSnapshot({
+	snapshot,
+}: {
+	snapshot: NonNullable<
+		RouterOutputs["acquisition"]["getResearchRun"]["snapshot"]
+	>;
+}) {
+	return (
+		<div className="rounded-md border border-border p-3">
+			<DetailSheetProse>{snapshot.summary}</DetailSheetProse>
+			<dl className="mt-3 grid gap-2 text-xs">
+				<div>
+					<dt className="font-medium">Recommended action</dt>
+					<dd className="text-muted-foreground">
+						{snapshot.recommendedAction}
+					</dd>
+				</div>
+				{snapshot.recommendedStage ? (
+					<div>
+						<dt className="font-medium">Recommended lifecycle</dt>
+						<dd className="text-muted-foreground">
+							{acquisitionStageLabel(snapshot.recommendedStage)}
+						</dd>
+					</div>
+				) : null}
+				<div>
+					<dt className="font-medium">Criterion outcomes</dt>
+					<dd className="text-muted-foreground">
+						{snapshot.criteria.length > 0
+							? snapshot.criteria
+									.map(
+										(criterion) =>
+											`${acquisitionCriterionLabel(criterion.id)}: ${criterion.result.toLowerCase()}`,
+									)
+									.join(" · ")
+							: "No criterion outcomes were recorded."}
+					</dd>
+				</div>
+				<div>
+					<dt className="font-medium">Unknowns</dt>
+					<dd className="text-muted-foreground">
+						{snapshot.missingInformation.length > 0
+							? snapshot.missingInformation.join(" · ")
+							: "No critical unknowns recorded."}
+					</dd>
+				</div>
+			</dl>
+		</div>
 	);
 }
 
