@@ -22,6 +22,7 @@ export const ACQUISITION_PROFILE_SELECT = {
 	customerConcentrationMax: true,
 	assetPreference: true,
 	financingAssumptions: true,
+	buyBoxRevision: true,
 } as const;
 
 export type AcquisitionProfileRecord = Prisma.AcquisitionProfileGetPayload<{

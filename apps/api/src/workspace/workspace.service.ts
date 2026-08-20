@@ -14,6 +14,7 @@ import {
 	WorkspaceMode,
 } from "@crm/db";
 import { isDiscoveryReady, isDossierReady } from "@crm/db/acquisition";
+import { acquisitionProfileChanged } from "@crm/db/acquisition-profile-revision";
 import { readReportingCurrency } from "@crm/db/settings";
 import { isOnboarded, markOnboarded, workspaceSlug } from "@crm/db/workspace";
 import {
@@ -256,28 +257,54 @@ export class WorkspaceService {
 			assetPreference: input.assetPreference,
 			financingAssumptions: blankToNull(input.financingAssumptions ?? ""),
 		};
-
-		await this.db.acquisitionProfile.upsert({
+		const current = await this.db.acquisitionProfile.findUnique({
 			where: { id: workspaceId },
-			create: {
-				id: workspaceId,
-				mode: WorkspaceMode.ACQUISITION,
-				buyBoxRevision: 0,
-				...fields,
+			select: {
+				preferredIndustries: true,
+				geographies: true,
+				excludedCategories: true,
+				currency: true,
+				revenueMin: true,
+				revenueMax: true,
+				ebitdaMin: true,
+				ebitdaMax: true,
+				purchasePriceMin: true,
+				purchasePriceMax: true,
+				ownerInvolvement: true,
+				recurringRevenuePreference: true,
+				customerConcentrationMax: true,
+				assetPreference: true,
+				financingAssumptions: true,
 			},
-			update: { ...fields, buyBoxRevision: { increment: 1 } },
 		});
+		const changed = acquisitionProfileChanged(current, fields);
 
-		const discoveryQueued = hasDiscoveryFocus(fields);
+		if (!current) {
+			await this.db.acquisitionProfile.create({
+				data: {
+					id: workspaceId,
+					mode: WorkspaceMode.ACQUISITION,
+					buyBoxRevision: 0,
+					...fields,
+				},
+			});
+		} else if (changed) {
+			await this.db.acquisitionProfile.update({
+				where: { id: workspaceId },
+				data: { ...fields, buyBoxRevision: { increment: 1 } },
+			});
+		}
+
+		const discoveryQueued = changed && hasDiscoveryFocus(fields);
 		if (discoveryQueued) {
 			await this.agent.acquisitionProfileChanged(
 				"The buy box changed; refresh the discovery strategy",
 			);
 		}
 
-		if (isDossierReady(fields)) {
-			await this.queueUnresearchedTargets(
-				"Buy box completed — acquisition research queued",
+		if (changed && isDossierReady(fields)) {
+			await this.queueTargetRefreshes(
+				"Buy box changed — acquisition research refresh queued",
 			);
 		}
 
@@ -528,13 +555,15 @@ export class WorkspaceService {
 		}
 	}
 
-	private async queueUnresearchedTargets(reason: string): Promise<void> {
+	private async queueTargetRefreshes(reason: string): Promise<void> {
 		const targets = await this.db.acquisitionTarget.findMany({
-			where: { researchedAt: null },
+			where: { company: { domain: { not: null } } },
 			select: {
 				companyId: true,
 				company: { select: { domain: true } },
 			},
+			orderBy: { researchedAt: "asc" },
+			take: 50,
 		});
 
 		await Promise.all(

@@ -89,6 +89,7 @@ export type CompanyRow = {
 		fit: AcquisitionFit;
 		researchedAt: string | null;
 		recommendedAction: string | null;
+		researchFreshness: "current" | "older-buy-box" | "untracked";
 	} | null;
 };
 
@@ -125,7 +126,7 @@ export class CompaniesService {
 	async list(input: CompanyListInput): Promise<ListResult<CompanyRow>> {
 		const acquisitionProfile = await this.db.acquisitionProfile.findUnique({
 			where: { id: getOrganizationId() ?? WORKSPACE_ID },
-			select: { mode: true },
+			select: { mode: true, buyBoxRevision: true },
 		});
 		const acquisitionMode =
 			acquisitionProfile?.mode === WorkspaceMode.ACQUISITION;
@@ -169,6 +170,7 @@ export class CompaniesService {
 							stage: true,
 							fit: true,
 							researchedAt: true,
+							researchedBuyBoxRevision: true,
 							recommendedAction: true,
 						},
 					},
@@ -202,6 +204,10 @@ export class CompaniesService {
 				acquisitionTarget: row.acquisitionTarget
 					? {
 							...row.acquisitionTarget,
+							researchFreshness: researchFreshness(
+								row.acquisitionTarget.researchedBuyBoxRevision,
+								acquisitionProfile?.buyBoxRevision ?? 0,
+							),
 							researchedAt:
 								row.acquisitionTarget.researchedAt?.toISOString() ?? null,
 						}
@@ -298,12 +304,20 @@ export class CompaniesService {
 			...rest
 		} = company;
 
-		const [queuedKinds, acquisitionResearch, reportingCurrency] =
-			await Promise.all([
-				this.queue.pendingKinds({ companyId: id }),
-				this.queue.acquisitionResearchState(id),
-				this.conversion.reportingCurrency(),
-			]);
+		const [
+			queuedKinds,
+			acquisitionResearch,
+			reportingCurrency,
+			acquisitionProfile,
+		] = await Promise.all([
+			this.queue.pendingKinds({ companyId: id }),
+			this.queue.acquisitionResearchState(id),
+			this.conversion.reportingCurrency(),
+			this.db.acquisitionProfile.findUnique({
+				where: { id: getOrganizationId() ?? WORKSPACE_ID },
+				select: { buyBoxRevision: true },
+			}),
+		]);
 
 		return {
 			...rest,
@@ -315,6 +329,10 @@ export class CompaniesService {
 			acquisitionTarget: acquisitionTarget
 				? {
 						...acquisitionTarget,
+						researchFreshness: researchFreshness(
+							acquisitionTarget.researchedBuyBoxRevision,
+							acquisitionProfile?.buyBoxRevision ?? 0,
+						),
 						strengths: parseDossierFindings(acquisitionTarget.strengths),
 						concerns: parseDossierFindings(acquisitionTarget.concerns),
 						criteria: parseDossierCriteria(acquisitionTarget.criteria),
@@ -869,6 +887,16 @@ export class CompaniesService {
 		}
 		return error;
 	}
+}
+
+function researchFreshness(
+	researchedBuyBoxRevision: number | null,
+	currentBuyBoxRevision: number,
+): "current" | "older-buy-box" | "untracked" {
+	if (researchedBuyBoxRevision === null) return "untracked";
+	return researchedBuyBoxRevision < currentBuyBoxRevision
+		? "older-buy-box"
+		: "current";
 }
 
 function parseDossierFindings(value: Prisma.JsonValue): DossierFinding[] {

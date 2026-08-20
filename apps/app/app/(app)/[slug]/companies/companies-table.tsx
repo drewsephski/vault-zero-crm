@@ -228,8 +228,13 @@ const RESEARCH_COLUMN: DataTableColumn<CompanyRow> = {
 	hideBelow: "lg",
 	cell: (row) =>
 		row.acquisitionTarget?.researchedAt ? (
-			<span className="text-muted-foreground" suppressHydrationWarning>
-				{relativeTimeFromIso(row.acquisitionTarget.researchedAt)}
+			<span className="flex flex-col" suppressHydrationWarning>
+				<span className="text-muted-foreground">
+					{relativeTimeFromIso(row.acquisitionTarget.researchedAt)}
+				</span>
+				{row.acquisitionTarget.researchFreshness === "older-buy-box" ? (
+					<span className="text-warning-foreground text-xs">Older buy box</span>
+				) : null}
 			</span>
 		) : (
 			<EmptyCellValue />

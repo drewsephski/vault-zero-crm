@@ -180,6 +180,7 @@ beforeAll(async () => {
 			excludedCategories: [],
 			currency: "USD",
 			revenueMin: 1_000_000,
+			buyBoxRevision: 7,
 		},
 		update: {
 			mode: WorkspaceMode.ACQUISITION,
@@ -198,6 +199,7 @@ beforeAll(async () => {
 			customerConcentrationMax: null,
 			assetPreference: null,
 			financingAssumptions: null,
+			buyBoxRevision: 7,
 		},
 	});
 
@@ -260,6 +262,7 @@ afterAll(async () => {
 					customerConcentrationMax: previousProfile.customerConcentrationMax,
 					assetPreference: previousProfile.assetPreference,
 					financingAssumptions: previousProfile.financingAssumptions,
+					buyBoxRevision: previousProfile.buyBoxRevision,
 				},
 			});
 		} else {
@@ -479,6 +482,7 @@ describe("write_acquisition_dossier", () => {
 			recommendedAction: baseDossierB.recommendedAction,
 			recommendedStage: baseDossierB.recommendedStage,
 			sourceSessionId: toolContext.session.id,
+			researchedBuyBoxRevision: 7,
 		});
 		expect(target?.sourceUrls).toHaveLength(3);
 		expect(target?.sourceUrls).toEqual(

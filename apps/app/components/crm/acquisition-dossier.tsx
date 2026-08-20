@@ -215,6 +215,15 @@ export function AcquisitionDossier({
 			</DetailSheetSplit>
 
 			<DetailSheetSection title="Research">
+				{target.researchFreshness === "older-buy-box" ? (
+					<Alert>
+						<AlertTitle>Research uses an older buy box</AlertTitle>
+						<AlertDescription>
+							The acquisition criteria changed after this dossier was written.
+							Refresh the research before relying on its fit decision.
+						</AlertDescription>
+					</Alert>
+				) : null}
 				<DetailSheetProperties columns={2}>
 					<DetailSheetProperty label="Last successful research">
 						{target.researchedAt ? (

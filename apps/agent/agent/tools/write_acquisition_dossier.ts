@@ -136,6 +136,10 @@ export default defineTool({
 		};
 
 		const written = await db.$transaction(async (tx) => {
+			const profile = await tx.acquisitionProfile.findUnique({
+				where: { id: getOrganizationId() ?? "workspace" },
+				select: { buyBoxRevision: true },
+			});
 			const { count } = await tx.acquisitionTarget.updateMany({
 				where: { companyId: company.id },
 				data: {
@@ -149,6 +153,7 @@ export default defineTool({
 					recommendedStage: input.recommendedStage,
 					sourceUrls,
 					researchedAt,
+					researchedBuyBoxRevision: profile?.buyBoxRevision ?? null,
 					sourceSessionId: ctx.session.id,
 				},
 			});

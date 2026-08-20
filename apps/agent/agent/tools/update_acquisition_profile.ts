@@ -8,6 +8,7 @@ import {
 	Prisma,
 	WorkspaceMode,
 } from "@crm/db";
+import { acquisitionProfileChanged } from "@crm/db/acquisition-profile-revision";
 import { PRIORITY, queueAgentTask } from "@crm/db/agent-tasks";
 import { isCurrencyCode, normalizeCurrency } from "@crm/db/currency";
 import { z } from "zod";
@@ -157,21 +158,29 @@ export default defineTool({
 				financingAssumptions: values.financingAssumptions,
 			};
 
-			const profile = await db.acquisitionProfile.upsert({
-				where: { id: organizationId },
-				create: {
-					id: organizationId,
-					mode: WorkspaceMode.ACQUISITION,
-					...fields,
-				},
-				update: fields,
-				select: ACQUISITION_PROFILE_SELECT,
-			});
+			const changed = acquisitionProfileChanged(current, fields);
+			const profile = !current
+				? await db.acquisitionProfile.create({
+						data: {
+							id: organizationId,
+							mode: WorkspaceMode.ACQUISITION,
+							buyBoxRevision: 0,
+							...fields,
+						},
+						select: ACQUISITION_PROFILE_SELECT,
+					})
+				: changed
+					? await db.acquisitionProfile.update({
+							where: { id: organizationId },
+							data: { ...fields, buyBoxRevision: { increment: 1 } },
+							select: ACQUISITION_PROFILE_SELECT,
+						})
+					: current;
 
 			let discoveryQueued = false;
 			if (
-				profile.preferredIndustries.length > 0 ||
-				profile.geographies.length > 0
+				(changed && profile.preferredIndustries.length > 0) ||
+				(changed && profile.geographies.length > 0)
 			) {
 				try {
 					await queueAcquisitionDiscovery(db);
@@ -180,6 +189,7 @@ export default defineTool({
 					console.error("[agent] could not queue acquisition discovery", error);
 				}
 			}
+			if (changed) await queueAcquisitionTargetRefreshes(db);
 
 			return {
 				updated: true as const,
@@ -279,4 +289,26 @@ export async function queueAcquisitionDiscovery(database: Db) {
 		budget: 12,
 		dueAt: new Date(),
 	});
+}
+
+async function queueAcquisitionTargetRefreshes(database: Db): Promise<void> {
+	const targets = await database.acquisitionTarget.findMany({
+		where: { company: { domain: { not: null } } },
+		select: { companyId: true },
+		orderBy: { researchedAt: "asc" },
+		take: 50,
+	});
+
+	await Promise.all(
+		targets.map((target) =>
+			queueAgentTask(database, {
+				companyId: target.companyId,
+				kind: "acquisition-refresh",
+				reason: "Buy box changed — acquisition research refresh queued",
+				priority: PRIORITY.acquisitionRefresh,
+				budget: 12,
+				dueAt: new Date(),
+			}),
+		),
+	);
 }

@@ -413,6 +413,7 @@ model AcquisitionTarget {
   recommendedStage   AcquisitionStage?
   sourceUrls         String[]
   researchedAt       DateTime?
+  researchedBuyBoxRevision Int?
   sourceSessionId    String?
 
   createdAt DateTime @default(now())
