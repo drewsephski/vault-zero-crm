@@ -1,4 +1,5 @@
 import { ActivityType, type Db } from "@crm/db";
+import { resolveAutomatedActivityAuthor } from "@crm/db/activity-author";
 import { Injectable } from "@nestjs/common";
 import { InjectDatabase } from "../database/database.constants";
 import { ActivityStampService } from "./activity-stamp.service";
@@ -45,12 +46,13 @@ export class EnrichmentLogService {
 	}
 
 	private async authorFor(event: EnrichmentEvent): Promise<string | null> {
+		const preferred: (string | null)[] = [];
 		if (event.contactId) {
 			const contact = await this.db.contact.findUnique({
 				where: { id: event.contactId },
 				select: { ownerId: true },
 			});
-			if (contact?.ownerId) return contact.ownerId;
+			preferred.push(contact?.ownerId ?? null);
 		}
 
 		if (event.companyId) {
@@ -58,11 +60,10 @@ export class EnrichmentLogService {
 				where: { id: event.companyId },
 				select: { ownerId: true },
 			});
-			if (company?.ownerId) return company.ownerId;
+			preferred.push(company?.ownerId ?? null);
 		}
 
-		const anyUser = await this.db.user.findFirst({ select: { id: true } });
-		return anyUser?.id ?? null;
+		return resolveAutomatedActivityAuthor(this.db, preferred);
 	}
 }
 

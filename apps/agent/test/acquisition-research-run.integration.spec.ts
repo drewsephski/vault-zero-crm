@@ -131,6 +131,15 @@ beforeAll(async () => {
 			emailVerified: true,
 		},
 	});
+	await db.member.create({
+		data: {
+			id: `acquisition-research-run-member-${suffix}`,
+			organizationId: WORKSPACE_ID,
+			userId,
+			role: "member",
+			createdAt: new Date(),
+		},
+	});
 	const company = await db.company.create({
 		data: {
 			name: `Research Run Target ${suffix}`,
@@ -189,6 +198,7 @@ async function cleanup(): Promise<void> {
 		where: { companyId: { in: companyIds } },
 	});
 	await db.company.deleteMany({ where: { id: { in: companyIds } } });
+	await db.member.deleteMany({ where: { userId } });
 	await db.user.deleteMany({ where: { email: userEmail } });
 }
 
@@ -312,6 +322,55 @@ describe("acquisition research runs", () => {
 			summary: dossierInput.summary,
 			sourceSessionId: sessionId,
 		});
+	});
+
+	it("rolls the dossier back when its running audit row cannot be finalized", async () => {
+		const [before, activityCount] = await Promise.all([
+			db.acquisitionTarget.findUniqueOrThrow({
+				where: { companyId },
+				select: { fit: true, summary: true, researchedAt: true },
+			}),
+			db.activity.count({ where: { companyId } }),
+		]);
+		const task = await queueRefresh("Scheduled acquisition refresh");
+		await db.agentTask.update({
+			where: { id: task.id },
+			data: { sessionId },
+		});
+		await ensureAcquisitionResearchRun({
+			id: task.id,
+			contactId: null,
+			companyId,
+			organizationId: WORKSPACE_ID,
+			kind: "acquisition-refresh",
+			reason: "Scheduled acquisition refresh",
+			budget: 12,
+			attempts: 1,
+			priority: 300,
+			dueAt: new Date(Date.now() - 1000),
+		});
+		await noteAcquisitionResearchSession(task.id, sessionId);
+		await db.acquisitionResearchRun.delete({ where: { agentTaskId: task.id } });
+
+		await expect(
+			writeAcquisitionDossier.execute({ ...dossierInput, companyId }, {
+				session: {
+					id: sessionId,
+					auth: {
+						current: { attributes: { organizationId: WORKSPACE_ID } },
+					},
+				},
+			} as never),
+		).rejects.toThrow("running acquisition research run");
+
+		const after = await db.acquisitionTarget.findUniqueOrThrow({
+			where: { companyId },
+			select: { fit: true, summary: true, researchedAt: true },
+		});
+		expect(after).toEqual(before);
+		expect(await db.activity.count({ where: { companyId } })).toBe(
+			activityCount,
+		);
 	});
 
 	it("marks the run failed when retries are exhausted and leaves dossier A intact", async () => {

@@ -1,4 +1,5 @@
 import { ActivityType, db } from "@crm/db";
+import { resolveAutomatedActivityAuthor } from "@crm/db/activity-author";
 import { z } from "zod";
 import { extract } from "../lib/context-dev";
 import { spend } from "../lib/focus";
@@ -82,10 +83,7 @@ export default defineTool({
 			return { written: false as const, reason: result.reason };
 		}
 
-		const author =
-			company.ownerId ??
-			(await db.user.findFirst({ select: { id: true } }))?.id ??
-			null;
+		const author = await resolveAutomatedActivityAuthor(db, [company.ownerId]);
 
 		if (!author)
 			return { written: false as const, reason: "No user to attribute to." };

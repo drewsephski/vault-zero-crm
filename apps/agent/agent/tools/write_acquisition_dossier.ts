@@ -11,6 +11,7 @@ import {
 	TARGET_LIFECYCLE_STAGES,
 } from "@crm/db/acquisition";
 import type { AcquisitionDossierSnapshot } from "@crm/db/acquisition-research-runs";
+import { resolveAutomatedActivityAuthor } from "@crm/db/activity-author";
 import { z } from "zod";
 import {
 	acquisitionCriteriaSchema,
@@ -113,15 +114,9 @@ export default defineTool({
 				),
 			),
 		];
-		const authorId =
-			company.ownerId ??
-			(
-				await db.user.findFirst({
-					orderBy: { createdAt: "asc" },
-					select: { id: true },
-				})
-			)?.id ??
-			null;
+		const authorId = await resolveAutomatedActivityAuthor(db, [
+			company.ownerId,
+		]);
 		if (!authorId) {
 			return { written: false as const, reason: "No user to attribute to." };
 		}
@@ -180,6 +175,14 @@ export default defineTool({
 				where: { id: company.id },
 				data: { lastActivityAt: researchedAt },
 			});
+			await succeedAcquisitionResearchRun(
+				{
+					sessionId: ctx.session.id,
+					companyId: company.id,
+					snapshot,
+				},
+				tx,
+			);
 			return true;
 		});
 		if (!written) {
@@ -189,12 +192,6 @@ export default defineTool({
 					"This company is not an acquisition target. Add it to targets before writing a dossier.",
 			};
 		}
-
-		await succeedAcquisitionResearchRun({
-			sessionId: ctx.session.id,
-			companyId: company.id,
-			snapshot,
-		});
 
 		return {
 			written: true as const,

@@ -5,6 +5,7 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
+		"./activity-author": "./src/activity-author.ts",
 		"./acquisition": "./src/acquisition.ts",
 		"./acquisition-research-runs": "./src/acquisition-research-runs.ts",
 		"./acquisition-candidates": "./src/acquisition-candidates.ts",

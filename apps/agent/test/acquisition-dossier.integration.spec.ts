@@ -211,6 +211,15 @@ beforeAll(async () => {
 		select: { id: true },
 	});
 	userId = user.id;
+	await db.member.create({
+		data: {
+			id: `acquisition-dossier-member-${suffix}`,
+			organizationId: WORKSPACE_ID,
+			userId,
+			role: "member",
+			createdAt: new Date(),
+		},
+	});
 
 	const company = await db.company.create({
 		data: {
@@ -277,6 +286,7 @@ async function cleanup(): Promise<void> {
 		await db.company.deleteMany({ where: { id: { in: companyIds } } });
 	}
 
+	await db.member.deleteMany({ where: { userId } });
 	await db.user.deleteMany({ where: { email: userEmail } });
 }
 
@@ -501,7 +511,11 @@ describe("write_acquisition_dossier", () => {
 			data: { ownerId: null },
 		});
 		const authorLookup = db.user.findFirst;
+		const memberLookup = db.member.findFirst;
+		const memberList = db.member.findMany;
 		db.user.findFirst = (async () => null) as typeof db.user.findFirst;
+		db.member.findFirst = (async () => null) as typeof db.member.findFirst;
+		db.member.findMany = (async () => []) as typeof db.member.findMany;
 
 		const observed = await (async () => {
 			try {
@@ -541,6 +555,8 @@ describe("write_acquisition_dossier", () => {
 				return { result, target, company, activityCount };
 			} finally {
 				db.user.findFirst = authorLookup;
+				db.member.findFirst = memberLookup;
+				db.member.findMany = memberList;
 			}
 		})();
 

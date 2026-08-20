@@ -52,12 +52,15 @@ export async function noteAcquisitionResearchSession(
 	});
 }
 
-export async function succeedAcquisitionResearchRun(input: {
-	sessionId: string;
-	companyId: string;
-	snapshot: AcquisitionDossierSnapshot;
-}): Promise<void> {
-	const task = await db.agentTask.findFirst({
+export async function succeedAcquisitionResearchRun(
+	input: {
+		sessionId: string;
+		companyId: string;
+		snapshot: AcquisitionDossierSnapshot;
+	},
+	client: ResearchRunClient = db,
+): Promise<boolean> {
+	const task = await client.agentTask.findFirst({
 		where: {
 			sessionId: input.sessionId,
 			companyId: input.companyId,
@@ -66,10 +69,10 @@ export async function succeedAcquisitionResearchRun(input: {
 		orderBy: { createdAt: "desc" },
 		select: { id: true },
 	});
-	if (!task) return;
+	if (!task) return false;
 
 	const now = new Date();
-	await db.acquisitionResearchRun.updateMany({
+	const result = await client.acquisitionResearchRun.updateMany({
 		where: {
 			agentTaskId: task.id,
 			status: AcquisitionResearchRunStatus.RUNNING,
@@ -81,6 +84,10 @@ export async function succeedAcquisitionResearchRun(input: {
 			outcome: null,
 		},
 	});
+	if (result.count !== 1) {
+		throw new Error("Could not finalize the running acquisition research run.");
+	}
+	return true;
 }
 
 type ResearchRunClient = PrismaClient | Prisma.TransactionClient;

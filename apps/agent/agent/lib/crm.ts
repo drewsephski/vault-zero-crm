@@ -1,4 +1,5 @@
 import { db, EnrichmentStatus } from "@crm/db";
+import { resolveAutomatedActivityAuthor } from "@crm/db/activity-author";
 import { domainOf, isDerivedName } from "./names";
 import type { Person } from "./socials";
 
@@ -348,10 +349,7 @@ export async function writeTimelineNote(
 	});
 	if (!contact) return null;
 
-	const author =
-		contact.ownerId ??
-		(await db.user.findFirst({ select: { id: true } }))?.id ??
-		null;
+	const author = await resolveAutomatedActivityAuthor(db, [contact.ownerId]);
 	if (!author) return null;
 
 	const activity = await db.activity.create({
