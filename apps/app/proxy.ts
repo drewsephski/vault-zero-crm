@@ -35,7 +35,11 @@ export async function proxy(request: NextRequest) {
 
 	const settled = workspace.gate === "settled";
 
-	if (!settled || !workspace.slug) return NextResponse.next();
+	if (!settled || !workspace.slug) {
+		return pathname === LANDING_PATH
+			? sendTo(ONBOARDING_PATH, request)
+			: NextResponse.next();
+	}
 
 	return sendTo(appPath(pathname, workspace.slug), request);
 }

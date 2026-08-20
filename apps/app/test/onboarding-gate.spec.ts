@@ -254,6 +254,16 @@ describe("proxy", () => {
 
 		expect(redirectedTo(response)).toBeNull();
 	});
+
+	it("moves an authenticated landing request to the durable workspace gate", async () => {
+		stub(async () => {
+			throw new Error("connect ECONNREFUSED");
+		});
+
+		expect(redirectedTo(await proxy(request("/", [SESSION_COOKIE])))).toBe(
+			"/onboarding",
+		);
+	});
 });
 
 describe("the slug the app is served under", () => {
