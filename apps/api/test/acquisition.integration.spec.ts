@@ -1298,6 +1298,120 @@ describe("acquisition candidate review", () => {
 });
 
 describe("eve recommendations and acquisition engagements", () => {
+	for (const mutation of [
+		{
+			name: "acceptRecommendedStage",
+			run: (acquisition: AcquisitionService, companyId: string) =>
+				acquisition.acceptRecommendedStage(
+					companyId,
+					"reviewer-1",
+					crypto.randomUUID(),
+				),
+		},
+		{
+			name: "dismissRecommendedStage",
+			run: (acquisition: AcquisitionService, companyId: string) =>
+				acquisition.dismissRecommendedStage(companyId, "reviewer-1"),
+		},
+		{
+			name: "acceptRecommendedAction",
+			run: (acquisition: AcquisitionService, companyId: string) =>
+				acquisition.acceptRecommendedAction(
+					companyId,
+					"reviewer-1",
+					crypto.randomUUID(),
+				),
+		},
+		{
+			name: "dismissRecommendedAction",
+			run: (acquisition: AcquisitionService, companyId: string) =>
+				acquisition.dismissRecommendedAction(companyId, "reviewer-1"),
+		},
+	] as const) {
+		it(`rejects ${mutation.name} for another workspace's target`, async () => {
+			await ensureWorkspaceMember(
+				"reviewer-1",
+				"reviewer-1@example.com",
+				"Reviewer",
+			);
+			const suffix = crypto.randomUUID();
+			const foreignOrganizationId = `foreign-recommendation-${suffix}`;
+			let foreignCompanyId = "";
+
+			await db.organization.create({
+				data: {
+					id: foreignOrganizationId,
+					name: "Foreign Recommendation Workspace",
+					slug: `foreign-recommendation-${suffix}`,
+					createdAt: new Date(),
+				},
+			});
+
+			try {
+				foreignCompanyId = await runInOrganization(
+					foreignOrganizationId,
+					async () => {
+						const company = await db.company.create({
+							data: {
+								name: "Foreign Recommendation Target",
+								domain: `foreign-recommendation-${suffix}.test`,
+								acquisitionTarget: {
+									create: {
+										stage: AcquisitionStage.DISCOVERED,
+										fit: AcquisitionFit.POTENTIAL,
+										strengths: [],
+										concerns: [],
+										missingInformation: [],
+										sourceUrls: [],
+										recommendedStage: AcquisitionStage.QUALIFIED,
+										recommendedAction: "Request foreign financials",
+									},
+								},
+							},
+							select: { id: true },
+						});
+						return company.id;
+					},
+				);
+				const beforeActivityCount = await db.activity.count({
+					where: { companyId: foreignCompanyId },
+				});
+
+				await expect(
+					runInOrganization(WORKSPACE_ID, () =>
+						mutation.run(service(), foreignCompanyId),
+					),
+				).rejects.toThrow("That target no longer exists.");
+
+				const target = await db.acquisitionTarget.findUniqueOrThrow({
+					where: { companyId: foreignCompanyId },
+					select: {
+						stage: true,
+						recommendedStage: true,
+						recommendedAction: true,
+					},
+				});
+				expect(target).toEqual({
+					stage: AcquisitionStage.DISCOVERED,
+					recommendedStage: AcquisitionStage.QUALIFIED,
+					recommendedAction: "Request foreign financials",
+				});
+				expect(
+					await db.activity.count({ where: { companyId: foreignCompanyId } }),
+				).toBe(beforeActivityCount);
+			} finally {
+				if (foreignCompanyId) {
+					await runInOrganization(foreignOrganizationId, () =>
+						db.company.deleteMany({ where: { id: foreignCompanyId } }),
+					);
+				}
+				await db.organization.deleteMany({
+					where: { id: foreignOrganizationId },
+				});
+			}
+		});
+	}
+
 	it("accepts and dismisses Eve stage recommendations", async () => {
 		await ensureWorkspaceMember(
 			"reviewer-1",

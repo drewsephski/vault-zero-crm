@@ -304,6 +304,7 @@ export class WorkspaceService {
 
 		if (changed && isDossierReady(fields)) {
 			await this.queueTargetRefreshes(
+				workspaceId,
 				"Buy box changed — acquisition research refresh queued",
 			);
 		}
@@ -555,9 +556,14 @@ export class WorkspaceService {
 		}
 	}
 
-	private async queueTargetRefreshes(reason: string): Promise<void> {
+	private async queueTargetRefreshes(
+		organizationId: string,
+		reason: string,
+	): Promise<void> {
 		const targets = await this.db.acquisitionTarget.findMany({
-			where: { company: { domain: { not: null } } },
+			where: {
+				company: { is: { organizationId, domain: { not: null } } },
+			},
 			select: {
 				companyId: true,
 				company: { select: { domain: true } },

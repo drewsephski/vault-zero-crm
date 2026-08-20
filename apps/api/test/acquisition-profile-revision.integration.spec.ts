@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { db } from "@crm/db";
+import { AcquisitionStage, db } from "@crm/db";
 import { runInOrganization } from "@crm/db/tenancy";
+import { AgentTriggerService } from "../src/agent/agent-trigger.service";
 import { WorkspaceService } from "../src/workspace/workspace.service";
 
 const suffix = crypto.randomUUID();
@@ -69,6 +70,124 @@ afterAll(async () => {
 });
 
 describe("buy-box revisions", () => {
+	it("queues refresh tasks only for targets in the updated workspace", async () => {
+		const foreignOrganizationId = `foreign-buy-box-org-${suffix}`;
+		const foreignUserId = `foreign-buy-box-user-${suffix}`;
+		let companyId = "";
+		let foreignCompanyId = "";
+		delete process.env.AGENT_BRIDGE_SECRET;
+
+		await db.user.create({
+			data: {
+				id: foreignUserId,
+				name: "Foreign Buy Box Owner",
+				email: `foreign-buy-box-${suffix}@example.test`,
+			},
+		});
+		await db.organization.create({
+			data: {
+				id: foreignOrganizationId,
+				name: "Foreign Buy Box Revision",
+				slug: `foreign-buy-box-${suffix}`,
+				createdAt: new Date(),
+				members: {
+					create: {
+						id: crypto.randomUUID(),
+						userId: foreignUserId,
+						role: "owner",
+						createdAt: new Date(),
+					},
+				},
+			},
+		});
+
+		try {
+			companyId = await runInOrganization(organizationId, async () => {
+				const company = await db.company.create({
+					data: {
+						name: "Owned Refresh Target",
+						domain: `owned-refresh-${suffix}.test`,
+						acquisitionTarget: {
+							create: {
+								stage: AcquisitionStage.DISCOVERED,
+								researchedAt: new Date("1900-01-01T00:00:00.000Z"),
+								strengths: [],
+								concerns: [],
+								missingInformation: [],
+								sourceUrls: [],
+							},
+						},
+					},
+					select: { id: true },
+				});
+				return company.id;
+			});
+			foreignCompanyId = await runInOrganization(
+				foreignOrganizationId,
+				async () => {
+					const company = await db.company.create({
+						data: {
+							name: "Foreign Refresh Target",
+							domain: `foreign-refresh-${suffix}.test`,
+							acquisitionTarget: {
+								create: {
+									stage: AcquisitionStage.DISCOVERED,
+									researchedAt: new Date("1900-01-02T00:00:00.000Z"),
+									strengths: [],
+									concerns: [],
+									missingInformation: [],
+									sourceUrls: [],
+								},
+							},
+						},
+						select: { id: true },
+					});
+					return company.id;
+				},
+			);
+
+			const realService = new WorkspaceService(db, new AgentTriggerService(db));
+			await runInOrganization(organizationId, () =>
+				realService.updateAcquisitionProfile(userId, {
+					...input,
+					customerConcentrationMax: 20,
+				}),
+			);
+
+			const tasks = await db.$queryRaw<
+				Array<{ organizationId: string; companyId: string | null }>
+			>`
+				SELECT "organizationId", "companyId"
+				FROM "agentTask"
+				WHERE kind = 'acquisition-refresh'
+				AND "companyId" IN (${companyId}, ${foreignCompanyId})
+			`;
+			expect(tasks).toContainEqual({ organizationId, companyId });
+			expect(tasks).not.toContainEqual({
+				organizationId,
+				companyId: foreignCompanyId,
+			});
+		} finally {
+			await db.$executeRaw`
+				DELETE FROM "agentTask"
+				WHERE "companyId" IN (${companyId}, ${foreignCompanyId})
+			`;
+			await runInOrganization(organizationId, () =>
+				db.company.deleteMany({ where: { id: companyId } }),
+			);
+			await db.$executeRaw`
+				DELETE FROM "acquisitionProfile" WHERE id = ${organizationId}
+			`;
+			await runInOrganization(foreignOrganizationId, () =>
+				db.company.deleteMany({ where: { id: foreignCompanyId } }),
+			);
+			await db.organization.deleteMany({
+				where: { id: foreignOrganizationId },
+			});
+			await db.user.deleteMany({ where: { id: foreignUserId } });
+		}
+	});
+
 	it("increments only for semantic changes", async () => {
 		await runInOrganization(organizationId, () =>
 			service.updateAcquisitionProfile(userId, input),

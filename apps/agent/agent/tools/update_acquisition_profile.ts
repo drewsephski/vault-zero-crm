@@ -189,7 +189,9 @@ export default defineTool({
 					console.error("[agent] could not queue acquisition discovery", error);
 				}
 			}
-			if (changed) await queueAcquisitionTargetRefreshes(db);
+			if (changed) {
+				await queueAcquisitionTargetRefreshes(db, organizationId);
+			}
 
 			return {
 				updated: true as const,
@@ -291,9 +293,14 @@ export async function queueAcquisitionDiscovery(database: Db) {
 	});
 }
 
-async function queueAcquisitionTargetRefreshes(database: Db): Promise<void> {
+async function queueAcquisitionTargetRefreshes(
+	database: Db,
+	organizationId: string,
+): Promise<void> {
 	const targets = await database.acquisitionTarget.findMany({
-		where: { company: { domain: { not: null } } },
+		where: {
+			company: { is: { organizationId, domain: { not: null } } },
+		},
 		select: { companyId: true },
 		orderBy: { researchedAt: "asc" },
 		take: 50,

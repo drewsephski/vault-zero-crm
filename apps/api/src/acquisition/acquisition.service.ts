@@ -509,6 +509,8 @@ export class AcquisitionService {
 		idempotencyKey?: string,
 	) {
 		return this.db.$transaction(async (tx) => {
+			const target = await this.recommendationTarget(tx, companyId);
+
 			if (idempotencyKey) {
 				const prior = await tx.activity.findFirst({
 					where: {
@@ -519,33 +521,13 @@ export class AcquisitionService {
 					select: { id: true },
 				});
 				if (prior) {
-					const current = await tx.acquisitionTarget.findUniqueOrThrow({
-						where: { companyId },
-						select: {
-							stage: true,
-							recommendedStage: true,
-							updatedAt: true,
-						},
-					});
 					return {
 						companyId,
-						stage: current.stage,
-						recommendedStage: current.recommendedStage,
-						updatedAt: current.updatedAt.toISOString(),
+						stage: target.stage,
+						recommendedStage: target.recommendedStage,
+						updatedAt: target.updatedAt.toISOString(),
 					};
 				}
-			}
-
-			const target = await tx.acquisitionTarget.findUnique({
-				where: { companyId },
-				select: {
-					stage: true,
-					recommendedStage: true,
-					company: { select: { name: true } },
-				},
-			});
-			if (!target) {
-				throw new NotFoundException("That target no longer exists.");
 			}
 
 			const recommended = target.recommendedStage;
@@ -572,7 +554,7 @@ export class AcquisitionService {
 				await tx.activity.create({
 					data: {
 						type: ActivityType.STAGE_CHANGE,
-						subject: `Moved ${target.company.name} to ${recommended.toLowerCase()}`,
+						subject: `Moved ${target.companyName} to ${recommended.toLowerCase()}`,
 						companyId,
 						createdById: actingUserId,
 						meta: {
@@ -605,13 +587,7 @@ export class AcquisitionService {
 
 	async dismissRecommendedStage(companyId: string, actingUserId: string) {
 		return this.db.$transaction(async (tx) => {
-			const target = await tx.acquisitionTarget.findUnique({
-				where: { companyId },
-				select: { recommendedStage: true },
-			});
-			if (!target) {
-				throw new NotFoundException("That target no longer exists.");
-			}
+			const target = await this.recommendationTarget(tx, companyId);
 			if (!target.recommendedStage) {
 				throw new BadRequestException("No stage recommendation is pending.");
 			}
@@ -660,6 +636,8 @@ export class AcquisitionService {
 		dueAt?: string,
 	) {
 		return this.db.$transaction(async (tx) => {
+			const target = await this.recommendationTarget(tx, companyId);
+
 			if (idempotencyKey) {
 				const prior = await tx.activity.findFirst({
 					where: {
@@ -670,10 +648,6 @@ export class AcquisitionService {
 					select: { id: true },
 				});
 				if (prior) {
-					const target = await tx.acquisitionTarget.findUniqueOrThrow({
-						where: { companyId },
-						select: { recommendedAction: true },
-					});
 					return {
 						companyId,
 						taskId: prior.id,
@@ -682,13 +656,6 @@ export class AcquisitionService {
 				}
 			}
 
-			const target = await tx.acquisitionTarget.findUnique({
-				where: { companyId },
-				select: { recommendedAction: true },
-			});
-			if (!target) {
-				throw new NotFoundException("That target no longer exists.");
-			}
 			if (!target.recommendedAction) {
 				throw new BadRequestException("No action recommendation is pending.");
 			}
@@ -724,13 +691,7 @@ export class AcquisitionService {
 
 	async dismissRecommendedAction(companyId: string, actingUserId: string) {
 		return this.db.$transaction(async (tx) => {
-			const target = await tx.acquisitionTarget.findUnique({
-				where: { companyId },
-				select: { recommendedAction: true },
-			});
-			if (!target) {
-				throw new NotFoundException("That target no longer exists.");
-			}
+			const target = await this.recommendationTarget(tx, companyId);
 			if (!target.recommendedAction) {
 				throw new BadRequestException("No action recommendation is pending.");
 			}
@@ -756,6 +717,34 @@ export class AcquisitionService {
 
 			return { companyId, recommendedAction: null };
 		});
+	}
+
+	private async recommendationTarget(
+		tx: PrismaNamespace.TransactionClient,
+		companyId: string,
+	) {
+		const company = await tx.company.findUnique({
+			where: { id: companyId },
+			select: {
+				name: true,
+				acquisitionTarget: {
+					select: {
+						stage: true,
+						recommendedStage: true,
+						recommendedAction: true,
+						updatedAt: true,
+					},
+				},
+			},
+		});
+		if (!company?.acquisitionTarget) {
+			throw new NotFoundException("That target no longer exists.");
+		}
+
+		return {
+			...company.acquisitionTarget,
+			companyName: company.name,
+		};
 	}
 
 	async createEngagement(
