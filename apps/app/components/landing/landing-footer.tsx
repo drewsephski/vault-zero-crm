@@ -29,10 +29,14 @@ export function LandingFooter() {
 						</Link>
 					</p>
 
-					<p className="flex items-center gap-2 text-[13px]/5 text-muted-foreground">
-						<span className="size-1.5 shrink-0 rounded-full bg-ring" />
-						All systems normal
-					</p>
+					<div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]/5 text-muted-foreground">
+						<Link href="/privacy">Privacy</Link>
+						<Link href="/terms">Terms</Link>
+						<p className="flex items-center gap-2">
+							<span className="size-1.5 shrink-0 rounded-full bg-ring" />
+							All systems normal
+						</p>
+					</div>
 				</div>
 			</div>
 		</footer>

@@ -8,6 +8,8 @@ const LANDING_PATH = "/";
 
 const SIGN_IN_PATH = "/sign-in";
 
+const PUBLIC_PATHS = [LANDING_PATH, "/privacy", "/terms"];
+
 const UNGATED = ["/grant-access", "/eve"];
 
 const SECTIONS = ["/companies", "/contacts", "/deals", "/tasks", "/settings"];
@@ -59,7 +61,7 @@ function isUnder(pathname: string, prefix: string): boolean {
 }
 
 function isPublic(pathname: string): boolean {
-	return pathname === LANDING_PATH;
+	return PUBLIC_PATHS.includes(pathname);
 }
 
 function isUngated(pathname: string): boolean {

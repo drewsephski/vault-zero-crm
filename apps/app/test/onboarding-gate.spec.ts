@@ -147,6 +147,13 @@ describe("proxy", () => {
 		expect(redirectedTo(await proxy(request("/sign-in")))).toBeNull();
 	});
 
+	it("lets a stranger read the legal pages without signing in", async () => {
+		marketing(undefined);
+
+		expect(redirectedTo(await proxy(request("/privacy")))).toBeNull();
+		expect(redirectedTo(await proxy(request("/terms")))).toBeNull();
+	});
+
 	it("never aims a redirect at the sign-in page itself", async () => {
 		marketing(undefined);
 		setup({ onboarded: false });

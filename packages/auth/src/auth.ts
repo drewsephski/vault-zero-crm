@@ -7,7 +7,7 @@ import { organization } from "better-auth/plugins/organization";
 import { AUTH_COOKIE_PREFIX } from "./cookies";
 import { env } from "./env";
 import { ensureWorkspaceMembership } from "./organization";
-import { IDENTITY_SCOPES, MICROSOFT_PROVIDER_ID, SYNC_SCOPES } from "./scopes";
+import { IDENTITY_SCOPES, MICROSOFT_PROVIDER_ID } from "./scopes";
 import { notifySignedIn } from "./signed-in";
 import {
 	hasSignInAllowList,
@@ -21,7 +21,7 @@ if (env.google) {
 	socialProviders.google = {
 		...env.google,
 
-		scope: [...SYNC_SCOPES],
+		scope: [...IDENTITY_SCOPES],
 
 		accessType: "offline",
 
