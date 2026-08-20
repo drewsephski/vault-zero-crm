@@ -1,8 +1,8 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { readCompanyHistory } from "../lib/accounts";
 import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
 import { focusOn } from "../lib/focus";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

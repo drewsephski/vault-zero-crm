@@ -1,9 +1,9 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { sensitiveWrite } from "../lib/approval";
 import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
 import { focusOn } from "../lib/focus";
 import { createCompany, writeError } from "../lib/record-writes";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

@@ -20,9 +20,8 @@ export default function PrivacyPage() {
 					Vault Zero CRM is an acquisition CRM with an integrated research
 					agent. The hosted service at{" "}
 					<a href="https://crm.vaultzero.dev">crm.vaultzero.dev</a> is operated
-					by Vault Zero (
-					<a href="https://www.vaultzero.dev">vaultzero.dev</a>). Questions
-					about this policy can be sent to{" "}
+					by Vault Zero (<a href="https://www.vaultzero.dev">vaultzero.dev</a>).
+					Questions about this policy can be sent to{" "}
 					<a href="mailto:privacy@vaultzero.dev">privacy@vaultzero.dev</a>.
 				</p>
 				<p>
@@ -44,8 +43,8 @@ export default function PrivacyPage() {
 					read-only access to Gmail and Google Calendar so meetings and email
 					threads can appear on the right company in your workspace. We store
 					metadata and message content only for conversations tied to companies
-					in your CRM. Personal mail that does not relate to a tracked company is
-					not saved.
+					in your CRM. Personal mail that does not relate to a tracked company
+					is not saved.
 				</p>
 				<p>
 					<strong>CRM content.</strong> We store the records you and your
@@ -85,7 +84,9 @@ export default function PrivacyPage() {
 			</LegalSection>
 
 			<LegalSection title="How we share information">
-				<p>We share information only as needed to run the service, including:</p>
+				<p>
+					We share information only as needed to run the service, including:
+				</p>
 				<ul className="list-disc space-y-2 pl-5">
 					<li>
 						infrastructure providers that host the application and database
@@ -112,8 +113,8 @@ export default function PrivacyPage() {
 				<p>
 					We keep account and CRM data while your account or workspace is
 					active. If you delete your account or ask us to remove hosted data, we
-					delete or anonymize it within a reasonable period, except where we must
-					keep limited records for security, billing, or legal compliance.
+					delete or anonymize it within a reasonable period, except where we
+					must keep limited records for security, billing, or legal compliance.
 				</p>
 			</LegalSection>
 

@@ -1,10 +1,10 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { enabled, unavailable } from "../lib/capabilities";
 import { isLikelyPersonName } from "../lib/external-person";
 import { spend } from "../lib/focus";
 import { lookupCompany, searchPeople } from "../lib/linkdapi";
 import { normalise } from "../lib/names";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

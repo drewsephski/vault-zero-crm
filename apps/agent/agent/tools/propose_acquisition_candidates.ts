@@ -1,9 +1,9 @@
 import { db, getOrganizationId, WorkspaceMode } from "@crm/db";
 import { isAcquisitionEvidenceUrl } from "@crm/db/acquisition";
 import { proposeAcquisitionCandidates } from "@crm/db/acquisition-candidates";
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { normalizeDomain } from "../lib/record-writes";
+import { defineTool } from "../lib/tool";
 
 const candidate = z.object({
 	name: z.string().trim().min(1).max(160),

@@ -159,7 +159,8 @@ export function acquisitionResearchActivity(
 	state: TargetResearchState,
 ): "queued" | "running" | null {
 	if (state.status === "queued") return "queued";
-	if (state.status === "running" || state.status === "retrying") return "running";
+	if (state.status === "running" || state.status === "retrying")
+		return "running";
 	return null;
 }
 

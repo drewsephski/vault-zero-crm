@@ -44,7 +44,6 @@ import {
 	paginate,
 	resolveOrderBy,
 } from "../trpc/list-input";
-import { isDiscoveryReady } from "@crm/db/acquisition";
 import type {
 	CompanyBulkUpdateInput,
 	CompanyCreateInput,
@@ -846,7 +845,9 @@ export class CompaniesService {
 
 		if (!profile || !isDossierReady(profile)) return;
 
-		await this.agent.acquisitionTargetRequested(companyId, reason).catch(() => null);
+		await this.agent
+			.acquisitionTargetRequested(companyId, reason)
+			.catch(() => null);
 	}
 
 	private translate(error: unknown, id: string): unknown {

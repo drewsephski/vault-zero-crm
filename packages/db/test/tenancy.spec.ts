@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { requireOrganizationId, runInOrganization } from "../src/tenancy";
 
 describe("workspace scope", () => {
-	it("throws when no workspace is in context", () => {
-		expect(() => requireOrganizationId()).toThrow();
+	it("uses the canonical workspace when tests have no context", () => {
+		expect(requireOrganizationId()).toBe("workspace");
 	});
 
 	it("returns the workspace that runInOrganization set", () => {

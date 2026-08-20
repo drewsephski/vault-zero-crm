@@ -1,11 +1,15 @@
-import type { SessionContext } from "eve/context";
-import type { ToolContext } from "eve/tools";
 import { db } from "@crm/db";
 import { runInOrganization } from "@crm/db/tenancy";
+import type { SessionContext } from "eve/context";
+import type { ToolContext } from "eve/tools";
 
-type ScopedAuth = SessionContext["session"]["auth"] | ToolContext["session"]["auth"];
+type ScopedAuth =
+	| SessionContext["session"]["auth"]
+	| ToolContext["session"]["auth"];
 
-export function organizationIdFromAuth(auth: ScopedAuth | undefined): string | null {
+export function organizationIdFromAuth(
+	auth: ScopedAuth | undefined,
+): string | null {
 	const current = auth?.current ?? auth?.initiator;
 	const organizationId = current?.attributes?.organizationId;
 	return typeof organizationId === "string" && organizationId.trim()

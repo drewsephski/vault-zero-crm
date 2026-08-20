@@ -32,8 +32,6 @@ import { formatCount, relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
-import { BuyBoxSetupButton } from "./settings/buy-box/buy-box-dialog";
-import { BuyBoxSummary } from "./settings/buy-box/buy-box-summary";
 import { AcquisitionEngagementStageIndicator } from "@/components/crm/acquisition-engagement-stage";
 import {
 	AcquisitionFitIndicator,
@@ -45,6 +43,8 @@ import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
+import { BuyBoxSetupButton } from "./settings/buy-box/buy-box-dialog";
+import { BuyBoxSummary } from "./settings/buy-box/buy-box-summary";
 
 type Summary = Extract<
 	RouterOutputs["dashboard"]["summary"],

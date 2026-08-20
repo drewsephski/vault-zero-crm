@@ -1,4 +1,3 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
 import {
@@ -6,6 +5,7 @@ import {
 	researchExternalPerson,
 } from "../lib/external-person";
 import { searchCrm } from "../lib/lookup";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

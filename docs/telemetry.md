@@ -222,11 +222,10 @@ no record within reach of it. Everything above still holds for the CRM itself.
 
 **It cannot run on your hostname.** `analyticsAllowed` (`apps/app/lib/analytics.ts`) compares
 `window.location.hostname` against the Vault Zero marketing hosts — and
-`posthog-js` sits behind a dynamic `import()` on the far side of that check. Turn
-`IS_MARKETING="true"` on and serve the same page from a domain of your own and the SDK is
-never fetched: not sent and then dropped, never downloaded. The gate is the hostname rather
-than `IS_MARKETING`, because `IS_MARKETING` is precisely the flag a self-hoster is invited to
-set.
+`posthog-js` sits behind a dynamic `import()` on the far side of that check. Serve the same
+public landing page from a domain of your own and the SDK is never fetched: not sent and then
+dropped, never downloaded. The gate is the hostname; the legacy `IS_MARKETING` variable is
+only an anonymous server-side telemetry classification and does not control the page.
 
 PostHog refuses it from the other side too. `recording_domains` on the receiving project names
 the same two origins, so replay and heatmaps are declined for any other page that presents the

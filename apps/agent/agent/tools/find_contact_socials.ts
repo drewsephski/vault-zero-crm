@@ -1,9 +1,9 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { enabled, unavailable } from "../lib/capabilities";
 import { personForVerification, stampSocialsChecked } from "../lib/crm";
 import { focusOn, spend } from "../lib/focus";
 import { findSocialCandidates } from "../lib/socials";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

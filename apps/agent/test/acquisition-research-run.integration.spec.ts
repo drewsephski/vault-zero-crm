@@ -291,7 +291,14 @@ describe("acquisition research runs", () => {
 
 		const result = await writeAcquisitionDossier.execute(
 			{ ...dossierInput, companyId },
-			{ session: { id: sessionId } } as never,
+			{
+				session: {
+					id: sessionId,
+					auth: {
+						current: { attributes: { organizationId: WORKSPACE_ID } },
+					},
+				},
+			} as never,
 		);
 		expect(result.written).toBe(true);
 

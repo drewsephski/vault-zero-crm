@@ -1,5 +1,5 @@
-import Logo from "@crm/ui/components/logo";
 import { Link } from "@crm/ui/components/link";
+import Logo from "@crm/ui/components/logo";
 import type { ReactNode } from "react";
 
 const COPYRIGHT_YEAR = 2026;
@@ -74,7 +74,9 @@ export function LegalSection({
 	return (
 		<section className="flex flex-col gap-3">
 			<h2 className="text-base font-semibold tracking-tight">{title}</h2>
-			<div className="flex flex-col gap-3 text-muted-foreground">{children}</div>
+			<div className="flex flex-col gap-3 text-muted-foreground">
+				{children}
+			</div>
 		</section>
 	);
 }

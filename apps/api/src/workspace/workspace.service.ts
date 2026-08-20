@@ -13,9 +13,9 @@ import {
 	type Prisma,
 	WorkspaceMode,
 } from "@crm/db";
+import { isDiscoveryReady, isDossierReady } from "@crm/db/acquisition";
 import { readReportingCurrency } from "@crm/db/settings";
 import { isOnboarded, markOnboarded, workspaceSlug } from "@crm/db/workspace";
-import { isDiscoveryReady, isDossierReady } from "@crm/db/acquisition";
 import {
 	BadRequestException,
 	ForbiddenException,

@@ -1,4 +1,7 @@
-import { AcquisitionFit, AcquisitionStage } from "./generated/prisma/enums";
+import {
+	type AcquisitionFit,
+	AcquisitionStage,
+} from "./generated/prisma/enums";
 
 export const ACQUISITION_CRITERION_IDS = [
 	"industry",

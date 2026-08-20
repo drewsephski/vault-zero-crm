@@ -1,4 +1,3 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { sensitiveWrite } from "../lib/approval";
 import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
@@ -8,6 +7,7 @@ import { recordFact } from "../lib/facts";
 import { focusOn } from "../lib/focus";
 import { slugFromLinkedinInput } from "../lib/linkdapi";
 import { createContact, writeError } from "../lib/record-writes";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

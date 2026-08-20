@@ -1,4 +1,3 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { sensitiveWrite } from "../lib/approval";
 import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
@@ -9,6 +8,7 @@ import {
 	updateDeal,
 	writeError,
 } from "../lib/record-writes";
+import { defineTool } from "../lib/tool";
 
 const company = z.object({
 	kind: z.literal("company"),

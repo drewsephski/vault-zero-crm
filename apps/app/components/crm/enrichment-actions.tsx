@@ -12,10 +12,10 @@ import {
 } from "@crm/ui/components/tooltip";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { BuyBoxSetupButton } from "@/app/(app)/[slug]/settings/buy-box/buy-box-dialog";
+import { acquisitionProfileDossierReady } from "@/lib/acquisition";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
-import { acquisitionProfileDossierReady } from "@/lib/acquisition";
-import { BuyBoxSetupButton } from "@/app/(app)/[slug]/settings/buy-box/buy-box-dialog";
 import type { EnrichmentActivity } from "./enrichment-status";
 
 export function EnrichmentActions({
@@ -124,7 +124,8 @@ export function EnrichmentActions({
 						</span>
 					</TooltipTrigger>
 					<TooltipContent>
-						Add at least one buy-box criterion before Eve analyzes acquisition fit.
+						Add at least one buy-box criterion before Eve analyzes acquisition
+						fit.
 					</TooltipContent>
 				</Tooltip>
 			) : (

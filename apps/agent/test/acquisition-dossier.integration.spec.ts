@@ -89,7 +89,12 @@ let previousProfile: Awaited<
 let releaseCanonicalWorkspace: (() => Promise<void>) | undefined;
 
 const toolContext = {
-	session: { id: `acquisition-dossier-session-${suffix}` },
+	session: {
+		id: `acquisition-dossier-session-${suffix}`,
+		auth: {
+			current: { attributes: { organizationId: WORKSPACE_ID } },
+		},
+	},
 } as unknown as DossierContext;
 
 const baseDossierB = {

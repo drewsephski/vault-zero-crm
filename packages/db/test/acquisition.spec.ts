@@ -1,15 +1,15 @@
 import { describe, expect, it } from "bun:test";
+import { AcquisitionFit, AcquisitionStage } from "@crm/db/enums";
 import {
+	acquisitionAttentionScore,
 	configuredCriteriaCount,
 	expectedAcquisitionCriterionIds,
 	isDiscoveryReady,
 	isDossierReady,
 	isTargetLifecycleStage,
-	acquisitionAttentionScore,
 	TARGET_LIFECYCLE_STAGES,
 	targetStages,
 } from "../src/acquisition";
-import { AcquisitionFit, AcquisitionStage } from "@crm/db/enums";
 
 const profile = {
 	preferredIndustries: ["HVAC"],
@@ -46,9 +46,9 @@ describe("acquisition domain", () => {
 	});
 
 	it("requires an industry or geography for discovery", () => {
-		expect(
-			isDiscoveryReady({ preferredIndustries: [], geographies: [] }),
-		).toBe(false);
+		expect(isDiscoveryReady({ preferredIndustries: [], geographies: [] })).toBe(
+			false,
+		);
 		expect(
 			isDiscoveryReady({
 				preferredIndustries: ["HVAC"],

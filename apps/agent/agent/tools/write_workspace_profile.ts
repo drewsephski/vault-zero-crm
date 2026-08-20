@@ -4,9 +4,9 @@ import {
 	MAX_NARRATIVE,
 	writeWorkspaceProfile,
 } from "@crm/db/workspace";
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { currentFocus } from "../lib/focus";
+import { defineTool } from "../lib/tool";
 import { identity } from "../lib/workspace";
 
 const line = (what: string) =>

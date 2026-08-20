@@ -5,9 +5,7 @@ import { brief, drainAll, taskAuth } from "../lib/dispatch";
 import { settle } from "../lib/enrichment";
 import { followUpRequestSchema, generateFollowUps } from "../lib/follow-ups";
 import { completeTask, failTask } from "../lib/tasks";
-import {
-	withTaskOrganizationScope,
-} from "../lib/tenant";
+import { withTaskOrganizationScope } from "../lib/tenant";
 import { authenticateCrmRep } from "./eve";
 
 const TASK_MARKER = "task:";

@@ -1,6 +1,6 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { researchExternalPerson } from "../lib/external-person";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

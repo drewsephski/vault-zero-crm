@@ -1,5 +1,5 @@
-import { defineDynamic, defineInstructions } from "eve/instructions";
 import { runInOrganization } from "@crm/db/tenancy";
+import { defineDynamic, defineInstructions } from "eve/instructions";
 import { focusOn } from "../lib/focus";
 import { sessionPreamble } from "../lib/preamble";
 import { organizationIdFromAuth } from "../lib/tenant";

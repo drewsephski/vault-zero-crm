@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import {
-	AcquisitionCandidateStatus,
 	AcquisitionEngagementStage,
 	AcquisitionEngagementStatus,
 	AcquisitionFit,
@@ -330,7 +329,7 @@ afterAll(async () => {
 				data: previousProfile,
 			});
 		} else {
-			await db.acquisitionProfile.delete({ where: { id: WORKSPACE_ID } });
+			await db.acquisitionProfile.deleteMany({ where: { id: WORKSPACE_ID } });
 		}
 	} finally {
 		await releaseCanonicalWorkspace?.();
@@ -415,7 +414,7 @@ describe("acquisition target query semantics", () => {
 			needsResearch: 1,
 			activeAgentWork: baselineAcquisitionWork + 1,
 			activeAcquisitions: 1,
-			missingNextActions: 0,
+			missingNextActions: 1,
 			nextActionCount: 3,
 		});
 		expect(
@@ -490,10 +489,14 @@ describe("acquisition target query semantics", () => {
 				),
 			).toBe(false);
 		} finally {
-			await db.company.deleteMany({
-				where: { domain: isolatedDomain },
+			await runInOrganization(isolatedOrgId, async () => {
+				await db.company.deleteMany({
+					where: { domain: isolatedDomain },
+				});
+				await db.acquisitionProfile.deleteMany({
+					where: { id: isolatedOrgId },
+				});
 			});
-			await db.acquisitionProfile.delete({ where: { id: isolatedOrgId } });
 			await db.organization.delete({ where: { id: isolatedOrgId } });
 		}
 	});

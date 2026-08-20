@@ -11,13 +11,13 @@ import {
 	TARGET_LIFECYCLE_STAGES,
 } from "@crm/db/acquisition";
 import type { AcquisitionDossierSnapshot } from "@crm/db/acquisition-research-runs";
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import {
 	acquisitionCriteriaSchema,
 	validateCriterionAssessments,
 } from "../lib/acquisition-criteria";
 import { succeedAcquisitionResearchRun } from "../lib/acquisition-research-run";
+import { defineTool } from "../lib/tool";
 
 const evidence = z.object({
 	label: z.string().trim().min(5).max(300),

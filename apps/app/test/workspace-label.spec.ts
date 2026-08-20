@@ -3,8 +3,8 @@ import { DEFAULT_WORKSPACE_NAME } from "@crm/auth";
 import { workspaceLabel } from "../components/app-header";
 
 describe("what the header calls this install", () => {
-	it("does not say CRM twice before anybody has named the workspace", () => {
-		expect(workspaceLabel(DEFAULT_WORKSPACE_NAME)).toBe("Vault Zero CRM");
+	it("uses the default workspace name until somebody names the workspace", () => {
+		expect(workspaceLabel(DEFAULT_WORKSPACE_NAME)).toBe("My workspace CRM");
 	});
 
 	it("falls back to CRM while the workspace is still loading", () => {

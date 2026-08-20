@@ -56,8 +56,8 @@ export function BuyBoxClearDialog({
 					<AlertDialogTitle>Clear the buy box?</AlertDialogTitle>
 					<AlertDialogDescription>
 						This removes all acquisition criteria. Target fit assessments will
-						no longer compare against your criteria until you configure a new buy
-						box.
+						no longer compare against your criteria until you configure a new
+						buy box.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>

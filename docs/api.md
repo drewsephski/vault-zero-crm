@@ -81,8 +81,10 @@ Settings and never prevent a signed-in user from entering the workspace.
   rather than leaving a year-long marker that insists the gate passed. Cache in the
   API if cost ever matters.
 - **An unreachable API fails open** (`unknown` lets the request through).
-- **`/sign-in`, `/grant-access`, `/eve` are ungated.** `/sign-in` is the only path a
-  stranger may read; `/` joins it only when `IS_MARKETING` is set.
+- **`/`, `/privacy`, `/terms`, and `/sign-in` are public.** OAuth production apps
+  require a public product homepage and legal disclosures. `/grant-access` and
+  `/eve` are ungated after session handling so consent and the signed bridge cannot
+  ping-pong through onboarding.
 - **Research capability is not an onboarding concern.** A missing optional provider
   removes that source while Eve continues with the sources that are available.
 

@@ -14,6 +14,7 @@ import {
 import { Icon } from "@crm/ui/components/icon";
 import { PersonAvatar } from "@crm/ui/components/person-avatar";
 import { SimpleTable, SimpleTableRow } from "@crm/ui/components/simple-table";
+import { StatusIndicator } from "@crm/ui/components/status-indicator";
 import { TableCell } from "@crm/ui/components/table";
 import {
 	Tooltip,
@@ -37,7 +38,6 @@ import {
 	enrichmentActivity,
 	isEnriching,
 } from "@/components/crm/enrichment-status";
-import { StatusIndicator } from "@crm/ui/components/status-indicator";
 import {
 	InlineField,
 	InlineSelectField,
@@ -62,7 +62,11 @@ import {
 	DetailSheetStats,
 	type DetailSheetTab,
 } from "@/components/detail-sheet";
-import { defaultCompanyTab, acquisitionResearchActivity, targetResearchCopy } from "@/lib/acquisition";
+import {
+	acquisitionResearchActivity,
+	defaultCompanyTab,
+	targetResearchCopy,
+} from "@/lib/acquisition";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";

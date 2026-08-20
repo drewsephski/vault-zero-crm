@@ -9,7 +9,10 @@ import {
 	type Prisma,
 	WorkspaceMode,
 } from "@crm/db";
-import { ACQUISITION_TASK_KINDS, acquisitionAttentionScore } from "@crm/db/acquisition";
+import {
+	ACQUISITION_TASK_KINDS,
+	acquisitionAttentionScore,
+} from "@crm/db/acquisition";
 import { getOrganizationId } from "@crm/db/tenancy";
 import { Injectable } from "@nestjs/common";
 import {
@@ -591,25 +594,30 @@ export class DashboardService {
 			}),
 		]);
 
-		const [strongPriorityTargets, potentialPriorityTargets] = await Promise.all([
-			this.db.acquisitionTarget.findMany({
-				where: {
-					AND: [activeTargetWhere, { fit: AcquisitionFit.STRONG }],
-				},
-				orderBy: [{ researchedAt: "desc" }, { updatedAt: "desc" }],
-				take: PRIORITY_TARGET_QUERY_CAP,
-				select: priorityTargetSelect,
-			}),
-			this.db.acquisitionTarget.findMany({
-				where: {
-					AND: [activeTargetWhere, { fit: AcquisitionFit.POTENTIAL }],
-				},
-				orderBy: [{ researchedAt: "desc" }, { updatedAt: "desc" }],
-				take: PRIORITY_TARGET_QUERY_CAP,
-				select: priorityTargetSelect,
-			}),
-		]);
-		const priorityTargets = [...strongPriorityTargets, ...potentialPriorityTargets]
+		const [strongPriorityTargets, potentialPriorityTargets] = await Promise.all(
+			[
+				this.db.acquisitionTarget.findMany({
+					where: {
+						AND: [activeTargetWhere, { fit: AcquisitionFit.STRONG }],
+					},
+					orderBy: [{ researchedAt: "desc" }, { updatedAt: "desc" }],
+					take: PRIORITY_TARGET_QUERY_CAP,
+					select: priorityTargetSelect,
+				}),
+				this.db.acquisitionTarget.findMany({
+					where: {
+						AND: [activeTargetWhere, { fit: AcquisitionFit.POTENTIAL }],
+					},
+					orderBy: [{ researchedAt: "desc" }, { updatedAt: "desc" }],
+					take: PRIORITY_TARGET_QUERY_CAP,
+					select: priorityTargetSelect,
+				}),
+			],
+		);
+		const priorityTargets = [
+			...strongPriorityTargets,
+			...potentialPriorityTargets,
+		]
 			.sort((left, right) => {
 				const leftScore = acquisitionAttentionScore({
 					fit: left.fit,
@@ -617,8 +625,7 @@ export class DashboardService {
 					researchedAt: left.researchedAt,
 					staleBefore,
 					openTaskCount: left.company._count.activities,
-					hasActiveEngagement:
-						left.company._count.acquisitionEngagements > 0,
+					hasActiveEngagement: left.company._count.acquisitionEngagements > 0,
 				});
 				const rightScore = acquisitionAttentionScore({
 					fit: right.fit,
@@ -626,8 +633,7 @@ export class DashboardService {
 					researchedAt: right.researchedAt,
 					staleBefore,
 					openTaskCount: right.company._count.activities,
-					hasActiveEngagement:
-						right.company._count.acquisitionEngagements > 0,
+					hasActiveEngagement: right.company._count.acquisitionEngagements > 0,
 				});
 				if (rightScore !== leftScore) return rightScore - leftScore;
 				const leftResearch = left.researchedAt?.getTime() ?? 0;

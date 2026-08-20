@@ -1,6 +1,6 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { contactsNeedingWork } from "../lib/crm";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

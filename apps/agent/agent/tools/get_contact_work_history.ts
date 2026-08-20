@@ -1,8 +1,8 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { enabled, unavailable } from "../lib/capabilities";
 import { contactProfileSlug } from "../lib/crm";
 import { getExperience, getProfile } from "../lib/linkdapi";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

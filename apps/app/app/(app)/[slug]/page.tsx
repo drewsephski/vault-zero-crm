@@ -12,13 +12,13 @@ import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { DashboardSummary } from "./dashboard-summary";
 import {
-	OverviewGreeting,
-	OverviewGreetingFallback,
-} from "./overview-greeting";
-import {
 	OverviewBuyBoxCta,
 	OverviewBuyBoxCtaFallback,
 } from "./overview-buy-box-cta";
+import {
+	OverviewGreeting,
+	OverviewGreetingFallback,
+} from "./overview-greeting";
 import {
 	OverviewScopeToggle,
 	OverviewScopeToggleFallback,

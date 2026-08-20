@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceUrl } from "@/lib/use-workspace-url";
+import { BuyBoxClearDialog } from "./buy-box-clear-dialog";
 import {
 	FinancialStep,
 	FinancingStep,
@@ -44,7 +45,6 @@ import {
 	stepDescription,
 	validateBuyBoxDraft,
 } from "./buy-box-values";
-import { BuyBoxClearDialog } from "./buy-box-clear-dialog";
 
 type BuyBoxFormProps = {
 	presentation?: "card" | "inline";
@@ -170,57 +170,57 @@ export function BuyBoxForm({
 			</CardHeader>
 
 			<CardContent className={presentation === "inline" ? "px-0" : undefined}>
-					<ol aria-label="Buy box progress" className="grid grid-cols-4 gap-2">
-						{BUY_BOX_STEPS.map((label, index) => (
-							<li key={label} aria-current={index === step ? "step" : undefined}>
-								<button
-									type="button"
-									disabled={!canManage}
-									onClick={() => setStep(index)}
-									className={
-										index === step
-											? "w-full border-primary border-t-2 pt-2 text-center font-medium text-xs"
-											: "w-full border-t pt-2 text-center text-muted-foreground text-xs hover:text-foreground disabled:pointer-events-none"
-									}
-								>
-									<span className="hidden sm:inline">{label}</span>
-									<span className="sm:hidden">{index + 1}</span>
-								</button>
-							</li>
-						))}
-					</ol>
+				<ol aria-label="Buy box progress" className="grid grid-cols-4 gap-2">
+					{BUY_BOX_STEPS.map((label, index) => (
+						<li key={label} aria-current={index === step ? "step" : undefined}>
+							<button
+								type="button"
+								disabled={!canManage}
+								onClick={() => setStep(index)}
+								className={
+									index === step
+										? "w-full border-primary border-t-2 pt-2 text-center font-medium text-xs"
+										: "w-full border-t pt-2 text-center text-muted-foreground text-xs hover:text-foreground disabled:pointer-events-none"
+								}
+							>
+								<span className="hidden sm:inline">{label}</span>
+								<span className="sm:hidden">{index + 1}</span>
+							</button>
+						</li>
+					))}
+				</ol>
 
-					{profile.data.mode === WorkspaceMode.SALES ? (
-						<p className="text-muted-foreground text-xs">
-							This buy box is saved, but acquisition terminology and dashboard
-							metrics stay off until you enable Acquisition CRM in{" "}
-							<Link href={workspaceUrl("/settings")} className="underline">
-								General settings
-							</Link>
-							.
-						</p>
+				{profile.data.mode === WorkspaceMode.SALES ? (
+					<p className="text-muted-foreground text-xs">
+						This buy box is saved, but acquisition terminology and dashboard
+						metrics stay off until you enable Acquisition CRM in{" "}
+						<Link href={workspaceUrl("/settings")} className="underline">
+							General settings
+						</Link>
+						.
+					</p>
+				) : null}
+
+				{profile.data.canManage ? null : (
+					<p className="text-muted-foreground text-xs">
+						Only a workspace owner or admin can change the buy box.
+					</p>
+				)}
+
+				<FieldSet disabled={!canManage}>
+					{step === 0 ? (
+						<FocusStep values={values} errors={errors} edit={edit} />
 					) : null}
-
-					{profile.data.canManage ? null : (
-						<p className="text-muted-foreground text-xs">
-							Only a workspace owner or admin can change the buy box.
-						</p>
-					)}
-
-					<FieldSet disabled={!canManage}>
-						{step === 0 ? (
-							<FocusStep values={values} errors={errors} edit={edit} />
-						) : null}
-						{step === 1 ? (
-							<FinancialStep values={values} errors={errors} edit={edit} />
-						) : null}
-						{step === 2 ? (
-							<OperationsStep values={values} errors={errors} edit={edit} />
-						) : null}
-						{step === 3 ? (
-							<FinancingStep values={values} errors={errors} edit={edit} />
-						) : null}
-					</FieldSet>
+					{step === 1 ? (
+						<FinancialStep values={values} errors={errors} edit={edit} />
+					) : null}
+					{step === 2 ? (
+						<OperationsStep values={values} errors={errors} edit={edit} />
+					) : null}
+					{step === 3 ? (
+						<FinancingStep values={values} errors={errors} edit={edit} />
+					) : null}
+				</FieldSet>
 			</CardContent>
 			<CardFooter className={presentation === "inline" ? "px-0" : undefined}>
 				<div className="flex w-full items-center justify-between gap-3">

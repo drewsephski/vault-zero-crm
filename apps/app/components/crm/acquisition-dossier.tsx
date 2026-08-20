@@ -33,6 +33,7 @@ import { relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { BuyBoxSetupButton } from "@/app/(app)/[slug]/settings/buy-box/buy-box-dialog";
 import {
 	AcquisitionFitIndicator,
 	acquisitionStageLabel,
@@ -64,7 +65,6 @@ import {
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
-import { BuyBoxSetupButton } from "@/app/(app)/[slug]/settings/buy-box/buy-box-dialog";
 
 type Company = RouterOutputs["companies"]["byId"];
 type Target = NonNullable<Company["acquisitionTarget"]>;
@@ -154,7 +154,9 @@ export function AcquisitionDossier({
 			? ({ status: "blocked", blocker: "missing-buy-box" } as const)
 			: null;
 	const researchCopy = targetResearchCopy(company.acquisitionResearch);
-	const researchActivity = acquisitionResearchActivity(company.acquisitionResearch);
+	const researchActivity = acquisitionResearchActivity(
+		company.acquisitionResearch,
+	);
 	const readinessCopy = readinessState
 		? targetResearchCopy(readinessState)
 		: null;

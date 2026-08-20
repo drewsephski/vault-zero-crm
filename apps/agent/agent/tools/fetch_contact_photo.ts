@@ -1,8 +1,8 @@
 import { blobEnabled } from "@crm/db/blob";
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { spend } from "../lib/focus";
 import { runPortrait } from "../lib/portrait";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

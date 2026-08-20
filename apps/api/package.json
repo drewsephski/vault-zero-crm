@@ -17,7 +17,7 @@
 		"start": "bun src/main.ts",
 		"start:prod": "bun dist/main.js",
 		"vercel:build": "node scripts/build-func.mjs",
-		"test": "CRM_TELEMETRY_DISABLED=1 bun test --preload ./test/env.ts",
+		"test": "CRM_TELEMETRY_DISABLED=1 bun test --max-concurrency 1 --preload ./test/env.ts",
 		"test:watch": "bun test --preload ./test/env.ts --watch",
 		"trpc:generate": "nestjs-trpc generate -e src/app.module.ts -r \"**/*.router.ts\" -o src/generated",
 		"clean": "rm -rf .turbo dist node_modules src/generated"

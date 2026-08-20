@@ -10,10 +10,10 @@ import {
 } from "@crm/ui/components/card";
 import { Spinner } from "@crm/ui/components/spinner";
 import { useQuery } from "@tanstack/react-query";
+import { useTRPC } from "@/lib/trpc/client";
 import { BuyBoxClearDialog } from "./buy-box-clear-dialog";
 import { BuyBoxSetupButton } from "./buy-box-dialog";
 import { buyBoxIsConfigured, buyBoxSummaryLines } from "./buy-box-values";
-import { useTRPC } from "@/lib/trpc/client";
 
 type BuyBoxSummaryProps = {
 	presentation?: "card" | "inline";

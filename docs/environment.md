@@ -47,15 +47,13 @@ set. Parsed on demand. `packages/auth/src/workspace.ts`.
   collides with any neighbour on a shared parent domain, silently: sign-in completes,
   the row is written, every reader resolves `null`. **Changing it signs everybody out.**
 
-## `IS_MARKETING` — landing page flag, off by default
+## `IS_MARKETING` — legacy telemetry classification
 
-`"true"` serves `app/(landing)` at `/`; anything else sends a signed-out visitor to
-`/sign-in`, because the page markets *this* product.
-
-- **Only the literal `true`** (same shape as `PRISMA_LOG_QUERIES`).
-- **It decides one thing**: what a stranger at `/` sees.
-- **`isMarketing()` (`apps/app/lib/env.ts`) reads per request**, so a config change
-  needs no rebuild. Declared in `apps/app/turbo.json` `passThroughEnv`.
+The public landing page is always served at `/`, alongside `/privacy` and `/terms`,
+so a production OAuth app has a public product homepage and legal disclosures.
+`IS_MARKETING="true"` remains only as the anonymous `is_marketing` capability on the
+daily install telemetry event for compatibility. It does not control routing or
+enable browser analytics.
 
 ## Typed, validated env
 
@@ -151,8 +149,8 @@ is sent. No client is constructed, so there is no queue waiting to flush later.
   appears once, on the `vaultzero.dev` landing page**, and nowhere a record can be
   reached: autocapture on a CRM would lift contact names and deal amounts out of
   somebody else's database. That one import is gated on
-  `window.location.hostname`, not on `IS_MARKETING` — turning the landing page on
-  for your own domain never loads it. `docs/telemetry.md`.
+  `window.location.hostname`, not on `IS_MARKETING` — serving the landing page on
+  your own domain never loads it. `docs/telemetry.md`.
 - **There is no variable for the destination.** The project key and host are
   constants in `packages/telemetry/src/project.ts`. A `phc_` key is write-only —
   it can send events and read nothing back — so making it configurable would

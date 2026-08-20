@@ -160,7 +160,10 @@ export async function completeTask(
 
 		if (!task) return null;
 
-		if (task.kind === "acquisition-refresh" && !options?.skipResearchRunFinalization) {
+		if (
+			task.kind === "acquisition-refresh" &&
+			!options?.skipResearchRunFinalization
+		) {
 			await finalizeAcquisitionResearchRunOnTaskComplete(taskId, tx);
 		}
 

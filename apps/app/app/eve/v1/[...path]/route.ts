@@ -1,5 +1,5 @@
-import { connection } from "next/server";
 import { organizationIdForUser } from "@crm/auth";
+import { connection } from "next/server";
 import {
 	AGENT_URL,
 	bridgeConfigured,

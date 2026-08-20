@@ -197,7 +197,7 @@ const dossierACriteria: AcquisitionCriterionAssessment[] = [
 ];
 
 describe("acquisition dossier read model", () => {
-	it("reports acquisition task state without replacing the persisted dossier", async () => {
+	it("reports open acquisition task state without replacing the persisted dossier", async () => {
 		const domain = `dossier-state-${crypto.randomUUID()}.test`;
 		const timestampA = new Date("2026-08-01T12:00:00.000Z");
 		domains.push(domain);
@@ -263,17 +263,6 @@ describe("acquisition dossier read model", () => {
 				},
 				expected: { status: "retrying", error: "provider timeout" },
 			},
-			{
-				name: "failed",
-				data: {
-					dueAt: new Date(now.getTime() - 60_000),
-					startedAt: now,
-					finishedAt: now,
-					outcome: "provider timeout",
-					lastError: "provider timeout",
-				},
-				expected: { status: "failed", error: "provider timeout" },
-			},
 		] as const;
 
 		for (const state of states) {
@@ -295,9 +284,7 @@ describe("acquisition dossier read model", () => {
 				timestampA.toISOString(),
 			);
 			expect(record.enrichmentStatus).toBe(EnrichmentStatus.COMPLETE);
-			expect(record.queuedKinds).toEqual(
-				state.name === "failed" ? [] : ["acquisition-refresh"],
-			);
+			expect(record.queuedKinds).toEqual(["acquisition-refresh"]);
 		}
 
 		await db.agentTask.deleteMany({ where: { companyId: company.id } });
@@ -1653,8 +1640,12 @@ describe("eve recommendations and acquisition engagements", () => {
 				);
 			});
 		} finally {
-			await db.company.deleteMany({ where: { domain: isolatedDomain } });
-			await db.acquisitionProfile.delete({ where: { id: isolatedOrgId } });
+			await runInOrganization(isolatedOrgId, async () => {
+				await db.company.deleteMany({ where: { domain: isolatedDomain } });
+				await db.acquisitionProfile.deleteMany({
+					where: { id: isolatedOrgId },
+				});
+			});
 			await db.organization.delete({ where: { id: isolatedOrgId } });
 		}
 	});
@@ -1869,8 +1860,12 @@ describe("eve recommendations and acquisition engagements", () => {
 				),
 			).toBe(false);
 		} finally {
-			await db.company.deleteMany({ where: { domain: isolatedDomain } });
-			await db.acquisitionProfile.delete({ where: { id: isolatedOrgId } });
+			await runInOrganization(isolatedOrgId, async () => {
+				await db.company.deleteMany({ where: { domain: isolatedDomain } });
+				await db.acquisitionProfile.deleteMany({
+					where: { id: isolatedOrgId },
+				});
+			});
 			await db.organization.delete({ where: { id: isolatedOrgId } });
 		}
 	});

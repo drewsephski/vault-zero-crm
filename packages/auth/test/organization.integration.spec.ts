@@ -109,12 +109,14 @@ afterAll(async () => {
 		await clear();
 
 		if (snapshot.organization) {
-			await db.organization.create({
-				data: {
+			await db.organization.upsert({
+				where: { id: WORKSPACE_ID },
+				create: {
 					id: WORKSPACE_ID,
 					createdAt: new Date(),
 					...snapshot.organization,
 				},
+				update: snapshot.organization,
 			});
 
 			await db.member.createMany({
@@ -122,7 +124,10 @@ afterAll(async () => {
 					...member,
 					organizationId: WORKSPACE_ID,
 				})),
+				skipDuplicates: true,
 			});
+		} else {
+			await db.organization.deleteMany({ where: { id: WORKSPACE_ID } });
 		}
 	} finally {
 		await releaseCanonicalWorkspace?.();
@@ -160,6 +165,16 @@ describe("ensureWorkspaceMembership", () => {
 	it("is idempotent, so signing in again neither duplicates nor re-roles", async () => {
 		const workspaceId = await ensureWorkspaceMembership(secondId);
 		if (!workspaceId) throw new Error("expected a workspace");
+
+		await db.member.create({
+			data: {
+				id: crypto.randomUUID(),
+				organizationId: workspaceId,
+				userId: firstId,
+				role: "owner",
+				createdAt: new Date(),
+			},
+		});
 
 		await db.member.update({
 			where: {

@@ -10,7 +10,6 @@ import {
 } from "@crm/db";
 import { PRIORITY, queueAgentTask } from "@crm/db/agent-tasks";
 import { isCurrencyCode, normalizeCurrency } from "@crm/db/currency";
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import {
 	ACQUISITION_PROFILE_SELECT,
@@ -20,6 +19,7 @@ import {
 } from "../lib/acquisition-profile";
 import { sensitiveWrite } from "../lib/approval";
 import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
+import { defineTool } from "../lib/tool";
 
 const list = z.array(z.string().trim().min(1).max(80)).max(25).optional();
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);

@@ -1,9 +1,9 @@
+import { isDossierReady } from "@crm/db/acquisition";
 import {
 	AcquisitionAssetPreference,
 	AcquisitionOwnerInvolvement,
 	AcquisitionRevenuePreference,
 } from "@crm/db/enums";
-import { isDossierReady } from "@crm/db/acquisition";
 import { formatMoneyCompact } from "@crm/ui/lib/format";
 import type { RouterOutputs } from "@/lib/trpc/types";
 
@@ -398,7 +398,8 @@ export function buyBoxSummaryLines(profile: Profile): BuyBoxSummaryLine[] {
 		profile.purchasePriceMaxCents,
 		currency,
 	);
-	if (purchasePrice) lines.push({ label: "Purchase price", value: purchasePrice });
+	if (purchasePrice)
+		lines.push({ label: "Purchase price", value: purchasePrice });
 
 	if (profile.ownerInvolvement) {
 		lines.push({
@@ -469,5 +470,8 @@ function formatMoneyRange(
 	if (minimum !== null) {
 		return `${formatMoneyCompact(minimum, currency)}+`;
 	}
-	return `Up to ${formatMoneyCompact(maximum!, currency)}`;
+	if (maximum !== null) {
+		return `Up to ${formatMoneyCompact(maximum, currency)}`;
+	}
+	return null;
 }

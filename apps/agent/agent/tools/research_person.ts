@@ -1,6 +1,6 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { comprehensiveSearch } from "../lib/research-search";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

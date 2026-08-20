@@ -25,8 +25,8 @@ export default function TermsPage() {
 				</p>
 				<p>
 					If you use the Service on behalf of a company, you represent that you
-					have authority to bind that company, and{" "}
-					<strong>you</strong> means that company.
+					have authority to bind that company, and <strong>you</strong> means
+					that company.
 				</p>
 			</LegalSection>
 
@@ -46,21 +46,22 @@ export default function TermsPage() {
 
 			<LegalSection title="Accounts and workspaces">
 				<p>
-					You must provide accurate account information and keep your credentials
-					secure. You are responsible for activity under your account and for
-					actions taken inside workspaces where you are a member.
+					You must provide accurate account information and keep your
+					credentials secure. You are responsible for activity under your
+					account and for actions taken inside workspaces where you are a
+					member.
 				</p>
 				<p>
 					Workspace owners and administrators can manage membership, connected
-					integrations, and workspace settings. You are responsible for
-					inviting only people who should have access to your workspace data.
+					integrations, and workspace settings. You are responsible for inviting
+					only people who should have access to your workspace data.
 				</p>
 			</LegalSection>
 
 			<LegalSection title="Connected accounts">
 				<p>
-					If you connect Google or Microsoft, you authorize Vault Zero to
-					access the scopes shown during connection. For Google, that includes
+					If you connect Google or Microsoft, you authorize Vault Zero to access
+					the scopes shown during connection. For Google, that includes
 					read-only Gmail and Calendar access when you grant it. You can revoke
 					access through workspace settings or through the provider&apos;s
 					account permissions page.
@@ -107,8 +108,8 @@ export default function TermsPage() {
 					You retain ownership of the information and records you submit to the
 					Service (<strong>Customer Content</strong>). You grant Vault Zero a
 					limited licence to host, process, transmit, and display Customer
-					Content solely to provide and improve the Service, comply with law, and
-					enforce these terms.
+					Content solely to provide and improve the Service, comply with law,
+					and enforce these terms.
 				</p>
 				<p>
 					You are responsible for obtaining any rights and notices needed to
@@ -122,8 +123,8 @@ export default function TermsPage() {
 					The research agent may automatically read connected sources, run
 					external lookups, and write results into your workspace. You are
 					responsible for reviewing automated output before relying on it for
-					business decisions. The agent is designed to avoid guessing facts about
-					people, but no automated system is perfect.
+					business decisions. The agent is designed to avoid guessing facts
+					about people, but no automated system is perfect.
 				</p>
 			</LegalSection>
 
@@ -138,12 +139,12 @@ export default function TermsPage() {
 
 			<LegalSection title="Disclaimers">
 				<p>
-					THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE.&quot;
-					TO THE MAXIMUM EXTENT PERMITTED BY LAW, VAULT ZERO DISCLAIMS ALL
-					WARRANTIES, WHETHER EXPRESS OR IMPLIED, INCLUDING IMPLIED WARRANTIES
-					OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
-					NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICE WILL BE
-					UNINTERRUPTED, ERROR-FREE, OR COMPLETELY SECURE.
+					THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS
+					AVAILABLE.&quot; TO THE MAXIMUM EXTENT PERMITTED BY LAW, VAULT ZERO
+					DISCLAIMS ALL WARRANTIES, WHETHER EXPRESS OR IMPLIED, INCLUDING
+					IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+					PURPOSE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICE WILL
+					BE UNINTERRUPTED, ERROR-FREE, OR COMPLETELY SECURE.
 				</p>
 			</LegalSection>
 

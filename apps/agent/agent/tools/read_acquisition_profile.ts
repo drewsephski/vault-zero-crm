@@ -1,5 +1,4 @@
 import { db, getOrganizationId } from "@crm/db";
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import {
 	ACQUISITION_PROFILE_SELECT,
@@ -7,6 +6,7 @@ import {
 	acquisitionProfileValues,
 } from "../lib/acquisition-profile";
 import { CRM, enabled, unavailableCapability } from "../lib/capabilities";
+import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:

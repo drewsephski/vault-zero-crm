@@ -3,9 +3,9 @@
 import { WorkspaceMode } from "@crm/db/enums";
 import { useQuery } from "@tanstack/react-query";
 import { useQueryState } from "nuqs";
-import { BuyBoxSummaryAction } from "./settings/buy-box/buy-box-summary";
-import { overviewParsers } from "./overview-search-params";
 import { useTRPC } from "@/lib/trpc/client";
+import { overviewParsers } from "./overview-search-params";
+import { BuyBoxSummaryAction } from "./settings/buy-box/buy-box-summary";
 
 export function OverviewBuyBoxCtaFallback() {
 	return null;

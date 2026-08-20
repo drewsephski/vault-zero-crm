@@ -1,8 +1,8 @@
 import "@crm/env/load";
 
 import { db } from "@crm/db";
-import { getOrganizationId } from "@crm/db/tenancy";
 import { readContextDevKey } from "@crm/db/settings";
+import { getOrganizationId } from "@crm/db/tenancy";
 
 export const CONTEXT_DEV = "CONTEXT_DEV";
 export const ANYSEARCH = "ANYSEARCH_API_KEY";

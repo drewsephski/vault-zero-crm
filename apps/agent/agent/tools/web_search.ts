@@ -1,10 +1,10 @@
-import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import {
 	comprehensiveSearch,
 	type SearchIntent,
 	type SearchProvider,
 } from "../lib/research-search";
+import { defineTool } from "../lib/tool";
 
 const PROVIDERS = ["auto", "anysearch", "tavily", "context"] as const;
 
