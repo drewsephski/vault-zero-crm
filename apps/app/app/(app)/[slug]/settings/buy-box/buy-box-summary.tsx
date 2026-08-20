@@ -3,9 +3,9 @@
 import {
 	Card,
 	CardAction,
+	CardContent,
 	CardDescription,
 	CardHeader,
-	CardPanel,
 	CardTitle,
 } from "@crm/ui/components/card";
 import { Spinner } from "@crm/ui/components/spinner";
@@ -67,8 +67,8 @@ export function BuyBoxSummary({
 					</CardAction>
 				) : null}
 			</CardHeader>
-			<CardPanel className={presentation === "inline" ? "px-0" : undefined}>
-				<dl className="grid gap-3 sm:grid-cols-2">
+			<CardContent className={presentation === "inline" ? "px-0" : undefined}>
+				<dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
 					{lines.map((line) => (
 						<div key={line.label} className="min-w-0">
 							<dt className="text-muted-foreground text-xs">{line.label}</dt>
@@ -76,7 +76,7 @@ export function BuyBoxSummary({
 						</div>
 					))}
 				</dl>
-			</CardPanel>
+			</CardContent>
 		</>
 	);
 
