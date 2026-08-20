@@ -54,7 +54,7 @@ export function AcquisitionEngagementStageMenu({
 			onSuccess: async () => {
 				setPendingStage(null);
 				setClosedReason("");
-				await cache.engagement();
+				await cache.acquisitionActivity();
 			},
 			onError: (error) => toast.error(error.message),
 		}),

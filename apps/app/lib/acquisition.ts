@@ -133,6 +133,28 @@ export function legacyResearchRevisionNotice(
 	return "This research predates buy-box revision tracking. Refresh it to confirm it still matches your current criteria.";
 }
 
+export function researchHistoryPollInterval(
+	runs: readonly { status: string }[] | undefined,
+): number | false {
+	return runs?.some((run) => run.status === "RUNNING") ? 3000 : false;
+}
+
+export function researchSnapshotUnavailable(
+	status: string,
+	snapshotSummary: string | null,
+): boolean {
+	return status === "SUCCEEDED" && snapshotSummary === null;
+}
+
+export function engagementAmountComparisonNote(
+	amountCents: number | null,
+	baseAmountCents: number | null,
+): string | null {
+	return amountCents !== null && baseAmountCents === null
+		? "FX unavailable · excluded from normalized sorting"
+		: null;
+}
+
 export type TargetResearchState =
 	| {
 			status: "idle" | "queued" | "running" | "retrying";

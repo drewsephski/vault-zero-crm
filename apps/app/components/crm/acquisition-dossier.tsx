@@ -60,6 +60,8 @@ import {
 	acquisitionResearchActivity,
 	criterionGroups,
 	legacyResearchRevisionNotice,
+	researchHistoryPollInterval,
+	researchSnapshotUnavailable,
 	safeAcquisitionEvidence,
 	targetResearchCopy,
 } from "@/lib/acquisition";
@@ -94,14 +96,15 @@ export function AcquisitionDossier({
 
 	const updateStage = useMutation(
 		trpc.acquisition.updateTarget.mutationOptions({
-			onSuccess: () => cache.acquisition(company.id, { settle: "record" }),
+			onSuccess: () =>
+				cache.acquisitionActivity(company.id, { settle: "record" }),
 			onError: (error) => toast.error(error.message),
 		}),
 	);
 	const acceptRecommendedStage = useMutation(
 		trpc.acquisition.acceptRecommendedStage.mutationOptions({
 			onSuccess: () => {
-				cache.acquisition(company.id, { settle: "record" });
+				cache.acquisitionActivity(company.id, { settle: "record" });
 				toast.success("Stage recommendation applied.");
 			},
 			onError: (error) => toast.error(error.message),
@@ -110,7 +113,7 @@ export function AcquisitionDossier({
 	const dismissRecommendedStage = useMutation(
 		trpc.acquisition.dismissRecommendedStage.mutationOptions({
 			onSuccess: () => {
-				cache.acquisition(company.id, { settle: "record" });
+				cache.acquisitionActivity(company.id, { settle: "record" });
 				toast.success("Stage recommendation dismissed.");
 			},
 			onError: (error) => toast.error(error.message),
@@ -119,7 +122,7 @@ export function AcquisitionDossier({
 	const acceptRecommendedAction = useMutation(
 		trpc.acquisition.acceptRecommendedAction.mutationOptions({
 			onSuccess: () => {
-				cache.acquisition(company.id, { settle: "record" });
+				cache.acquisitionActivity(company.id, { settle: "record" });
 				toast.success("Task created from Eve recommendation.");
 			},
 			onError: (error) => toast.error(error.message),
@@ -128,7 +131,7 @@ export function AcquisitionDossier({
 	const dismissRecommendedAction = useMutation(
 		trpc.acquisition.dismissRecommendedAction.mutationOptions({
 			onSuccess: () => {
-				cache.acquisition(company.id, { settle: "record" });
+				cache.acquisitionActivity(company.id, { settle: "record" });
 				toast.success("Action recommendation dismissed.");
 			},
 			onError: (error) => toast.error(error.message),
@@ -467,14 +470,17 @@ export function AcquisitionDossier({
 function ResearchHistory({ companyId }: { companyId: string }) {
 	const trpc = useTRPC();
 	const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
-	const history = useQuery(
-		trpc.acquisition.listResearchRuns.queryOptions({ companyId, limit: 5 }),
-	);
+	const history = useQuery({
+		...trpc.acquisition.listResearchRuns.queryOptions({ companyId, limit: 5 }),
+		refetchInterval: (query) => researchHistoryPollInterval(query.state.data),
+	});
 	const expandedRun = useQuery({
 		...trpc.acquisition.getResearchRun.queryOptions({
 			id: expandedRunId ?? "",
 		}),
 		enabled: expandedRunId !== null,
+		refetchInterval: (query) =>
+			query.state.data?.status === "RUNNING" ? 3000 : false,
 	});
 	const runs = history.data ?? [];
 
@@ -498,8 +504,13 @@ function ResearchHistory({ companyId }: { companyId: string }) {
 				{runs.map((run) => {
 					const label = researchRunHistoryLabel(run);
 					const canExpand =
-						run.status === "SUCCEEDED" && run.snapshotSummary !== null;
+						run.status === "RUNNING" ||
+						(run.status === "SUCCEEDED" && run.snapshotSummary !== null);
 					const expanded = expandedRunId === run.id;
+					const snapshotUnavailable = researchSnapshotUnavailable(
+						run.status,
+						run.snapshotSummary,
+					);
 
 					return (
 						<li key={run.id} className="flex flex-col gap-2">
@@ -520,11 +531,25 @@ function ResearchHistory({ companyId }: { companyId: string }) {
 									className="h-auto justify-start px-0 text-xs"
 									onClick={() => setExpandedRunId(expanded ? null : run.id)}
 								>
-									{expanded ? "Hide snapshot" : "View snapshot"}
+									{run.status === "RUNNING"
+										? expanded
+											? "Hide status"
+											: "View status"
+										: expanded
+											? "Hide snapshot"
+											: "View snapshot"}
 								</Button>
+							) : null}
+							{snapshotUnavailable ? (
+								<span className="text-xs text-muted-foreground">
+									Snapshot unavailable
+								</span>
 							) : null}
 							{expanded && expandedRun.data?.snapshot ? (
 								<ResearchSnapshot snapshot={expandedRun.data.snapshot} />
+							) : null}
+							{expanded && expandedRun.data?.status === "RUNNING" ? (
+								<DetailSheetProse>Research is still running…</DetailSheetProse>
 							) : null}
 						</li>
 					);

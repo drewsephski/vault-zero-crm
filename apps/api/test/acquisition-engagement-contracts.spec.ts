@@ -1,9 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { AcquisitionEngagementStage } from "@crm/db";
 import {
+	createAcquisitionEngagementInput,
 	listAcquisitionEngagementsInput,
+	updateAcquisitionEngagementInput,
 	updateAcquisitionEngagementStageInput,
 } from "../src/acquisition/acquisition-engagements.contracts";
+import { MAX_AMOUNT_CENTS } from "../src/deals/deals.contracts";
 
 describe("acquisition engagement contracts", () => {
 	it("rejects unknown list filters", () => {
@@ -29,5 +32,37 @@ describe("acquisition engagement contracts", () => {
 				closedReason: "Seller expectations exceed the buy box.",
 			}).success,
 		).toBe(true);
+	});
+
+	it("rejects engagement amounts above the storage-safe maximum", () => {
+		const create = {
+			companyId: "company-1",
+			idempotencyKey: "123e4567-e89b-42d3-a456-426614174000",
+		};
+
+		expect(
+			createAcquisitionEngagementInput.safeParse({
+				...create,
+				amountCents: MAX_AMOUNT_CENTS,
+			}).success,
+		).toBe(true);
+		expect(
+			createAcquisitionEngagementInput.safeParse({
+				...create,
+				amountCents: MAX_AMOUNT_CENTS + 1,
+			}).success,
+		).toBe(false);
+		expect(
+			updateAcquisitionEngagementInput.safeParse({
+				engagementId: "engagement-1",
+				amountCents: MAX_AMOUNT_CENTS,
+			}).success,
+		).toBe(true);
+		expect(
+			updateAcquisitionEngagementInput.safeParse({
+				engagementId: "engagement-1",
+				amountCents: MAX_AMOUNT_CENTS + 1,
+			}).success,
+		).toBe(false);
 	});
 });

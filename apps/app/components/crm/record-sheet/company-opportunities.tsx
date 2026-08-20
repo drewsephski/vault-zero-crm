@@ -30,6 +30,7 @@ import {
 	DetailSheetProperties,
 	DetailSheetSection,
 } from "@/components/detail-sheet";
+import { engagementAmountComparisonNote } from "@/lib/acquisition";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
@@ -59,6 +60,10 @@ const CURRENCY_OPTIONS = CURRENCIES.map((currency) => ({
 }));
 
 function EngagementRowCells({ engagement }: { engagement: EngagementRow }) {
+	const comparisonNote = engagementAmountComparisonNote(
+		engagement.amountCents,
+		engagement.baseAmountCents,
+	);
 	return (
 		<>
 			<TableCell className="px-3 py-2.5 pl-5">
@@ -75,8 +80,15 @@ function EngagementRowCells({ engagement }: { engagement: EngagementRow }) {
 				{engagement.amountCents === null ? (
 					<EmptyCellValue />
 				) : (
-					<span className="tabular-nums">
-						{formatMoney(engagement.amountCents, engagement.currency)}
+					<span className="flex flex-col items-end">
+						<span className="tabular-nums">
+							{formatMoney(engagement.amountCents, engagement.currency)}
+						</span>
+						{comparisonNote ? (
+							<span className="text-xs text-muted-foreground">
+								{comparisonNote}
+							</span>
+						) : null}
 					</span>
 				)}
 			</TableCell>
@@ -126,7 +138,7 @@ export function CompanyOpportunities({ company }: { company: Company }) {
 	const create = useMutation(
 		trpc.acquisition.createEngagement.mutationOptions({
 			onSuccess: async () => {
-				await cache.engagement(company.id);
+				await cache.acquisitionActivity(company.id);
 				toast.success("Opportunity opened.");
 				idempotencyKey.current = crypto.randomUUID();
 			},

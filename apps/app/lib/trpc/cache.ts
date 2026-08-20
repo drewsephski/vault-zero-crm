@@ -14,6 +14,7 @@ type RemovedRecord = { kind: "company" | "contact" | "deal"; id: string };
 export type CrmCache = {
 	company(id?: string, options?: Options): Promise<void>;
 	acquisition(companyId?: string, options?: Options): Promise<void>;
+	acquisitionActivity(companyId?: string, options?: Options): Promise<void>;
 	engagement(companyId?: string, options?: Options): Promise<void>;
 	contact(id?: string, options?: Options): Promise<void>;
 	deal(id?: string, options?: Options): Promise<void>;
@@ -93,6 +94,26 @@ export function useCrmCache(): CrmCache {
 					trpc.acquisition.listResearchRuns.queryKey(
 						companyId ? { companyId } : undefined,
 					),
+				],
+				[
+					trpc.companies.list.queryKey(),
+					trpc.acquisition.listEngagements.queryKey(),
+					trpc.acquisition.engagementTargetOptions.queryKey(),
+					trpc.dashboard.summary.queryKey(),
+				],
+				options,
+			),
+
+		acquisitionActivity: (companyId, options) =>
+			run(
+				[
+					companyId
+						? trpc.companies.byId.queryKey({ id: companyId })
+						: trpc.companies.byId.queryKey(),
+					trpc.acquisition.listResearchRuns.queryKey(
+						companyId ? { companyId } : undefined,
+					),
+					...activityKeys(),
 				],
 				[
 					trpc.companies.list.queryKey(),

@@ -158,12 +158,12 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 					description={fitDescription}
 				/>
 				<StatCard
-					label="Needs research"
+					label="Workspace needs research"
 					value={acquisition.needsResearch}
 					description={
 						acquisition.activeAgentWork > 0
-							? `${formatCount(acquisition.activeAgentWork, "Eve task")} queued or running`
-							: "Targets without a completed research pass"
+							? `${formatCount(acquisition.activeAgentWork, "workspace Eve task")} queued or running`
+							: "Workspace targets without a completed research pass"
 					}
 				/>
 				<StatCard
@@ -260,7 +260,7 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 
 				<Card className="min-w-0">
 					<CardHeader>
-						<CardTitle>Discovery review</CardTitle>
+						<CardTitle>Workspace discovery review</CardTitle>
 						<CardDescription>
 							{acquisition.discovery.count === 0
 								? "Eve saves credible companies here before they enter the CRM"

@@ -44,7 +44,7 @@ export function TargetOpportunitySection({ company }: { company: Company }) {
 	const create = useMutation(
 		trpc.acquisition.createEngagement.mutationOptions({
 			onSuccess: async () => {
-				await cache.engagement(company.id);
+				await cache.acquisitionActivity(company.id);
 				toast.success("Opportunity opened.");
 				idempotencyKey.current = crypto.randomUUID();
 			},

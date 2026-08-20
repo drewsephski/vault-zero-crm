@@ -84,7 +84,7 @@ function CreateEngagementForm({ companyId }: { companyId?: string }) {
 	const create = useMutation(
 		trpc.acquisition.createEngagement.mutationOptions({
 			onSuccess: async (engagement) => {
-				await cache.engagement(engagement.companyId);
+				await cache.acquisitionActivity(engagement.companyId);
 				toast.success("Opportunity opened.");
 				await setOpen(null);
 				setCompany(companyId ?? UNSET);

@@ -6,7 +6,10 @@ import {
 	acquisitionTargetCreateSubmission,
 	criterionGroups,
 	defaultCompanyTab,
+	engagementAmountComparisonNote,
 	legacyResearchRevisionNotice,
+	researchHistoryPollInterval,
+	researchSnapshotUnavailable,
 	safeAcquisitionCandidateSource,
 	safeAcquisitionEvidence,
 	targetResearchCopy,
@@ -188,5 +191,29 @@ describe("acquisition presentation", () => {
 		expect(
 			legacyResearchRevisionNotice("current", "2026-01-01T00:00:00.000Z"),
 		).toBeNull();
+	});
+
+	it("polls research history only while a run is active", () => {
+		expect(researchHistoryPollInterval(undefined)).toBe(false);
+		expect(researchHistoryPollInterval([])).toBe(false);
+		expect(researchHistoryPollInterval([{ status: "FAILED" }])).toBe(false);
+		expect(researchHistoryPollInterval([{ status: "SUCCEEDED" }])).toBe(false);
+		expect(researchHistoryPollInterval([{ status: "RUNNING" }])).toBe(3000);
+	});
+
+	it("marks malformed successful research snapshots unavailable", () => {
+		expect(researchSnapshotUnavailable("SUCCEEDED", null)).toBe(true);
+		expect(researchSnapshotUnavailable("SUCCEEDED", "Valid summary")).toBe(
+			false,
+		);
+		expect(researchSnapshotUnavailable("FAILED", null)).toBe(false);
+	});
+
+	it("discloses acquisition amounts excluded from normalized sorting", () => {
+		expect(engagementAmountComparisonNote(null, null)).toBeNull();
+		expect(engagementAmountComparisonNote(10_000, 10_000)).toBeNull();
+		expect(engagementAmountComparisonNote(10_000, null)).toBe(
+			"FX unavailable · excluded from normalized sorting",
+		);
 	});
 });

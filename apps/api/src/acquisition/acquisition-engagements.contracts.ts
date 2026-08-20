@@ -4,13 +4,22 @@ import {
 } from "@crm/db";
 import { isCurrencyCode, normalizeCurrency } from "@crm/db/currency";
 import { z } from "zod";
+import { MAX_AMOUNT_CENTS } from "../deals/deals.contracts";
 import { listInput } from "../trpc/list-input";
+
+const amountCents = z
+	.number()
+	.int()
+	.nonnegative()
+	.max(MAX_AMOUNT_CENTS, "That amount is too large to record.")
+	.nullable()
+	.optional();
 
 export const createAcquisitionEngagementInput = z.object({
 	companyId: z.string().min(1),
 	idempotencyKey: z.string().uuid(),
 	ownerId: z.string().min(1).nullable().optional(),
-	amountCents: z.number().int().nonnegative().nullable().optional(),
+	amountCents,
 	currency: z
 		.string()
 		.trim()
@@ -68,7 +77,7 @@ export const updateAcquisitionEngagementStageInput = z
 export const updateAcquisitionEngagementInput = z.object({
 	engagementId: z.string().min(1),
 	ownerId: z.string().min(1).nullable().optional(),
-	amountCents: z.number().int().nonnegative().nullable().optional(),
+	amountCents,
 	currency: z
 		.string()
 		.trim()

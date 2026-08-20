@@ -20,6 +20,7 @@ import { usePrefetchRecord } from "@/components/crm/record-sheet/record-prefetch
 import { useOpenRecord } from "@/components/crm/record-sheet/record-stack";
 import { ListSearch } from "@/components/data-table/list-search";
 import { useTableQuery } from "@/components/data-table/use-table-query";
+import { engagementAmountComparisonNote } from "@/lib/acquisition";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
@@ -76,14 +77,26 @@ const COLUMNS: DataTableColumn<EngagementRow>[] = [
 		align: "right",
 		width: "w-[12%]",
 		hideBelow: "sm",
-		cell: (row) =>
-			row.amountCents === null ? (
+		cell: (row) => {
+			const comparisonNote = engagementAmountComparisonNote(
+				row.amountCents,
+				row.baseAmountCents,
+			);
+			return row.amountCents === null ? (
 				<EmptyCellValue />
 			) : (
-				<span className="tabular-nums">
-					{formatMoney(row.amountCents, row.currency)}
+				<span className="flex flex-col items-end">
+					<span className="tabular-nums">
+						{formatMoney(row.amountCents, row.currency)}
+					</span>
+					{comparisonNote ? (
+						<span className="text-xs text-muted-foreground">
+							{comparisonNote}
+						</span>
+					) : null}
 				</span>
-			),
+			);
+		},
 	},
 	{
 		id: "expectedCloseDate",

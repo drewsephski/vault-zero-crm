@@ -207,6 +207,40 @@ describe("acquisition research run read API", () => {
 		});
 	});
 
+	it("keeps malformed historical runs visible with an unavailable snapshot", async () => {
+		const domain = `research-run-malformed-${crypto.randomUUID()}.test`;
+		const companyId = await createTarget(domain);
+		const run = await db.acquisitionResearchRun.create({
+			data: {
+				organizationId: WORKSPACE_ID,
+				companyId,
+				kind: "acquisition-refresh",
+				agentTaskId: `task-malformed-${crypto.randomUUID()}`,
+				status: AcquisitionResearchRunStatus.SUCCEEDED,
+				dossierSnapshot: {
+					fit: "GOOD",
+					summary: "Legacy malformed snapshot",
+				},
+			},
+		});
+
+		const rows = await runInOrganization(WORKSPACE_ID, () =>
+			service().listResearchRuns({ companyId }),
+		);
+		const detail = await runInOrganization(WORKSPACE_ID, () =>
+			service().getResearchRun({ id: run.id }),
+		);
+
+		expect(rows).toHaveLength(1);
+		expect(rows[0]).toMatchObject({
+			id: run.id,
+			status: AcquisitionResearchRunStatus.SUCCEEDED,
+			snapshotFit: null,
+			snapshotSummary: null,
+		});
+		expect(detail.snapshot).toBeNull();
+	});
+
 	it("scopes listResearchRuns to the active organization", async () => {
 		const domain = `research-runs-tenant-${crypto.randomUUID()}.test`;
 		let companyId = "";
