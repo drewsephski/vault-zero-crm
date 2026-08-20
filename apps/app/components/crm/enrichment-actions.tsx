@@ -11,12 +11,11 @@ import {
 	TooltipTrigger,
 } from "@crm/ui/components/tooltip";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import { toast } from "sonner";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
-import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 import { acquisitionProfileDossierReady } from "@/lib/acquisition";
+import { BuyBoxSetupButton } from "@/app/(app)/[slug]/settings/buy-box/buy-box-dialog";
 import type { EnrichmentActivity } from "./enrichment-status";
 
 export function EnrichmentActions({
@@ -34,7 +33,6 @@ export function EnrichmentActions({
 }) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
-	const workspaceUrl = useWorkspaceUrl();
 	const acquisitionProfile = useQuery({
 		...trpc.workspace.acquisitionProfile.queryOptions(),
 		enabled: acquisition,
@@ -115,15 +113,15 @@ export function EnrichmentActions({
 			{researchBlocked ? (
 				<Tooltip>
 					<TooltipTrigger asChild>
-						<Button size="sm" asChild>
-							<Link
-								href={workspaceUrl("/settings/buy-box")}
+						<span>
+							<BuyBoxSetupButton
+								size="sm"
 								aria-label="Set buy box before analyzing fit"
 							>
 								<Icon icon={MagicWand} data-icon="inline-start" />
 								<span className="hidden sm:inline">Set buy box</span>
-							</Link>
-						</Button>
+							</BuyBoxSetupButton>
+						</span>
 					</TooltipTrigger>
 					<TooltipContent>
 						Add at least one buy-box criterion before Eve analyzes acquisition fit.

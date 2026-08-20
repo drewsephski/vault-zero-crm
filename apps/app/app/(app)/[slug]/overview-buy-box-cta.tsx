@@ -3,7 +3,7 @@
 import { WorkspaceMode } from "@crm/db/enums";
 import { useQuery } from "@tanstack/react-query";
 import { useQueryState } from "nuqs";
-import { BuyBoxSetupButton } from "./settings/buy-box/buy-box-dialog";
+import { BuyBoxSummaryAction } from "./settings/buy-box/buy-box-summary";
 import { overviewParsers } from "./overview-search-params";
 import { useTRPC } from "@/lib/trpc/client";
 
@@ -16,12 +16,9 @@ export function OverviewBuyBoxCta() {
 	const [scope] = useQueryState("scope", overviewParsers.scope);
 	const summary = useQuery(trpc.dashboard.summary.queryOptions({ scope }));
 
-	if (
-		summary.data?.mode !== WorkspaceMode.ACQUISITION ||
-		summary.data.acquisition.visibleMatches !== null
-	) {
+	if (summary.data?.mode !== WorkspaceMode.ACQUISITION) {
 		return null;
 	}
 
-	return <BuyBoxSetupButton size="sm" />;
+	return <BuyBoxSummaryAction />;
 }

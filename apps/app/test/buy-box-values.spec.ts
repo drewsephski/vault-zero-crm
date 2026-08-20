@@ -2,6 +2,10 @@ import { describe, expect, it } from "bun:test";
 import {
 	appendListValues,
 	type BuyBoxDraft,
+	buyBoxIsConfigured,
+	buyBoxMutationPayload,
+	buyBoxSummaryLines,
+	emptyBuyBoxDraft,
 	listValues,
 	moneyCents,
 	moneySliderDraft,
@@ -97,5 +101,59 @@ describe("buy box values", () => {
 		).toMatchObject({
 			preferredIndustries: "Preferred industries can include up to 25 items.",
 		});
+	});
+
+	it("builds mutation payloads and empty drafts", () => {
+		expect(buyBoxMutationPayload(draft)).toMatchObject({
+			preferredIndustries: ["HVAC"],
+			geographies: ["Texas"],
+			revenueMinCents: 100_000_000,
+			customerConcentrationMax: 20,
+			financingAssumptions: "SBA with a seller note.",
+		});
+		expect(emptyBuyBoxDraft("USD")).toMatchObject({
+			preferredIndustries: "",
+			currency: "USD",
+			ownerInvolvement: null,
+		});
+	});
+
+	it("detects configured profiles and formats summary lines", () => {
+		const profile = {
+			mode: "ACQUISITION" as const,
+			preferredIndustries: ["HVAC", "Plumbing"],
+			geographies: ["Texas"],
+			excludedCategories: [] as string[],
+			currency: "USD",
+			revenueMinCents: 1_000_000_00,
+			revenueMaxCents: 5_000_000_00,
+			ebitdaMinCents: null,
+			ebitdaMaxCents: null,
+			purchasePriceMinCents: null,
+			purchasePriceMaxCents: null,
+			ownerInvolvement: null,
+			recurringRevenuePreference: null,
+			customerConcentrationMax: null,
+			assetPreference: null,
+			financingAssumptions: null,
+			updatedAt: null,
+			canManage: true,
+		};
+
+		expect(buyBoxIsConfigured(profile)).toBe(true);
+		expect(buyBoxSummaryLines(profile)).toEqual([
+			{ label: "Industries", value: "HVAC, Plumbing" },
+			{ label: "Geography", value: "Texas" },
+			{ label: "Annual revenue", value: "$1M–$5M" },
+		]);
+		expect(
+			buyBoxIsConfigured({
+				...profile,
+				preferredIndustries: [],
+				geographies: [],
+				revenueMinCents: null,
+				revenueMaxCents: null,
+			}),
+		).toBe(false);
 	});
 });

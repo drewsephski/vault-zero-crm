@@ -33,6 +33,7 @@ import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
 import { BuyBoxSetupButton } from "./settings/buy-box/buy-box-dialog";
+import { BuyBoxSummary } from "./settings/buy-box/buy-box-summary";
 import { AcquisitionEngagementStageIndicator } from "@/components/crm/acquisition-engagement-stage";
 import {
 	AcquisitionFitIndicator,
@@ -145,7 +146,7 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 
 	const fitDescription =
 		acquisition.visibleMatches === null
-			? "Add industry or geography criteria to compare targets"
+			? "Add criteria to compare targets against your buy box"
 			: `${formatCount(acquisition.visibleMatches, "target")} have an evidence-backed strong or potential fit`;
 
 	return (
@@ -185,14 +186,16 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 				<Alert>
 					<AlertTitle>Finish the buy box</AlertTitle>
 					<AlertDescription>
-						Add an industry, geography, or exclusion before the dashboard
-						screens targets against your criteria.
+						Add industries, geographies, financial ranges, or other criteria
+						before the dashboard screens targets against your preferences.
 					</AlertDescription>
 					<AlertAction>
 						<BuyBoxSetupButton />
 					</AlertAction>
 				</Alert>
-			) : null}
+			) : (
+				<BuyBoxSummary />
+			)}
 
 			<div className="grid gap-6 @5xl/acquisition-dashboard:grid-cols-2">
 				<Card className="min-w-0">

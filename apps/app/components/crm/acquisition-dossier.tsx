@@ -31,7 +31,6 @@ import {
 } from "@crm/ui/components/tooltip";
 import { relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -65,7 +64,7 @@ import {
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
-import { useWorkspaceUrl } from "@/lib/use-workspace-url";
+import { BuyBoxSetupButton } from "@/app/(app)/[slug]/settings/buy-box/buy-box-dialog";
 
 type Company = RouterOutputs["companies"]["byId"];
 type Target = NonNullable<Company["acquisitionTarget"]>;
@@ -87,7 +86,6 @@ export function AcquisitionDossier({
 }) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
-	const workspaceUrl = useWorkspaceUrl();
 	const target = company.acquisitionTarget;
 	const acquisitionProfile = useQuery(
 		trpc.workspace.acquisitionProfile.queryOptions(),
@@ -249,7 +247,6 @@ export function AcquisitionDossier({
 							<AlertAction>
 								<ResearchAction
 									action={researchCopy.action}
-									buyBoxHref={workspaceUrl("/settings/buy-box")}
 									pending={research.isPending}
 									onAddDomain={onAddDomain}
 									onRetry={() => research.mutate({ id: company.id })}
@@ -266,7 +263,6 @@ export function AcquisitionDossier({
 						<AlertAction>
 							<ResearchAction
 								action={readinessCopy.action}
-								buyBoxHref={workspaceUrl("/settings/buy-box")}
 								pending={research.isPending}
 								onAddDomain={onAddDomain}
 								onRetry={() => research.mutate({ id: company.id })}
@@ -688,22 +684,20 @@ function AcquisitionFindings({
 
 function ResearchAction({
 	action,
-	buyBoxHref,
 	pending,
 	onAddDomain,
 	onRetry,
 }: {
 	action: NonNullable<ReturnType<typeof targetResearchCopy>["action"]>;
-	buyBoxHref: string;
 	pending: boolean;
 	onAddDomain: () => void;
 	onRetry: () => void;
 }) {
 	if (action.kind === "buy-box") {
 		return (
-			<Button asChild variant="outline" size="sm">
-				<Link href={buyBoxHref}>{action.label}</Link>
-			</Button>
+			<BuyBoxSetupButton variant="outline" size="sm">
+				{action.label}
+			</BuyBoxSetupButton>
 		);
 	}
 

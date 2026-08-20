@@ -13,6 +13,7 @@ import { requireSession } from "@/lib/session";
 import { HydrateClient } from "@/lib/trpc/hydrate";
 import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { BuyBoxForm } from "./buy-box-form";
+import { BuyBoxSummary } from "./buy-box-summary";
 
 export const metadata: Metadata = {
 	title: "Buy box",
@@ -53,6 +54,7 @@ async function BuyBoxSettings() {
 	return (
 		<HydrateClient>
 			<div className="flex max-w-3xl flex-col gap-6">
+				<BuyBoxSummary showEdit={false} />
 				<BuyBoxForm />
 			</div>
 		</HydrateClient>

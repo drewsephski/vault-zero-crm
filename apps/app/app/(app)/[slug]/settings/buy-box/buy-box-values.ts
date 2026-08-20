@@ -1,6 +1,36 @@
+import {
+	AcquisitionAssetPreference,
+	AcquisitionOwnerInvolvement,
+	AcquisitionRevenuePreference,
+} from "@crm/db/enums";
+import { isDossierReady } from "@crm/db/acquisition";
+import { formatMoneyCompact } from "@crm/ui/lib/format";
 import type { RouterOutputs } from "@/lib/trpc/types";
 
 type Profile = RouterOutputs["workspace"]["acquisitionProfile"];
+
+export type BuyBoxMutationInput = {
+	preferredIndustries: string[];
+	geographies: string[];
+	excludedCategories: string[];
+	currency: string;
+	revenueMinCents: number | null;
+	revenueMaxCents: number | null;
+	ebitdaMinCents: number | null;
+	ebitdaMaxCents: number | null;
+	purchasePriceMinCents: number | null;
+	purchasePriceMaxCents: number | null;
+	ownerInvolvement: Profile["ownerInvolvement"];
+	recurringRevenuePreference: Profile["recurringRevenuePreference"];
+	customerConcentrationMax: number | null;
+	assetPreference: Profile["assetPreference"];
+	financingAssumptions: string | null;
+};
+
+export type BuyBoxSummaryLine = {
+	label: string;
+	value: string;
+};
 
 export type BuyBoxDraft = {
 	preferredIndustries: string;
@@ -265,4 +295,179 @@ export function errorsForStep(
 	return Object.fromEntries(
 		fields.flatMap((field) => (errors[field] ? [[field, errors[field]]] : [])),
 	) as BuyBoxErrors;
+}
+
+export function buyBoxIsConfigured(profile: Profile): boolean {
+	return isDossierReady({
+		preferredIndustries: profile.preferredIndustries,
+		geographies: profile.geographies,
+		excludedCategories: profile.excludedCategories,
+		revenueMin: profile.revenueMinCents,
+		revenueMax: profile.revenueMaxCents,
+		ebitdaMin: profile.ebitdaMinCents,
+		ebitdaMax: profile.ebitdaMaxCents,
+		purchasePriceMin: profile.purchasePriceMinCents,
+		purchasePriceMax: profile.purchasePriceMaxCents,
+		ownerInvolvement: profile.ownerInvolvement,
+		recurringRevenuePreference: profile.recurringRevenuePreference,
+		customerConcentrationMax: profile.customerConcentrationMax,
+		assetPreference: profile.assetPreference,
+		financingAssumptions: profile.financingAssumptions,
+	});
+}
+
+export function emptyBuyBoxDraft(currency: string): BuyBoxDraft {
+	return {
+		preferredIndustries: "",
+		geographies: "",
+		excludedCategories: "",
+		currency,
+		revenueMin: "",
+		revenueMax: "",
+		ebitdaMin: "",
+		ebitdaMax: "",
+		purchasePriceMin: "",
+		purchasePriceMax: "",
+		ownerInvolvement: null,
+		recurringRevenuePreference: null,
+		customerConcentrationMax: "",
+		assetPreference: null,
+		financingAssumptions: "",
+	};
+}
+
+export function buyBoxMutationPayload(draft: BuyBoxDraft): BuyBoxMutationInput {
+	return {
+		preferredIndustries: listValues(draft.preferredIndustries),
+		geographies: listValues(draft.geographies),
+		excludedCategories: listValues(draft.excludedCategories),
+		currency: draft.currency,
+		revenueMinCents: moneyCents(draft.revenueMin),
+		revenueMaxCents: moneyCents(draft.revenueMax),
+		ebitdaMinCents: moneyCents(draft.ebitdaMin),
+		ebitdaMaxCents: moneyCents(draft.ebitdaMax),
+		purchasePriceMinCents: moneyCents(draft.purchasePriceMin),
+		purchasePriceMaxCents: moneyCents(draft.purchasePriceMax),
+		ownerInvolvement: draft.ownerInvolvement,
+		recurringRevenuePreference: draft.recurringRevenuePreference,
+		customerConcentrationMax: percentage(draft.customerConcentrationMax),
+		assetPreference: draft.assetPreference,
+		financingAssumptions: draft.financingAssumptions.trim() || null,
+	};
+}
+
+export function buyBoxSummaryLines(profile: Profile): BuyBoxSummaryLine[] {
+	const lines: BuyBoxSummaryLine[] = [];
+	const currency = profile.currency.toLowerCase();
+
+	if (profile.preferredIndustries.length > 0) {
+		lines.push({
+			label: "Industries",
+			value: formatListSummary(profile.preferredIndustries),
+		});
+	}
+	if (profile.geographies.length > 0) {
+		lines.push({
+			label: "Geography",
+			value: formatListSummary(profile.geographies),
+		});
+	}
+	if (profile.excludedCategories.length > 0) {
+		lines.push({
+			label: "Exclusions",
+			value: formatListSummary(profile.excludedCategories),
+		});
+	}
+
+	const revenue = formatMoneyRange(
+		profile.revenueMinCents,
+		profile.revenueMaxCents,
+		currency,
+	);
+	if (revenue) lines.push({ label: "Annual revenue", value: revenue });
+
+	const ebitda = formatMoneyRange(
+		profile.ebitdaMinCents,
+		profile.ebitdaMaxCents,
+		currency,
+	);
+	if (ebitda) lines.push({ label: "EBITDA or SDE", value: ebitda });
+
+	const purchasePrice = formatMoneyRange(
+		profile.purchasePriceMinCents,
+		profile.purchasePriceMaxCents,
+		currency,
+	);
+	if (purchasePrice) lines.push({ label: "Purchase price", value: purchasePrice });
+
+	if (profile.ownerInvolvement) {
+		lines.push({
+			label: "Owner involvement",
+			value: OWNER_INVOLVEMENT_LABELS[profile.ownerInvolvement],
+		});
+	}
+	if (profile.recurringRevenuePreference) {
+		lines.push({
+			label: "Recurring revenue",
+			value: RECURRING_REVENUE_LABELS[profile.recurringRevenuePreference],
+		});
+	}
+	if (profile.customerConcentrationMax !== null) {
+		lines.push({
+			label: "Max customer concentration",
+			value: `${profile.customerConcentrationMax}%`,
+		});
+	}
+	if (profile.assetPreference) {
+		lines.push({
+			label: "Asset profile",
+			value: ASSET_PREFERENCE_LABELS[profile.assetPreference],
+		});
+	}
+	if (profile.financingAssumptions?.trim()) {
+		lines.push({
+			label: "Financing",
+			value: profile.financingAssumptions.trim(),
+		});
+	}
+
+	return lines;
+}
+
+const OWNER_INVOLVEMENT_LABELS = {
+	[AcquisitionOwnerInvolvement.PASSIVE]: "Manager-run",
+	[AcquisitionOwnerInvolvement.TRANSITIONAL]: "Transition period",
+	[AcquisitionOwnerInvolvement.OPERATOR]: "Buyer-operated",
+} as const;
+
+const RECURRING_REVENUE_LABELS = {
+	[AcquisitionRevenuePreference.REQUIRED]: "Required",
+	[AcquisitionRevenuePreference.PREFERRED]: "Preferred",
+	[AcquisitionRevenuePreference.OPTIONAL]: "Not required",
+} as const;
+
+const ASSET_PREFERENCE_LABELS = {
+	[AcquisitionAssetPreference.ASSET_LIGHT]: "Asset-light",
+	[AcquisitionAssetPreference.BALANCED]: "Balanced",
+	[AcquisitionAssetPreference.ASSET_HEAVY]: "Asset-heavy",
+} as const;
+
+function formatListSummary(values: readonly string[]): string {
+	if (values.length <= 3) return values.join(", ");
+	return `${values.slice(0, 3).join(", ")} +${values.length - 3} more`;
+}
+
+function formatMoneyRange(
+	minimum: number | null,
+	maximum: number | null,
+	currency: string,
+): string | null {
+	if (minimum === null && maximum === null) return null;
+	if (minimum !== null && maximum !== null) {
+		return `${formatMoneyCompact(minimum, currency)}–${formatMoneyCompact(maximum, currency)}`;
+	}
+	if (minimum !== null) {
+		return `${formatMoneyCompact(minimum, currency)}+`;
+	}
+	return `Up to ${formatMoneyCompact(maximum!, currency)}`;
 }

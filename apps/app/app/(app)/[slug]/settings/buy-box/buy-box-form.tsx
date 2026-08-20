@@ -37,14 +37,14 @@ import {
 	type BuyBoxDraft,
 	type BuyBoxErrors,
 	type BuyBoxField,
+	buyBoxIsConfigured,
+	buyBoxMutationPayload,
 	errorsForStep,
-	listValues,
-	moneyCents,
-	percentage,
 	profileDraft,
 	stepDescription,
 	validateBuyBoxDraft,
 } from "./buy-box-values";
+import { BuyBoxClearDialog } from "./buy-box-clear-dialog";
 
 type BuyBoxFormProps = {
 	presentation?: "card" | "inline";
@@ -148,23 +148,7 @@ export function BuyBoxForm({
 			return;
 		}
 
-		save.mutate({
-			preferredIndustries: listValues(values.preferredIndustries),
-			geographies: listValues(values.geographies),
-			excludedCategories: listValues(values.excludedCategories),
-			currency: values.currency,
-			revenueMinCents: moneyCents(values.revenueMin),
-			revenueMaxCents: moneyCents(values.revenueMax),
-			ebitdaMinCents: moneyCents(values.ebitdaMin),
-			ebitdaMaxCents: moneyCents(values.ebitdaMax),
-			purchasePriceMinCents: moneyCents(values.purchasePriceMin),
-			purchasePriceMaxCents: moneyCents(values.purchasePriceMax),
-			ownerInvolvement: values.ownerInvolvement,
-			recurringRevenuePreference: values.recurringRevenuePreference,
-			customerConcentrationMax: percentage(values.customerConcentrationMax),
-			assetPreference: values.assetPreference,
-			financingAssumptions: values.financingAssumptions.trim() || null,
-		});
+		save.mutate(buyBoxMutationPayload(values));
 	};
 
 	const form = (
@@ -188,17 +172,20 @@ export function BuyBoxForm({
 			<CardContent className={presentation === "inline" ? "px-0" : undefined}>
 					<ol aria-label="Buy box progress" className="grid grid-cols-4 gap-2">
 						{BUY_BOX_STEPS.map((label, index) => (
-							<li
-								key={label}
-								aria-current={index === step ? "step" : undefined}
-								className={
-									index === step
-										? "border-primary border-t-2 pt-2 text-center font-medium text-xs"
-										: "border-t pt-2 text-center text-muted-foreground text-xs"
-								}
-							>
-								<span className="hidden sm:inline">{label}</span>
-								<span className="sm:hidden">{index + 1}</span>
+							<li key={label} aria-current={index === step ? "step" : undefined}>
+								<button
+									type="button"
+									disabled={!canManage}
+									onClick={() => setStep(index)}
+									className={
+										index === step
+											? "w-full border-primary border-t-2 pt-2 text-center font-medium text-xs"
+											: "w-full border-t pt-2 text-center text-muted-foreground text-xs hover:text-foreground disabled:pointer-events-none"
+									}
+								>
+									<span className="hidden sm:inline">{label}</span>
+									<span className="sm:hidden">{index + 1}</span>
+								</button>
 							</li>
 						))}
 					</ol>
@@ -237,14 +224,30 @@ export function BuyBoxForm({
 			</CardContent>
 			<CardFooter className={presentation === "inline" ? "px-0" : undefined}>
 				<div className="flex w-full items-center justify-between gap-3">
-					<Button
-						type="button"
-						variant="outline"
-						disabled={step === 0 || save.isPending}
-						onClick={() => setStep((current) => Math.max(0, current - 1))}
-					>
-						Back
-					</Button>
+					<span className="flex items-center gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							disabled={step === 0 || save.isPending}
+							onClick={() => setStep((current) => Math.max(0, current - 1))}
+						>
+							Back
+						</Button>
+						{buyBoxIsConfigured(profile.data) && canManage ? (
+							<BuyBoxClearDialog
+								currency={profile.data.currency}
+								variant="ghost"
+								size="sm"
+								onCleared={() => {
+									setDraft(null);
+									setErrors({});
+									setStep(0);
+								}}
+							>
+								Clear
+							</BuyBoxClearDialog>
+						) : null}
+					</span>
 					<span className="text-muted-foreground text-xs" aria-live="polite">
 						{BUY_BOX_STEPS[step]}
 					</span>

@@ -8,7 +8,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@crm/ui/components/dialog";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { useState } from "react";
 import { BuyBoxForm } from "./buy-box-form";
 
@@ -45,7 +45,7 @@ export function BuyBoxSetupButton({
 	size = "sm",
 	...props
 }: Omit<ComponentProps<typeof Button>, "onClick"> & {
-	children?: string;
+	children?: ReactNode;
 }) {
 	const [open, setOpen] = useState(false);
 
@@ -57,4 +57,13 @@ export function BuyBoxSetupButton({
 			<BuyBoxDialog open={open} onOpenChange={setOpen} />
 		</>
 	);
+}
+
+export function useBuyBoxDialog() {
+	const [open, setOpen] = useState(false);
+	return {
+		open,
+		setOpen,
+		dialog: <BuyBoxDialog open={open} onOpenChange={setOpen} />,
+	};
 }
