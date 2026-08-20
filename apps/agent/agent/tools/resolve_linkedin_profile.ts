@@ -17,6 +17,23 @@ export default defineTool({
 		const rapidEnabled = await enabled("RAPIDAPI_KEY");
 		const tavilyEnabled = await enabled("TAVILY_API_KEY");
 		let rapidReason: string | undefined;
+		const local = email.split("@")[0] ?? "";
+		const terms = searchTerms(local);
+
+		if (tavilyEnabled) {
+			const charge = spend();
+			if (!charge.ok) return { candidateSlugs: [], note: charge.reason };
+
+			const slugs = await findProfileUrls(terms, companyName);
+			if (slugs.length > 0) {
+				return {
+					searchedFor: terms,
+					candidateSlugs: slugs.slice(0, 5),
+					note: "Unverified. Each slug must be checked with get_linkedin_profile.",
+					source: "Tavily public web search",
+				};
+			}
+		}
 
 		if (rapidEnabled) {
 			const companyCharge = spend();
@@ -37,8 +54,6 @@ export default defineTool({
 				return { candidateSlugs: [], note: rapidCharge.reason };
 			}
 
-			const local = email.split("@")[0] ?? "";
-			const terms = searchTerms(local);
 			const rapid = await searchPeople({
 				keyword: terms[1] ?? terms[0] ?? local,
 				currentCompany: exactCompany?.id,
@@ -64,26 +79,11 @@ export default defineTool({
 					: rapid.reason;
 		}
 
-		if (!tavilyEnabled) {
-			return {
-				candidateSlugs: [],
-				...(rapidEnabled
-					? { note: rapidReason ?? "No LinkedIn candidates found." }
-					: unavailable("TAVILY_API_KEY")),
-			};
-		}
-
-		const charge = spend();
-		if (!charge.ok) return { candidateSlugs: [], note: charge.reason };
-
-		const local = email.split("@")[0] ?? "";
-		const terms = searchTerms(local);
-		const slugs = await findProfileUrls(terms, companyName);
-
 		return {
-			searchedFor: terms,
-			candidateSlugs: slugs.slice(0, 5),
-			note: "Unverified. Each slug must be checked with get_linkedin_profile.",
+			candidateSlugs: [],
+			...(rapidEnabled || tavilyEnabled
+				? { note: rapidReason ?? "No LinkedIn candidates found." }
+				: unavailable("TAVILY_API_KEY or RAPIDAPI_KEY")),
 		};
 	},
 });

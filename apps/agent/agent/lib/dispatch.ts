@@ -1,4 +1,4 @@
-import { EnrichmentStatus } from "@crm/db";
+import { db, EnrichmentStatus, Prisma } from "@crm/db";
 import { runInOrganization } from "@crm/db/tenancy";
 import {
 	ensureAcquisitionResearchRun,
@@ -25,6 +25,10 @@ export const VISIBLE_LEASE_MS = 2 * 60_000;
 
 export const RESEARCH_BATCH = 12;
 export const RESEARCH_LEASE_MS = 30 * 60_000;
+
+export function researchSlots(active: number): number {
+	return Math.max(0, RESEARCH_BATCH - active);
+}
 
 export async function retireAbandoned(): Promise<void> {
 	let abandoned: TaskSubject[] = [];
@@ -100,8 +104,21 @@ async function runDirect(task: LeasedTask): Promise<void> {
 export async function runResearchLane(
 	start: (task: LeasedTask) => Promise<{ id: string }>,
 ): Promise<number> {
+	const [{ count: active } = { count: 0 }] = await db.$queryRaw<
+		Array<{ count: number }>
+	>`
+		SELECT count(*)::int AS count
+		FROM "agentTask"
+		WHERE "finishedAt" IS NULL
+			AND "startedAt" IS NOT NULL
+			AND "leasedUntil" > now()
+			AND kind NOT IN (${Prisma.join(DIRECT_KINDS)})
+	`;
+	const available = researchSlots(active);
+	if (available === 0) return 0;
+
 	const tasks = await claimDue(
-		RESEARCH_BATCH,
+		available,
 		{ except: DIRECT_KINDS },
 		RESEARCH_LEASE_MS,
 	);
@@ -150,6 +167,40 @@ export const drainAll = collapsing(
 		await Promise.all([runVisibleLane(), runResearchLane(start)]);
 	},
 );
+
+export async function dispatchReceipt(
+	taskId: string,
+	read: (taskId: string) => Promise<{
+		attempts: number;
+		finishedAt: Date | null;
+	} | null> = (id) =>
+		db.agentTask.findUnique({
+			where: { id },
+			select: { attempts: true, finishedAt: true },
+		}),
+) {
+	const task = await read(taskId);
+	return {
+		taskId,
+		state:
+			task && (task.attempts > 0 || task.finishedAt) ? "claimed" : "queued",
+	} as const;
+}
+
+export async function requestQueueRefill(
+	agentUrl: string,
+	secret: string,
+	request: typeof fetch = fetch,
+): Promise<void> {
+	const response = await request(new URL("/internal/crm/dispatch", agentUrl), {
+		method: "POST",
+		headers: { authorization: `Bearer ${secret}` },
+		signal: AbortSignal.timeout(15_000),
+	});
+	if (!response.ok) {
+		throw new Error(`Queue refill returned HTTP ${response.status}.`);
+	}
+}
 
 export function brief(task: LeasedTask): string {
 	const again =

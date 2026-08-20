@@ -56,6 +56,34 @@ export class AgentQueueService {
 		return agentTaskState(task, now);
 	}
 
+	async companyDetailsState(companyId: string) {
+		const now = new Date();
+		const task = await this.db.agentTask.findFirst({
+			where: {
+				companyId,
+				kind: { in: ["company-details", "brand"] },
+				finishedAt: null,
+			},
+			orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
+			select: {
+				createdAt: true,
+				dueAt: true,
+				startedAt: true,
+				finishedAt: true,
+				outcome: true,
+				lastError: true,
+				attempts: true,
+			},
+		});
+
+		return {
+			...agentTaskState(task, now),
+			queuedAt: task?.createdAt.toISOString() ?? null,
+			startedAt: task?.startedAt?.toISOString() ?? null,
+			attempts: task?.attempts ?? 0,
+		};
+	}
+
 	private async queued(
 		column: "companyId" | "contactId",
 		ids: readonly string[],

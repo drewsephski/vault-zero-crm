@@ -79,8 +79,47 @@ export async function researchExternalPerson(input: {
 	const tavilyEnabled = await enabled("TAVILY_API_KEY");
 	const linkedinCandidates: ExternalPersonCandidate[] = [];
 	let rapidReason: string | undefined;
+	const budgetedProviders: SearchProvider[] = [
+		...(anySearchEnabled ? ["anysearch" as const] : []),
+		...(tavilyEnabled ? ["tavily" as const] : []),
+	];
+	const web = await comprehensiveSearch(
+		[
+			`Research the professional background of "${input.name}".`,
+			input.companyName ? `They may work at ${input.companyName}.` : "",
+			input.title ? `Their title may be ${input.title}.` : "",
+			"Find an official LinkedIn profile if available, plus employer pages, public talks, publications, GitHub, news, interviews, and other professional sources.",
+		]
+			.filter(Boolean)
+			.join(" "),
+		{
+			providers: budgetedProviders.length > 0 ? budgetedProviders : undefined,
+			intent: "identity",
+			deep: true,
+			maxResults: limit,
+			exactMatch: true,
+		},
+	);
+	const publicSources = web.ok ? web.sources : [];
+	const webLinkedinCandidates = publicSources.flatMap((source) => {
+		const slug = slugFromProfileUrl(source.url);
+		if (!slug) return [];
 
-	if (rapidEnabled) {
+		return [
+			{
+				profileUrl: `https://www.linkedin.com/in/${slug}`,
+				fullName: null,
+				title: source.title,
+				headline: null,
+				location: null,
+				content: source.content || null,
+				score: source.score,
+				source: "linkedin" as const,
+			},
+		];
+	});
+
+	if (rapidEnabled && webLinkedinCandidates.length === 0) {
 		let currentCompany: string | undefined;
 		if (input.companyName) {
 			const companyCharge = spend();
@@ -131,49 +170,6 @@ export async function researchExternalPerson(input: {
 		}
 	}
 
-	const budgetedProviders: SearchProvider[] = [
-		...(anySearchEnabled ? ["anysearch" as const] : []),
-		...(tavilyEnabled ? ["tavily" as const] : []),
-	];
-	const publicSearchProviders: readonly SearchProvider[] | undefined =
-		rapidEnabled && budgetedProviders.length > 0
-			? budgetedProviders
-			: undefined;
-	const web = await comprehensiveSearch(
-		[
-			`Research the professional background of "${input.name}".`,
-			input.companyName ? `They may work at ${input.companyName}.` : "",
-			input.title ? `Their title may be ${input.title}.` : "",
-			"Find an official LinkedIn profile if available, plus employer pages, public talks, publications, GitHub, news, interviews, and other professional sources.",
-		]
-			.filter(Boolean)
-			.join(" "),
-		{
-			providers: publicSearchProviders,
-			intent: "identity",
-			deep: true,
-			maxResults: limit,
-			exactMatch: true,
-		},
-	);
-	const publicSources = web.ok ? web.sources : [];
-	const webLinkedinCandidates = publicSources.flatMap((source) => {
-		const slug = slugFromProfileUrl(source.url);
-		if (!slug) return [];
-
-		return [
-			{
-				profileUrl: `https://www.linkedin.com/in/${slug}`,
-				fullName: null,
-				title: source.title,
-				headline: null,
-				location: null,
-				content: source.content || null,
-				score: source.score,
-				source: "linkedin" as const,
-			},
-		];
-	});
 	const candidates = dedupeCandidates([
 		...linkedinCandidates,
 		...webLinkedinCandidates,

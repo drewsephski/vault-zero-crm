@@ -6,24 +6,56 @@ import { InjectDatabase } from "../database/database.constants";
 import { type Bridge, bridge } from "./bridge";
 
 const POKE_TIMEOUT_MS = 15_000;
+const POKE_ATTEMPTS = 3;
+const POKE_RETRY_MS = 200;
 
 type Defer = (promise: Promise<unknown>) => void;
 
 type EnqueueResult = { taskId: string; created: boolean };
 
+type DispatchReceipt = { taskId: string; state: "claimed" };
+
 export async function requestAgentDispatch(
 	agent: Bridge,
+	taskId: string,
 	fetcher: typeof fetch = fetch,
-): Promise<void> {
-	const response = await fetcher(agent.url("/internal/crm/dispatch"), {
-		method: "POST",
-		headers: { authorization: `Bearer ${agent.secret}` },
-		signal: AbortSignal.timeout(POKE_TIMEOUT_MS),
-	});
+): Promise<DispatchReceipt> {
+	let failure: Error | null = null;
 
-	if (!response.ok) {
-		throw new Error(`Agent dispatch returned HTTP ${response.status}.`);
+	for (let attempt = 1; attempt <= POKE_ATTEMPTS; attempt += 1) {
+		try {
+			const response = await fetcher(agent.url("/internal/crm/dispatch"), {
+				method: "POST",
+				headers: {
+					authorization: `Bearer ${agent.secret}`,
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({ taskId }),
+				signal: AbortSignal.timeout(POKE_TIMEOUT_MS),
+			});
+
+			if (!response.ok) {
+				throw new Error(`Agent dispatch returned HTTP ${response.status}.`);
+			}
+
+			const receipt = (await response.json().catch(() => null)) as {
+				taskId?: unknown;
+				state?: unknown;
+			} | null;
+			if (receipt?.taskId !== taskId || receipt.state !== "claimed") {
+				throw new Error(`Agent dispatch did not claim task ${taskId}.`);
+			}
+
+			return { taskId, state: "claimed" };
+		} catch (error) {
+			failure = error instanceof Error ? error : new Error(String(error));
+			if (attempt < POKE_ATTEMPTS) {
+				await new Promise((resolve) => setTimeout(resolve, POKE_RETRY_MS));
+			}
+		}
 	}
+
+	throw failure ?? new Error(`Agent dispatch did not claim task ${taskId}.`);
 }
 
 export function keepAgentDispatchAlive(
@@ -196,8 +228,8 @@ export class AgentTriggerService {
 				alreadyQueued: ids.length - queued,
 			});
 
-			if (results.some((result) => result.created || result.advanced))
-				this.poke();
+			const dispatchTarget = results[0];
+			if (dispatchTarget) this.poke(dispatchTarget.taskId);
 
 			return {
 				queued,
@@ -238,7 +270,7 @@ export class AgentTriggerService {
 				});
 			}
 
-			if (result.created || result.advanced) this.poke();
+			this.poke(result.taskId);
 			return { taskId: result.taskId, created: result.created };
 		} catch (error) {
 			this.logger.error(
@@ -249,7 +281,7 @@ export class AgentTriggerService {
 		}
 	}
 
-	private poke(): void {
+	private poke(taskId: string): void {
 		const agent = bridge();
 		if (!agent) return;
 
@@ -260,7 +292,7 @@ export class AgentTriggerService {
 			});
 		};
 
-		const dispatch = requestAgentDispatch(agent)
+		const dispatch = requestAgentDispatch(agent, taskId)
 			.then(() => {
 				this.logger.debug({ message: "Agent poke landed" });
 			})

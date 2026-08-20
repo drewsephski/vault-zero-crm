@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { searchPeople, slugFromLinkedinInput } from "../agent/lib/linkdapi";
+import {
+	getProfile,
+	searchPeople,
+	slugFromLinkedinInput,
+} from "../agent/lib/linkdapi";
 
 const realFetch = globalThis.fetch;
 const realKey = process.env.RAPIDAPI_KEY;
@@ -161,6 +165,20 @@ describe("LinkdAPI people search", () => {
 		expect(result).toEqual({ ok: true, data: [] });
 	});
 
+	it("reuses a recent profile response without another provider request", async () => {
+		process.env.RAPIDAPI_KEY = "rapid-profile-cache";
+		stub({
+			success: true,
+			data: { username: "jane-doe", fullName: "Jane Doe" },
+		});
+
+		const first = await getProfile("jane-doe");
+		const second = await getProfile("jane-doe");
+
+		expect(first).toEqual(second);
+		expect(requests).toHaveLength(1);
+	});
+
 	it("retries one short provider throttle after Retry-After", async () => {
 		process.env.RAPIDAPI_KEY = "rapid-short-throttle";
 		stubSequence([
@@ -201,7 +219,7 @@ describe("LinkdAPI people search", () => {
 		expect(requests).toHaveLength(1);
 	});
 
-	it("suppresses duplicate calls while a provider limit is active", async () => {
+	it("classifies monthly exhaustion and suppresses duplicate calls", async () => {
 		process.env.RAPIDAPI_KEY = "rapid-provider-limit";
 		stubSequence([
 			{
@@ -210,7 +228,7 @@ describe("LinkdAPI people search", () => {
 						"You have exceeded the rate limit per month for your BASIC plan.",
 				},
 				status: 429,
-				headers: { "retry-after": "120" },
+				headers: { "retry-after": "1" },
 			},
 		]);
 
@@ -220,16 +238,16 @@ describe("LinkdAPI people search", () => {
 		expect(first).toMatchObject({
 			ok: false,
 			missing: false,
-			code: "rate_limited",
-			retryAfterSeconds: 120,
+			code: "quota_exhausted",
+			retryAfterSeconds: 86_400,
 		});
 		expect(second).toMatchObject({
 			ok: false,
 			missing: false,
-			code: "rate_limited",
+			code: "quota_exhausted",
 		});
 		if (!first.ok && !first.missing) {
-			expect(first.reason).toContain("Retrying immediately will not help");
+			expect(first.reason).toContain("billing quota to reset");
 		}
 		expect(requests).toHaveLength(1);
 	});

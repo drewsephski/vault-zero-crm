@@ -1,7 +1,13 @@
 import { EnrichmentStatus } from "@crm/db";
 import { defineChannel, POST } from "eve/channels";
 import { verifyKey } from "../lib/context-dev";
-import { brief, drainAll, taskAuth } from "../lib/dispatch";
+import {
+	brief,
+	dispatchReceipt,
+	drainAll,
+	requestQueueRefill,
+	taskAuth,
+} from "../lib/dispatch";
 import { settle } from "../lib/enrichment";
 import { followUpRequestSchema, generateFollowUps } from "../lib/follow-ups";
 import { completeTask, failTask } from "../lib/tasks";
@@ -15,6 +21,19 @@ function authorised(request: Request): boolean {
 	if (!secret) return false;
 
 	return request.headers.get("authorization") === `Bearer ${secret}`;
+}
+
+async function refillQueue(): Promise<void> {
+	const agentUrl = process.env.AGENT_URL?.trim();
+	const secret = process.env.AGENT_BRIDGE_SECRET?.trim();
+	if (!agentUrl || !secret) return;
+
+	await requestQueueRefill(agentUrl, secret).catch((error) => {
+		console.error(
+			"[dispatch] queue refill failed",
+			error instanceof Error ? error.message : String(error),
+		);
+	});
 }
 
 export function taskToken(taskId: string): string {
@@ -61,21 +80,25 @@ export default defineChannel({
 			}
 		}),
 
-		POST("/internal/crm/dispatch", async (request, { send, waitUntil }) => {
+		POST("/internal/crm/dispatch", async (request, { send }) => {
 			if (!authorised(request)) {
 				return new Response("Unauthorized", { status: 401 });
 			}
 
-			waitUntil(
-				drainAll((task) =>
-					send(brief(task), {
-						auth: taskAuth(task),
-						continuationToken: taskToken(task.id),
-					}),
-				),
+			const body = (await request.json().catch(() => null)) as {
+				taskId?: unknown;
+			} | null;
+			const taskId = typeof body?.taskId === "string" ? body.taskId : null;
+			await drainAll((task) =>
+				send(brief(task), {
+					auth: taskAuth(task),
+					continuationToken: taskToken(task.id),
+				}),
 			);
 
-			return new Response(null, { status: 202 });
+			return Response.json(
+				taskId ? await dispatchReceipt(taskId) : { state: "drained" },
+			);
 		}),
 
 		POST("/internal/crm/verify-key", async (request) => {
@@ -121,6 +144,7 @@ export default defineChannel({
 					);
 				}
 			});
+			await refillQueue();
 		},
 
 		async "session.waiting"(_data, channel) {
@@ -131,6 +155,7 @@ export default defineChannel({
 				const subject = await completeTask(taskId, "ran");
 				if (subject) await settle(subject, EnrichmentStatus.COMPLETE);
 			});
+			await refillQueue();
 		},
 
 		async "turn.failed"(data, channel) {
@@ -160,6 +185,7 @@ export default defineChannel({
 							: reason,
 				);
 			});
+			await refillQueue();
 		},
 	},
 

@@ -23,10 +23,8 @@ export default defineTool({
 		companyDomain: z.string(),
 		includeHistory: z
 			.boolean()
-			.default(true)
-			.describe(
-				"Also fetch full work history — costs an extra call. Defaults to true.",
-			),
+			.default(false)
+			.describe("Also fetch full work history as an extra request."),
 		contactId: z
 			.string()
 			.optional()

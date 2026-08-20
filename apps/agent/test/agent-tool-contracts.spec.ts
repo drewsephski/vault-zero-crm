@@ -63,12 +63,12 @@ describe("agent tool contracts", () => {
 		expect(result.success).toBe(true);
 	});
 
-	it("fetches LinkedIn work history by default", () => {
+	it("requires LinkedIn work history to be explicitly requested", () => {
 		expect(
 			readLinkedInProfile.inputSchema.safeParse({
 				profile: "drewsepeczi",
 			}).data?.includeHistory,
-		).toBe(true);
+		).toBe(false);
 		expect(
 			getLinkedInProfile.inputSchema.safeParse({
 				slug: "drewsepeczi",
@@ -76,7 +76,7 @@ describe("agent tool contracts", () => {
 				companyName: "Example",
 				companyDomain: "example.com",
 			}).data?.includeHistory,
-		).toBe(true);
+		).toBe(false);
 	});
 
 	it("requires real source URLs for discovery candidates", () => {

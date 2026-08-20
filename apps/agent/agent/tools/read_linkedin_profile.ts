@@ -19,8 +19,10 @@ export default defineTool({
 		expectedDomain: z.string().trim().min(3).optional(),
 		includeHistory: z
 			.boolean()
-			.default(true)
-			.describe("Also fetch the person's full work history. Defaults to true."),
+			.default(false)
+			.describe(
+				"Also fetch the person's full work history as an extra request.",
+			),
 	}),
 	async execute({
 		profile,

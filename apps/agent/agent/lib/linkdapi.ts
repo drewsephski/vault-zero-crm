@@ -5,6 +5,7 @@ const TIMEOUT_MS = 20_000;
 const MAX_SHORT_RETRY_MS = 2_000;
 const DEFAULT_LIMIT_COOLDOWN_MS = 60_000;
 const MAX_LIMIT_COOLDOWN_MS = 5 * 60_000;
+const PROFILE_CACHE_TTL_MS = 15 * 60_000;
 
 export type Profile = {
 	slug: string;
@@ -54,15 +55,17 @@ type Outcome<T> =
 			ok: false;
 			missing: false;
 			reason: string;
-			code?: "rate_limited";
+			code?: "rate_limited" | "quota_exhausted";
 			retryAfterSeconds?: number;
 	  };
 
 type ActiveLimit = {
 	until: number;
+	code: "rate_limited" | "quota_exhausted";
 };
 
 const activeLimits = new Map<string, ActiveLimit>();
+const profileCache = new Map<string, { until: number; data: unknown }>();
 
 function key(): string | null {
 	const value = process.env.RAPIDAPI_KEY?.trim();
@@ -250,19 +253,31 @@ async function call<T>(
 ): Promise<Outcome<T>> {
 	const apiKey = key();
 	if (!apiKey) return { ok: false, missing: false, reason: "No RAPIDAPI_KEY." };
+	const url = new URL(`https://${HOST}${path}`);
+	for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+	const fingerprint = credentialFingerprint(apiKey);
+	const cacheKey = `${fingerprint}:${url.toString()}`;
+	if (path.includes("/profile/")) {
+		const cached = profileCache.get(cacheKey);
+		if (cached && cached.until > Date.now()) {
+			return { ok: true, data: cached.data as T };
+		}
+		if (cached) profileCache.delete(cacheKey);
+	}
 	const scope = limitScope(path);
-	const limitKey = `${credentialFingerprint(apiKey)}:${scope.key}`;
+	const limitKey = `${fingerprint}:${scope.key}`;
 	const activeLimit = activeLimits.get(limitKey);
 	if (activeLimit) {
 		const remainingMs = activeLimit.until - Date.now();
 		if (remainingMs > 0) {
-			return rateLimited(scope.label, Math.ceil(remainingMs / 1_000));
+			return limited(
+				scope.label,
+				activeLimit.code,
+				Math.ceil(remainingMs / 1_000),
+			);
 		}
 		activeLimits.delete(limitKey);
 	}
-
-	const url = new URL(`https://${HOST}${path}`);
-	for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -276,8 +291,14 @@ async function call<T>(
 
 			if (response.status === 429) {
 				const retryMs = retryDelayMs(response.headers);
+				const responseText = await response.text();
+				const quotaExhausted =
+					/(?:per|this)\s+(?:month|billing)|monthly|quota\s+(?:has\s+been\s+)?exceeded/i.test(
+						responseText,
+					);
 				if (
 					attempt === 0 &&
+					!quotaExhausted &&
 					retryMs !== null &&
 					retryMs <= MAX_SHORT_RETRY_MS
 				) {
@@ -285,15 +306,19 @@ async function call<T>(
 					continue;
 				}
 
-				const cooldownMs = Math.min(
-					Math.max(retryMs ?? DEFAULT_LIMIT_COOLDOWN_MS, 1_000),
-					MAX_LIMIT_COOLDOWN_MS,
-				);
+				const code = quotaExhausted ? "quota_exhausted" : "rate_limited";
+				const cooldownMs = quotaExhausted
+					? Math.max(retryMs ?? 0, 24 * 60 * 60 * 1_000)
+					: Math.min(
+							Math.max(retryMs ?? DEFAULT_LIMIT_COOLDOWN_MS, 1_000),
+							MAX_LIMIT_COOLDOWN_MS,
+						);
 				const retryAfterSeconds = Math.ceil(cooldownMs / 1_000);
 				activeLimits.set(limitKey, {
 					until: Date.now() + cooldownMs,
+					code,
 				});
-				return rateLimited(scope.label, retryAfterSeconds);
+				return limited(scope.label, code, retryAfterSeconds);
 			}
 
 			if (!response.ok) {
@@ -314,10 +339,16 @@ async function call<T>(
 			}
 
 			activeLimits.delete(limitKey);
+			if (path.includes("/profile/")) {
+				profileCache.set(cacheKey, {
+					until: Date.now() + PROFILE_CACHE_TTL_MS,
+					data: body.data,
+				});
+			}
 			return { ok: true, data: body.data };
 		}
 
-		return rateLimited(scope.label, 1);
+		return limited(scope.label, "rate_limited", 1);
 	} catch (error) {
 		const aborted = error instanceof Error && error.name === "AbortError";
 		return {
@@ -378,7 +409,20 @@ function retryDelayMs(headers: Headers): number | null {
 	return null;
 }
 
-function rateLimited(label: string, retryAfterSeconds: number): Outcome<never> {
+function limited(
+	label: string,
+	code: "rate_limited" | "quota_exhausted",
+	retryAfterSeconds: number,
+): Outcome<never> {
+	if (code === "quota_exhausted") {
+		return {
+			ok: false,
+			missing: false,
+			code,
+			retryAfterSeconds,
+			reason: `${label} have exhausted the provider quota. Retrying in a few minutes will not help; use another configured source or wait for the provider billing quota to reset.`,
+		};
+	}
 	const duration =
 		retryAfterSeconds < 60
 			? `about ${retryAfterSeconds} seconds`
@@ -386,7 +430,7 @@ function rateLimited(label: string, retryAfterSeconds: number): Outcome<never> {
 	return {
 		ok: false,
 		missing: false,
-		code: "rate_limited",
+		code,
 		retryAfterSeconds,
 		reason: `${label} are rate-limited by the provider for ${duration}. Retrying immediately will not help; use another configured source or try again later.`,
 	};

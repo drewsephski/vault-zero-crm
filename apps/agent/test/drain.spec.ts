@@ -1,7 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { APP_AUTH } from "../agent/lib/app-auth";
 import { isAutomated } from "../agent/lib/approval";
-import { taskAuth } from "../agent/lib/dispatch";
+import {
+	dispatchReceipt,
+	requestQueueRefill,
+	researchSlots,
+	taskAuth,
+} from "../agent/lib/dispatch";
 import { collapsing } from "../agent/lib/pool";
 import type { LeasedTask } from "../agent/lib/tasks";
 
@@ -132,5 +137,63 @@ describe("taskAuth", () => {
 
 		expect(auth).toMatchObject({ issuer: "eve" });
 		expect(isAutomated({ auth: { current: auth } })).toBe(true);
+	});
+});
+
+describe("dispatchReceipt", () => {
+	it("confirms a task that the drain claimed", async () => {
+		const receipt = await dispatchReceipt("task_1", async () => ({
+			attempts: 1,
+			finishedAt: null,
+		}));
+
+		expect(receipt).toEqual({ taskId: "task_1", state: "claimed" });
+	});
+
+	it("keeps an untouched task visibly queued", async () => {
+		const receipt = await dispatchReceipt("task_1", async () => ({
+			attempts: 0,
+			finishedAt: null,
+		}));
+
+		expect(receipt).toEqual({ taskId: "task_1", state: "queued" });
+	});
+});
+
+describe("researchSlots", () => {
+	it("fills only the unused global research capacity", () => {
+		expect(researchSlots(0)).toBe(12);
+		expect(researchSlots(7)).toBe(5);
+		expect(researchSlots(12)).toBe(0);
+		expect(researchSlots(20)).toBe(0);
+	});
+});
+
+describe("requestQueueRefill", () => {
+	it("asks the authenticated agent route to fill newly available capacity", async () => {
+		const requests: Array<{ input: string; authorization: string | null }> = [];
+		const fetcher = async (
+			input: string | URL | Request,
+			init?: RequestInit,
+		) => {
+			requests.push({
+				input: String(input),
+				authorization: new Headers(init?.headers).get("authorization"),
+			});
+			return new Response(null, { status: 200 });
+		};
+
+		await requestQueueRefill(
+			"https://agent.example.com",
+			"bridge-secret",
+			fetcher as typeof fetch,
+		);
+
+		expect(requests).toEqual([
+			{
+				input: "https://agent.example.com/internal/crm/dispatch",
+				authorization: "Bearer bridge-secret",
+			},
+		]);
 	});
 });

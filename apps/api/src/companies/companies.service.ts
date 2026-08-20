@@ -306,11 +306,13 @@ export class CompaniesService {
 
 		const [
 			queuedKinds,
+			companyDetailsResearch,
 			acquisitionResearch,
 			reportingCurrency,
 			acquisitionProfile,
 		] = await Promise.all([
 			this.queue.pendingKinds({ companyId: id }),
+			this.queue.companyDetailsState(id),
 			this.queue.acquisitionResearchState(id),
 			this.conversion.reportingCurrency(),
 			this.db.acquisitionProfile.findUnique({
@@ -323,6 +325,7 @@ export class CompaniesService {
 			...rest,
 			queued: queuedKinds.length > 0,
 			queuedKinds,
+			companyDetailsResearch,
 			acquisitionResearch,
 			createdAt: createdAt.toISOString(),
 			enrichedAt: enrichedAt?.toISOString() ?? null,

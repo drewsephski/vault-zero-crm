@@ -176,9 +176,10 @@ contact, do not stop at the CRM result and do not ask for email, company or doma
 first. Immediately call `research_external_person` with the actual first and last
 name and any context the rep already gave. Never send a company, product, action
 phrase, or generic two-word query to LinkedIn as if it were a person. If it returns
-candidates, read the best candidate with `read_linkedin_profile` using its default
-full work history, summarize the headline, location, current role, prior roles and
-other observed profile details, and ask the rep to confirm the observed profile. If
+candidates, read only the best candidate with `read_linkedin_profile`. Start with
+the profile overview and request full work history only when the rep's question
+needs prior roles. Summarize the observed profile details and ask the rep to confirm
+the profile. If
 it returns no candidates, use `ask_question` with `allowFreeform: true` and
 `display: "text"` to ask for a LinkedIn profile URL or username. Never treat a
 Tavily result or a name search as identity proof.

@@ -325,14 +325,22 @@ export function DetailSheetResearchStatus({
 	subject,
 	fields,
 	state,
+	queuedFor,
+	attempts = 0,
+	error,
 	mode = "details",
 }: {
 	subject: string;
 	fields: string[];
-	state: "queued" | "running";
+	state: "queued" | "running" | "retrying";
+	queuedFor?: string | null;
+	attempts?: number;
+	error?: string | null;
 	mode?: "details" | "acquisition";
 }) {
 	const acquisition = mode === "acquisition";
+	const running = state === "running";
+	const retrying = state === "retrying";
 	const detail = acquisition
 		? "Comparing the evidence with your buy box and preparing a decision-ready dossier."
 		: fields.length > 0
@@ -351,28 +359,39 @@ export function DetailSheetResearchStatus({
 			<div className="min-w-0 space-y-1">
 				<p className="font-medium text-sm">
 					{acquisition
-						? state === "running"
+						? running
 							? `Analyzing ${subject}`
-							: `Fit analysis queued for ${subject}`
-						: state === "running"
+							: retrying
+								? `Retrying fit analysis for ${subject}`
+								: `Fit analysis queued for ${subject}`
+						: running
 							? `Refreshing ${subject}`
-							: `Detail refresh queued for ${subject}`}
+							: retrying
+								? `Retrying detail refresh for ${subject}`
+								: `Detail refresh queued for ${subject}`}
 				</p>
 				<p className="text-pretty text-muted-foreground text-xs/5">
-					{state === "queued" ? "Waiting for the agent to start. " : ""}
+					{state === "queued"
+						? `Waiting for the agent to start${queuedFor ? ` · queued ${queuedFor}` : ""}. `
+						: ""}
+					{retrying
+						? `Attempt ${Math.max(attempts, 1)} did not finish${error ? `: ${error}` : "."} `
+						: ""}
 					{detail} Updates will appear here automatically.
 				</p>
 			</div>
 			<StatusIndicator
-				tone={state === "running" ? "info" : "neutral"}
-				busy={state === "running"}
+				tone={running ? "info" : retrying ? "error" : "neutral"}
+				busy={running}
 				pulse={state === "queued"}
 				label={
-					state === "running"
+					running
 						? acquisition
 							? "Analyzing now"
 							: "Refreshing now"
-						: "In queue"
+						: retrying
+							? "Retrying shortly"
+							: "In queue"
 				}
 				size="sm"
 			/>

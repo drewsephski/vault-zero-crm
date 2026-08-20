@@ -24,11 +24,15 @@ describe("requestAgentDispatch", () => {
 				init: Parameters<typeof fetch>[1],
 			) => {
 				requests.push({ input, init });
-				return new Response(null, { status: 202 });
+				return Response.json({ taskId: "task-1", state: "claimed" });
 			},
 		);
 
-		await requestAgentDispatch(agent, fetcher as unknown as typeof fetch);
+		const receipt = await requestAgentDispatch(
+			agent,
+			"task-1",
+			fetcher as unknown as typeof fetch,
+		);
 
 		expect(String(requests[0]?.input)).toBe(
 			"https://agent.example.com/internal/crm/dispatch",
@@ -36,16 +40,45 @@ describe("requestAgentDispatch", () => {
 		expect(requests[0]?.init?.method).toBe("POST");
 		expect(requests[0]?.init?.headers).toEqual({
 			authorization: "Bearer test-bridge-secret",
+			"content-type": "application/json",
 		});
+		expect(requests[0]?.init?.body).toBe(JSON.stringify({ taskId: "task-1" }));
 		expect(requests[0]?.init?.signal).toBeInstanceOf(AbortSignal);
+		expect(receipt).toEqual({ taskId: "task-1", state: "claimed" });
 	});
 
 	it("rejects a dispatch the agent did not accept", async () => {
 		const fetcher = mock(async () => new Response(null, { status: 401 }));
 
 		expect(
-			requestAgentDispatch(agent, fetcher as unknown as typeof fetch),
+			requestAgentDispatch(agent, "task-1", fetcher as unknown as typeof fetch),
 		).rejects.toThrow("Agent dispatch returned HTTP 401.");
+	});
+
+	it("rejects an acknowledgement without a valid task receipt", async () => {
+		const fetcher = mock(async () =>
+			Response.json({ taskId: "task-1", state: "queued" }),
+		);
+
+		expect(
+			requestAgentDispatch(agent, "task-1", fetcher as unknown as typeof fetch),
+		).rejects.toThrow("Agent dispatch did not claim task task-1.");
+	});
+
+	it("retries a transient queued acknowledgement", async () => {
+		let calls = 0;
+		const fetcher = mock(async () => {
+			calls += 1;
+			return Response.json({
+				taskId: "task-1",
+				state: calls === 1 ? "queued" : "claimed",
+			});
+		});
+
+		await expect(
+			requestAgentDispatch(agent, "task-1", fetcher as unknown as typeof fetch),
+		).resolves.toEqual({ taskId: "task-1", state: "claimed" });
+		expect(calls).toBe(2);
 	});
 });
 
@@ -338,6 +371,46 @@ describe("AgentTriggerService", () => {
 		expect(await queue.acquisitionResearchState(companyId)).toEqual({
 			status: "idle",
 			error: null,
+		});
+	});
+
+	it("reports the queued and running detail task timeline", async () => {
+		const queuedAt = new Date(Date.now() - 120_000);
+		const task = await db.agentTask.create({
+			data: {
+				companyId,
+				kind: "company-details",
+				reason: "Manual refresh",
+				dueAt: queuedAt,
+				createdAt: queuedAt,
+			},
+			select: { id: true },
+		});
+
+		expect(await queue.companyDetailsState(companyId)).toEqual({
+			status: "queued",
+			error: null,
+			queuedAt: queuedAt.toISOString(),
+			startedAt: null,
+			attempts: 0,
+		});
+
+		const startedAt = new Date();
+		await db.agentTask.update({
+			where: { id: task.id },
+			data: {
+				startedAt,
+				leasedUntil: new Date(Date.now() + 60_000),
+				attempts: 1,
+			},
+		});
+
+		expect(await queue.companyDetailsState(companyId)).toEqual({
+			status: "running",
+			error: null,
+			queuedAt: queuedAt.toISOString(),
+			startedAt: startedAt.toISOString(),
+			attempts: 1,
 		});
 	});
 

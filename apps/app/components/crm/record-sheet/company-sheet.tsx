@@ -491,7 +491,10 @@ function CompanyOverview({
 	const detailsActivity = company.queuedKinds.some((kind) =>
 		["brand", "company-details"].includes(kind),
 	)
-		? researchActivity
+		? company.companyDetailsResearch.status === "idle" ||
+			company.companyDetailsResearch.status === "failed"
+			? researchActivity
+			: company.companyDetailsResearch.status
 		: null;
 	const acquisitionBannerActivity = acquisitionResearchActivity(
 		company.acquisitionResearch,
@@ -512,6 +515,13 @@ function CompanyOverview({
 					subject={company.name}
 					fields={fields}
 					state={detailsActivity}
+					queuedFor={
+						company.companyDetailsResearch.queuedAt
+							? relativeTimeFromIso(company.companyDetailsResearch.queuedAt)
+							: null
+					}
+					attempts={company.companyDetailsResearch.attempts}
+					error={company.companyDetailsResearch.error}
 				/>
 			) : null}
 
