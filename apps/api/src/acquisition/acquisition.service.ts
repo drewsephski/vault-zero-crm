@@ -20,20 +20,42 @@ import {
 	Logger,
 	NotFoundException,
 } from "@nestjs/common";
+import type { z } from "zod";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
 import { CompaniesService } from "../companies/companies.service";
 import { normalizeDomain } from "../companies/domain";
+import { toCents } from "../crm/values";
 import { InjectDatabase } from "../database/database.constants";
+import {
+	countsByKey,
+	FACET_ALL,
+	FACET_UNASSIGNED,
+	type ListResult,
+	ownerFilter,
+	paginate,
+	resolveOrderBy,
+} from "../trpc/list-input";
+import type {
+	CreateAcquisitionEngagementInput,
+	EngagementTargetOptionsInput,
+	ListAcquisitionEngagementsInput,
+	UpdateAcquisitionEngagementStageInput,
+} from "./acquisition-engagements.contracts";
+import {
+	ENGAGEMENT_STATUS_FILTERS,
+	engagementTargetOptionsInput,
+	listAcquisitionEngagementsInput,
+} from "./acquisition-engagements.contracts";
+
+type ParsedListAcquisitionEngagementsInput = z.infer<
+	typeof listAcquisitionEngagementsInput
+>;
+
 import type {
 	CreateAcquisitionTargetInput,
 	TargetMutationResult,
 	TargetResearchResult,
 } from "./acquisition.contracts";
-import type {
-	CreateAcquisitionEngagementInput,
-	ListAcquisitionEngagementsInput,
-	UpdateAcquisitionEngagementStageInput,
-} from "./acquisition-engagements.contracts";
 
 const ACTIVE_ENGAGEMENT_CONFLICT =
 	"This target already has an active acquisition opportunity.";
@@ -48,6 +70,38 @@ const TERMINAL_ENGAGEMENT_STAGES = new Set<AcquisitionEngagementStage>([
 	AcquisitionEngagementStage.ACQUIRED,
 	AcquisitionEngagementStage.PASSED,
 ]);
+
+const OWNER_SELECT = {
+	id: true,
+	name: true,
+	email: true,
+	image: true,
+} as const;
+
+const COMPANY_SELECT = {
+	id: true,
+	name: true,
+	domain: true,
+	iconUrl: true,
+	iconDarkUrl: true,
+	iconTone: true,
+	logoUrl: true,
+} as const;
+
+const ENGAGEMENT_SORTABLE: Record<
+	string,
+	(
+		dir: Prisma.SortOrder,
+	) => Prisma.AcquisitionEngagementOrderByWithRelationInput[]
+> = {
+	company: (dir) => [{ company: { name: dir } }, { stageChangedAt: "desc" }],
+	stage: (dir) => [{ stage: dir }, { stageChangedAt: "desc" }],
+	stageChangedAt: (dir) => [{ stageChangedAt: dir }],
+	amount: (dir) => [{ baseAmount: { sort: dir, nulls: "last" } }],
+	expectedCloseDate: (dir) => [{ expectedCloseDate: dir }],
+	createdAt: (dir) => [{ createdAt: dir }],
+	owner: (dir) => [{ owner: { name: dir } }, { company: { name: "asc" } }],
+};
 
 const ENGAGEMENT_SELECT = {
 	id: true,
@@ -67,13 +121,8 @@ const ENGAGEMENT_SELECT = {
 	fxRateAt: true,
 	createdAt: true,
 	updatedAt: true,
-	company: {
-		select: {
-			id: true,
-			name: true,
-			domain: true,
-		},
-	},
+	owner: { select: OWNER_SELECT },
+	company: { select: COMPANY_SELECT },
 } satisfies Prisma.AcquisitionEngagementSelect;
 
 type EngagementRow = Prisma.AcquisitionEngagementGetPayload<{
@@ -781,18 +830,61 @@ export class AcquisitionService {
 		}
 	}
 
-	async listEngagements(input: ListAcquisitionEngagementsInput) {
+	async listEngagements(raw: ListAcquisitionEngagementsInput) {
+		const input = listAcquisitionEngagementsInput.parse(raw);
 		const organizationId = getOrganizationId() ?? WORKSPACE_ID;
-		const rows = await this.db.acquisitionEngagement.findMany({
+		const where = this.buildEngagementWhere(input, organizationId);
+		const { skip, take } = paginate(input);
+
+		const [rows, total, facetCounts] = await Promise.all([
+			this.db.acquisitionEngagement.findMany({
+				where,
+				skip,
+				take,
+				orderBy: resolveOrderBy(input, ENGAGEMENT_SORTABLE, [
+					{ stageChangedAt: "desc" },
+					{ createdAt: "desc" },
+				]),
+				select: ENGAGEMENT_SELECT,
+			}),
+			this.db.acquisitionEngagement.count({ where }),
+			this.engagementFacetCounts(input, organizationId),
+		]);
+
+		return {
+			rows: rows.map((row) => this.serializeEngagement(row)),
+			total,
+			facetCounts,
+		} satisfies ListResult<ReturnType<typeof this.serializeEngagement>>;
+	}
+
+	async engagementTargetOptions(raw: EngagementTargetOptionsInput) {
+		const { q } = engagementTargetOptionsInput.parse(raw);
+		const organizationId = getOrganizationId() ?? WORKSPACE_ID;
+		const term = q.trim();
+
+		return this.db.company.findMany({
 			where: {
 				organizationId,
-				...(input.companyId ? { companyId: input.companyId } : {}),
-				...(input.status ? { status: input.status } : {}),
+				acquisitionTarget: { isNot: null },
+				acquisitionEngagements: {
+					none: { status: AcquisitionEngagementStatus.ACTIVE },
+				},
+				...(term
+					? { name: { contains: term, mode: "insensitive" as const } }
+					: {}),
 			},
-			orderBy: [{ stageChangedAt: "desc" }, { createdAt: "desc" }],
-			select: ENGAGEMENT_SELECT,
+			orderBy: [{ name: "asc" }],
+			select: {
+				id: true,
+				name: true,
+				domain: true,
+				iconUrl: true,
+				iconDarkUrl: true,
+				iconTone: true,
+				logoUrl: true,
+			},
 		});
-		return rows.map((row) => this.serializeEngagement(row));
 	}
 
 	async updateEngagementStage(
@@ -921,13 +1013,105 @@ export class AcquisitionService {
 
 	private serializeEngagement(row: EngagementRow) {
 		return {
-			...row,
+			id: row.id,
+			companyId: row.companyId,
+			ownerId: row.ownerId,
+			stage: row.stage,
+			status: row.status,
+			amountCents: toCents(row.amount),
+			baseAmountCents: toCents(row.baseAmount),
+			currency: row.currency,
+			owner: row.owner,
+			company: row.company,
 			stageChangedAt: row.stageChangedAt.toISOString(),
 			expectedCloseDate: row.expectedCloseDate?.toISOString() ?? null,
 			closedAt: row.closedAt?.toISOString() ?? null,
+			closedReason: row.closedReason,
+			fxRate: row.fxRate?.toNumber() ?? null,
 			fxRateAt: row.fxRateAt?.toISOString() ?? null,
 			createdAt: row.createdAt.toISOString(),
 			updatedAt: row.updatedAt.toISOString(),
+		};
+	}
+
+	private engagementSearchFilter(
+		q: string,
+	): Prisma.AcquisitionEngagementWhereInput {
+		const term = q.trim();
+		if (!term) return {};
+
+		return {
+			OR: [
+				{ company: { name: { contains: term, mode: "insensitive" } } },
+				{ company: { domain: { contains: term, mode: "insensitive" } } },
+			],
+		};
+	}
+
+	private buildEngagementWhere(
+		input: ParsedListAcquisitionEngagementsInput,
+		organizationId: string,
+	): Prisma.AcquisitionEngagementWhereInput {
+		const where: Prisma.AcquisitionEngagementWhereInput = {
+			organizationId,
+			...this.engagementSearchFilter(input.q),
+		};
+
+		if (input.companyId) {
+			where.companyId = input.companyId;
+		}
+
+		if (input.status === "active") {
+			where.status = ENGAGEMENT_STATUS_FILTERS.active;
+		} else if (input.status === "terminal") {
+			where.status = ENGAGEMENT_STATUS_FILTERS.terminal;
+		}
+
+		if (input.owner !== FACET_ALL) {
+			const owner = ownerFilter(input.owner);
+			if (owner) where.ownerId = owner.ownerId;
+		}
+
+		if (input.stage !== FACET_ALL) {
+			where.stage = input.stage as AcquisitionEngagementStage;
+		}
+
+		return where;
+	}
+
+	private async engagementFacetCounts(
+		input: ParsedListAcquisitionEngagementsInput,
+		organizationId: string,
+	) {
+		const base: Prisma.AcquisitionEngagementWhereInput = {
+			organizationId,
+			...this.engagementSearchFilter(input.q),
+			...(input.companyId ? { companyId: input.companyId } : {}),
+		};
+
+		const [owners, stages, activeCount, terminalCount] = await Promise.all([
+			this.db.acquisitionEngagement.groupBy({
+				by: ["ownerId"],
+				where: base,
+				_count: { _all: true },
+			}),
+			this.db.acquisitionEngagement.groupBy({
+				by: ["stage"],
+				where: base,
+				_count: { _all: true },
+			}),
+			this.db.acquisitionEngagement.count({
+				where: { ...base, status: ENGAGEMENT_STATUS_FILTERS.active },
+			}),
+			this.db.acquisitionEngagement.count({
+				where: { ...base, status: ENGAGEMENT_STATUS_FILTERS.terminal },
+			}),
+		]);
+
+		return {
+			status: { active: activeCount, terminal: terminalCount },
+			owner: countsByKey(owners, "ownerId", FACET_UNASSIGNED),
+			stage: countsByKey(stages, "stage"),
 		};
 	}
 }

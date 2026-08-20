@@ -14,6 +14,7 @@ type RemovedRecord = { kind: "company" | "contact" | "deal"; id: string };
 export type CrmCache = {
 	company(id?: string, options?: Options): Promise<void>;
 	acquisition(companyId?: string, options?: Options): Promise<void>;
+	engagement(companyId?: string, options?: Options): Promise<void>;
 	contact(id?: string, options?: Options): Promise<void>;
 	deal(id?: string, options?: Options): Promise<void>;
 	removed(record: RemovedRecord): Promise<void>;
@@ -60,6 +61,8 @@ export function useCrmCache(): CrmCache {
 		trpc.companies.list.queryKey(),
 		trpc.contacts.list.queryKey(),
 		trpc.deals.list.queryKey(),
+		trpc.acquisition.listEngagements.queryKey(),
+		trpc.acquisition.engagementTargetOptions.queryKey(),
 		trpc.search.quick.queryKey(),
 	];
 
@@ -87,7 +90,23 @@ export function useCrmCache(): CrmCache {
 						? trpc.companies.byId.queryKey({ id: companyId })
 						: trpc.companies.byId.queryKey(),
 				],
-				[trpc.companies.list.queryKey(), trpc.dashboard.summary.queryKey()],
+				[
+					trpc.companies.list.queryKey(),
+					trpc.acquisition.listEngagements.queryKey(),
+					trpc.acquisition.engagementTargetOptions.queryKey(),
+					trpc.dashboard.summary.queryKey(),
+				],
+				options,
+			),
+
+		engagement: (companyId, options) =>
+			run(
+				[
+					companyId
+						? trpc.companies.byId.queryKey({ id: companyId })
+						: trpc.companies.byId.queryKey(),
+				],
+				[...listKeys(), trpc.dashboard.summary.queryKey()],
 				options,
 			),
 

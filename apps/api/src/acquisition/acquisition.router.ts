@@ -1,24 +1,32 @@
 import { Inject } from "@nestjs/common";
-import { Ctx, Input, Mutation, Query, Router, UseMiddlewares } from "nestjs-trpc";
+import {
+	Ctx,
+	Input,
+	Mutation,
+	Query,
+	Router,
+	UseMiddlewares,
+} from "nestjs-trpc";
 import type { z } from "zod";
 import type { AuthedTrpcContext } from "../trpc/context.types";
 import { AuthMiddleware } from "../trpc/middlewares/auth.middleware";
 import {
-	acquisitionCandidateIdInput,
-	addAcquisitionTargetInput,
 	acceptRecommendedActionInput,
 	acceptRecommendedStageInput,
+	acquisitionCandidateIdInput,
+	addAcquisitionTargetInput,
 	createAcquisitionTargetInput,
 	dismissRecommendedActionInput,
 	dismissRecommendedStageInput,
 	updateAcquisitionTargetInput,
 } from "./acquisition.contracts";
+import { AcquisitionService } from "./acquisition.service";
 import {
 	createAcquisitionEngagementInput,
+	engagementTargetOptionsInput,
 	listAcquisitionEngagementsInput,
 	updateAcquisitionEngagementStageInput,
 } from "./acquisition-engagements.contracts";
-import { AcquisitionService } from "./acquisition.service";
 
 @Router({ alias: "acquisition" })
 @UseMiddlewares(AuthMiddleware)
@@ -129,6 +137,13 @@ export class AcquisitionRouter {
 		@Input() input: z.infer<typeof listAcquisitionEngagementsInput>,
 	) {
 		return this.acquisition.listEngagements(input);
+	}
+
+	@Query({ input: engagementTargetOptionsInput })
+	async engagementTargetOptions(
+		@Input() input: z.infer<typeof engagementTargetOptionsInput>,
+	) {
+		return this.acquisition.engagementTargetOptions(input);
 	}
 
 	@Mutation({ input: updateAcquisitionEngagementStageInput })

@@ -1,8 +1,8 @@
-import { type AcquisitionFit, AcquisitionStage } from "@crm/db/enums";
 import {
 	TARGET_LIFECYCLE_STAGES,
 	type TargetLifecycleStage,
 } from "@crm/db/acquisition";
+import { type AcquisitionFit, AcquisitionStage } from "@crm/db/enums";
 import {
 	StatusIndicator,
 	type StatusTone,

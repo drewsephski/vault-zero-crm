@@ -1864,7 +1864,9 @@ describe("eve recommendations and acquisition engagements", () => {
 				status: "active",
 			});
 			expect(
-				listed.rows.some((engagement) => engagement.companyId === isolatedCompanyId),
+				listed.rows.some(
+					(engagement) => engagement.companyId === isolatedCompanyId,
+				),
 			).toBe(false);
 		} finally {
 			await db.company.deleteMany({ where: { domain: isolatedDomain } });

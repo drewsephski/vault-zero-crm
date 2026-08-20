@@ -66,6 +66,7 @@ import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
+import { CompanyOpportunities } from "./company-opportunities";
 import { QuickAddContact, QuickAddDeal } from "./quick-add";
 import { RecordActions } from "./record-actions";
 import {
@@ -278,15 +279,21 @@ export function CompanySheet({ companyId }: { companyId: string }) {
 				{
 					value: "deals",
 					label: labels.deals,
-					count: company.deals.length,
-					content: (
-						<CompanyDeals
-							company={company}
-							adding={adding === "deal"}
-							onAdd={() => setAdding("deal")}
-							onDone={() => setAdding(null)}
-						/>
-					),
+					count:
+						labels.acquisition && company.acquisitionTarget
+							? undefined
+							: company.deals.length,
+					content:
+						labels.acquisition && company.acquisitionTarget ? (
+							<CompanyOpportunities company={company} />
+						) : (
+							<CompanyDeals
+								company={company}
+								adding={adding === "deal"}
+								onAdd={() => setAdding("deal")}
+								onDone={() => setAdding(null)}
+							/>
+						),
 				},
 				{
 					value: "activity",

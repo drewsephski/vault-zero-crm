@@ -35,11 +35,12 @@ import Link from "next/link";
 import { useId } from "react";
 import { toast } from "sonner";
 import {
-	TARGET_LIFECYCLE_STAGES,
 	AcquisitionFitIndicator,
 	acquisitionStageLabel,
+	TARGET_LIFECYCLE_STAGES,
 	type TargetLifecycleStage,
 } from "@/components/crm/acquisition-status";
+import { TargetOpportunitySection } from "@/components/crm/target-opportunity-section";
 import {
 	DetailSheetBody,
 	DetailSheetEmpty,
@@ -196,6 +197,7 @@ export function AcquisitionDossier({
 					<DetailSheetSection title="Fit against the buy box">
 						<AcquisitionFitIndicator fit={target.fit} />
 					</DetailSheetSection>
+					<TargetOpportunitySection company={company} />
 				</DetailSheetRail>
 			</DetailSheetSplit>
 

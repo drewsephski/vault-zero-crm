@@ -32,6 +32,7 @@ import { formatCount, relativeTimeFromIso } from "@crm/ui/lib/format";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { toast } from "sonner";
+import { AcquisitionEngagementStageIndicator } from "@/components/crm/acquisition-engagement-stage";
 import {
 	AcquisitionFitIndicator,
 	AcquisitionStageIndicator,
@@ -58,6 +59,7 @@ const ACTION_COLUMNS: SimpleTableColumn[] = [
 
 const OPPORTUNITY_COLUMNS: SimpleTableColumn[] = [
 	{ header: "Opportunity" },
+	{ header: "Stage", width: "w-28" },
 	{ header: "Next action", width: "w-28", align: "right" },
 ];
 
@@ -461,22 +463,18 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 										<TableCell className={CELL}>
 											<span className="flex min-w-0 flex-col">
 												<RecordLink kind="company" id={opportunity.company.id}>
-													{opportunity.name}
+													{opportunity.company.name}
 												</RecordLink>
-												<span className="flex min-w-0 gap-1 text-muted-foreground">
-													<RecordLink
-														kind="company"
-														id={opportunity.company.id}
-													>
-														{opportunity.company.name}
-													</RecordLink>
-													<span aria-hidden>·</span>
-													<span className="truncate">
-														Moved{" "}
-														{relativeTimeFromIso(opportunity.stageChangedAt)}
-													</span>
+												<span className="truncate text-muted-foreground">
+													Moved{" "}
+													{relativeTimeFromIso(opportunity.stageChangedAt)}
 												</span>
 											</span>
+										</TableCell>
+										<TableCell className={CELL}>
+											<AcquisitionEngagementStageIndicator
+												stage={opportunity.stage}
+											/>
 										</TableCell>
 										<TableCell className={`${CELL} text-right`}>
 											<StatusIndicator
