@@ -10,14 +10,14 @@ export function Hero() {
 				</h1>
 
 				<p className="max-w-[640px] text-pretty text-center text-muted-foreground text-lg/[28px] md:text-xl/[30px]">
-					Vault Zero continuously discovers, researches, and qualifies
-					acquisition targets against your buy box—so your time goes to
-					judgment, outreach, and closing.
+					Vault Zero CRM is an AI acquisition CRM that continuously discovers,
+					researches, and qualifies businesses against your buy box—so you can
+					focus on judgment, outreach, and closing.
 				</p>
 
 				<div className="flex flex-wrap items-center justify-center gap-3 pt-3">
 					<Button size="xl" asChild>
-						<Link href="/sign-in">Open Vault Zero</Link>
+						<Link href="/sign-in">Open Vault Zero CRM</Link>
 					</Button>
 				</div>
 

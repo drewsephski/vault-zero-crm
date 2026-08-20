@@ -9,9 +9,11 @@ import { LandingNav } from "@/components/landing/landing-nav";
 import { ProductShot } from "@/components/landing/product-shot/product-shot";
 
 export const metadata: Metadata = {
-	title: "Vault Zero | AI acquisition CRM",
+	title: {
+		absolute: "Vault Zero CRM | AI acquisition CRM",
+	},
 	description:
-		"Discover, research, qualify, and advance businesses that fit your acquisition thesis.",
+		"Vault Zero CRM discovers, researches, qualifies, and advances businesses that fit your acquisition thesis.",
 };
 
 export default function Home() {

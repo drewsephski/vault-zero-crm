@@ -9,8 +9,8 @@ export function LandingFooter() {
 				<div className="flex w-[280px] max-w-full shrink-0 flex-col gap-[14px]">
 					<Wordmark />
 					<p className="text-[13px]/[21px] text-muted-foreground">
-						An AI-native acquisition CRM for finding and advancing businesses
-						worth buying.
+						Vault Zero CRM is an AI-native acquisition CRM for finding and
+						advancing businesses worth buying.
 					</p>
 				</div>
 			</div>
