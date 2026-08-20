@@ -1,13 +1,12 @@
 import { z } from "zod";
-import { enabled, unavailable } from "../lib/capabilities";
 import { spend } from "../lib/focus";
+import { looksLikeSameCompany, namesMatch } from "../lib/names";
+import { defineTool } from "../lib/tool";
 import {
 	getExperience,
 	getProfile,
 	slugFromLinkedinInput,
-} from "../lib/linkdapi";
-import { looksLikeSameCompany, namesMatch } from "../lib/names";
-import { defineTool } from "../lib/tool";
+} from "../lib/web-profile";
 
 export default defineTool({
 	description:
@@ -31,10 +30,6 @@ export default defineTool({
 		expectedDomain,
 		includeHistory,
 	}) {
-		if (!(await enabled("RAPIDAPI_KEY"))) {
-			return { found: false as const, ...unavailable("RAPIDAPI_KEY") };
-		}
-
 		const slug = slugFromLinkedinInput(profile);
 		if (!slug) {
 			return {

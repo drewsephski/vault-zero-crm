@@ -1,5 +1,5 @@
 import { db, Prisma } from "@crm/db";
-import { slugFromLinkedinInput } from "./linkdapi";
+import { slugFromLinkedinInput } from "./web-profile";
 
 export type CompanyUpdate = {
 	name?: string;

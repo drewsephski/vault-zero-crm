@@ -9,7 +9,6 @@ export const ALLOWED_PROPERTIES = [
 	"postgres_version",
 	"seed_only",
 
-	"cap_rapidapi",
 	"cap_tavily",
 	"cap_context_dev",
 	"cap_blob",
@@ -136,6 +135,7 @@ export const AGENT_TOOLS = [
 	"update_crm_record",
 	"write_acquisition_dossier",
 	"write_brief",
+	"write_company_brief",
 	"write_workspace_profile",
 	"web_search",
 ] as const;

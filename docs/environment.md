@@ -75,7 +75,6 @@ single place that knows what is set.
 | --- | --- |
 | `TAVILY_API_KEY` | Open-web research with citations; finds a LinkedIn slug |
 | `ANYSEARCH_API_KEY` | Unified general and vertical search; adds compact search results and LinkedIn candidate discovery |
-| `RAPIDAPI_KEY` | LinkedIn people search and profiles via LinkDAPI |
 | `GITHUB_TOKEN` | Raises the GitHub rate limit from 60/hour |
 | `BLOB_READ_WRITE_TOKEN` | Mirrors logos and photos into Blob |
 | `AGENT_BRIDGE_SECRET` | The rep-facing Agent panel — see `agent.md` |

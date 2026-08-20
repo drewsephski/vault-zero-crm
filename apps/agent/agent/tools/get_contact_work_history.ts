@@ -1,8 +1,7 @@
 import { z } from "zod";
-import { enabled, unavailable } from "../lib/capabilities";
 import { contactProfileSlug } from "../lib/crm";
-import { getExperience, getProfile } from "../lib/linkdapi";
 import { defineTool } from "../lib/tool";
+import { getExperience, getProfile } from "../lib/web-profile";
 
 export default defineTool({
 	description:
@@ -11,10 +10,6 @@ export default defineTool({
 		contactId: z.string(),
 	}),
 	async execute({ contactId }) {
-		if (!(await enabled("RAPIDAPI_KEY"))) {
-			return { found: false as const, ...unavailable("RAPIDAPI_KEY") };
-		}
-
 		const profileRef = await contactProfileSlug(contactId);
 		if (!profileRef) {
 			return {

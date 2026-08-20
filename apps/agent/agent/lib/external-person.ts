@@ -1,12 +1,12 @@
 import { enabled, unavailable } from "./capabilities";
 import { spend } from "./focus";
-import { lookupCompany, searchPeople, slugFromProfileUrl } from "./linkdapi";
 import { normalise } from "./names";
 import {
 	comprehensiveSearch,
 	type ResearchSource,
 	type SearchProvider,
 } from "./research-search";
+import { lookupCompany, searchPeople, slugFromProfileUrl } from "./web-profile";
 
 const NON_PERSON_TERMS = new Set([
 	"a",
@@ -75,10 +75,8 @@ export async function researchExternalPerson(input: {
 
 	const limit = Math.min(Math.max(input.limit ?? 5, 1), 5);
 	const anySearchEnabled = await enabled("ANYSEARCH_API_KEY");
-	const rapidEnabled = await enabled("RAPIDAPI_KEY");
 	const tavilyEnabled = await enabled("TAVILY_API_KEY");
 	const linkedinCandidates: ExternalPersonCandidate[] = [];
-	let rapidReason: string | undefined;
 	const budgetedProviders: SearchProvider[] = [
 		...(anySearchEnabled ? ["anysearch" as const] : []),
 		...(tavilyEnabled ? ["tavily" as const] : []),
@@ -119,7 +117,10 @@ export async function researchExternalPerson(input: {
 		];
 	});
 
-	if (rapidEnabled && webLinkedinCandidates.length === 0) {
+	if (
+		webLinkedinCandidates.length === 0 &&
+		(anySearchEnabled || tavilyEnabled)
+	) {
 		let currentCompany: string | undefined;
 		if (input.companyName) {
 			const companyCharge = spend();
@@ -133,10 +134,8 @@ export async function researchExternalPerson(input: {
 					);
 					currentCompany = (exact ?? company.data[0])?.id;
 				} else {
-					rapidReason = "LinkedIn company lookup was unavailable.";
 				}
 			} else {
-				rapidReason = companyCharge.reason;
 			}
 		}
 
@@ -163,10 +162,8 @@ export async function researchExternalPerson(input: {
 					})),
 				);
 			} else {
-				rapidReason = "LinkedIn people search was unavailable.";
 			}
 		} else {
-			rapidReason = peopleCharge.reason;
 		}
 	}
 
@@ -206,25 +203,16 @@ export async function researchExternalPerson(input: {
 	const configuredWebProvider =
 		web.ok ||
 		web.providerErrors.some(({ reason }) => !/not configured/i.test(reason));
-	if (
-		!anySearchEnabled &&
-		!rapidEnabled &&
-		!tavilyEnabled &&
-		!configuredWebProvider
-	) {
+	if (!anySearchEnabled && !tavilyEnabled && !configuredWebProvider) {
 		return {
 			found: false,
-			...unavailable(
-				"ANYSEARCH_API_KEY, RAPIDAPI_KEY, TAVILY_API_KEY or Context.dev",
-			),
+			...unavailable("ANYSEARCH_API_KEY or TAVILY_API_KEY"),
 		};
 	}
 
 	return {
 		found: false,
-		reason:
-			rapidReason ??
-			(web.ok ? "No public professional sources matched." : web.reason),
+		reason: web.ok ? "No public professional sources matched." : web.reason,
 	};
 }
 

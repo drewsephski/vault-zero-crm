@@ -2,6 +2,7 @@ import { ActivityType, db } from "@crm/db";
 import { resolveAutomatedActivityAuthor } from "@crm/db/activity-author";
 import { z } from "zod";
 import { focusOn } from "../lib/focus";
+import { companyProfileRequester } from "../lib/tasks";
 import { defineTool } from "../lib/tool";
 
 const text = z.string().trim().min(1).max(2000);
@@ -32,7 +33,10 @@ export default defineTool({
 			return { written: false as const, reason: "No such company." };
 		}
 
-		const author = await resolveAutomatedActivityAuthor(db, [company.ownerId]);
+		const requestedById = await companyProfileRequester(company.id);
+		const author =
+			requestedById ??
+			(await resolveAutomatedActivityAuthor(db, [company.ownerId]));
 		if (!author) {
 			return { written: false as const, reason: "No user to attribute to." };
 		}

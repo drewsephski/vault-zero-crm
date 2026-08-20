@@ -5,12 +5,48 @@ import createContact from "../agent/tools/create_contact";
 import getLinkedInProfile from "../agent/tools/get_linkedin_profile";
 import proposeAcquisitionCandidates from "../agent/tools/propose_acquisition_candidates";
 import readLinkedInProfile from "../agent/tools/read_linkedin_profile";
+import sendEmail, { emailServiceFailure } from "../agent/tools/send_email";
 import updateAcquisitionProfile, {
 	mergeValues,
 } from "../agent/tools/update_acquisition_profile";
 import writeAcquisitionDossier from "../agent/tools/write_acquisition_dossier";
 
 describe("agent tool contracts", () => {
+	it("requires one complete email and rejects malformed recipients", () => {
+		expect(
+			sendEmail.inputSchema.safeParse({
+				to: ["person@example.com"],
+				cc: [],
+				subject: "A concrete next step",
+				body: "Hello,\n\nWould Tuesday work?",
+			}).success,
+		).toBe(true);
+		expect(
+			sendEmail.inputSchema.safeParse({
+				to: ["not-an-email"],
+				subject: "Hello",
+				body: "Body",
+			}).success,
+		).toBe(false);
+	});
+
+	it("classifies email bridge failures as non-retryable configuration errors", () => {
+		expect(emailServiceFailure(403)).toEqual({
+			outcome: "failed",
+			code: "email-bridge-auth-mismatch",
+			retryable: false,
+			reason:
+				"Email sending is unavailable because the agent and CRM API are not connected with matching credentials. Retrying will not help until an administrator repairs the deployment.",
+		});
+		expect(emailServiceFailure(503)).toMatchObject({
+			code: "email-bridge-unconfigured",
+			retryable: false,
+		});
+		expect(emailServiceFailure(502)).toMatchObject({
+			code: "email-service-error",
+			retryable: true,
+		});
+	});
 	it("accepts a complete acquisition buy box in whole currency units", () => {
 		expect(
 			updateAcquisitionProfile.inputSchema.safeParse({

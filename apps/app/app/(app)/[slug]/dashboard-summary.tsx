@@ -1,5 +1,6 @@
 "use client";
 
+import TrashCan from "@carbon/icons-react/es/TrashCan";
 import { WorkspaceMode } from "@crm/db/enums";
 import {
 	Alert,
@@ -7,6 +8,16 @@ import {
 	AlertDescription,
 	AlertTitle,
 } from "@crm/ui/components/alert";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@crm/ui/components/alert-dialog";
 import { Button } from "@crm/ui/components/button";
 import {
 	Card,
@@ -24,6 +35,7 @@ import {
 	EntityLogo,
 	type EntityLogoTone,
 } from "@crm/ui/components/entity-logo";
+import { Icon } from "@crm/ui/components/icon";
 import {
 	SimpleTable,
 	type SimpleTableColumn,
@@ -41,6 +53,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useQueryState } from "nuqs";
 import type { CSSProperties } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
 	DealStageIndicator,
@@ -86,6 +99,18 @@ function DashboardData() {
 	const complete = useMutation(
 		trpc.activities.complete.mutationOptions({
 			onSuccess: () => cache.activity(),
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+	const [deletingActivityId, setDeletingActivityId] = useState<string | null>(
+		null,
+	);
+	const removeActivity = useMutation(
+		trpc.activities.delete.mutationOptions({
+			onSuccess: () => {
+				setDeletingActivityId(null);
+				void cache.activity();
+			},
 			onError: (error) => toast.error(error.message),
 		}),
 	);
@@ -150,6 +175,7 @@ function DashboardData() {
 		{ header: "Deal", width: "w-48", className: "hidden lg:table-cell" },
 		{ header: "Who", width: "w-32", className: "hidden md:table-cell" },
 		{ header: "When", width: "w-20", align: "right" },
+		{ srLabel: "Actions", width: "w-10" },
 	];
 
 	return (
@@ -331,11 +357,48 @@ function DashboardData() {
 										{relativeTimeFromIso(entry.createdAt)}
 									</span>
 								</TableCell>
+								<TableCell className={CELL}>
+									<Button
+										variant="ghost"
+										size="icon-sm"
+										disabled={removeActivity.isPending}
+										onClick={() => setDeletingActivityId(entry.id)}
+									>
+										<Icon icon={TrashCan} />
+										<span className="sr-only">Delete activity</span>
+									</Button>
+								</TableCell>
 							</SimpleTableRow>
 						))}
 					</SimpleTable>
 				)}
 			</Card>
+			<AlertDialog
+				open={deletingActivityId !== null}
+				onOpenChange={(open) => !open && setDeletingActivityId(null)}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete this activity?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This removes the activity from the workspace and cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							variant="destructive"
+							disabled={removeActivity.isPending}
+							onClick={() => {
+								if (deletingActivityId)
+									removeActivity.mutate({ id: deletingActivityId });
+							}}
+						>
+							Delete
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }

@@ -9,7 +9,6 @@ import {
 } from "../agent/lib/capabilities";
 
 const KEYS = [
-	"RAPIDAPI_KEY",
 	"TAVILY_API_KEY",
 	"ANYSEARCH_API_KEY",
 	"BLOB_READ_WRITE_TOKEN",
@@ -42,14 +41,12 @@ describe("capabilities", () => {
 				.filter((capability) => capability.id !== CRM)
 				.every((capability) => !capability.enabled),
 		).toBe(true);
-		expect(await enabled("RAPIDAPI_KEY")).toBe(false);
 	});
 
 	it("turns one on without turning on the others", async () => {
 		process.env.TAVILY_API_KEY = "tvly-test";
 
 		expect(await enabled("TAVILY_API_KEY")).toBe(true);
-		expect(await enabled("RAPIDAPI_KEY")).toBe(false);
 	});
 
 	it("exposes AnySearch as an independent source", async () => {
@@ -61,17 +58,6 @@ describe("capabilities", () => {
 				(capability) => capability.id === "ANYSEARCH_API_KEY",
 			)?.label,
 		).toBe("AnySearch");
-	});
-
-	it("treats blank and whitespace as unset", async () => {
-		process.env.RAPIDAPI_KEY = "   ";
-		expect(await enabled("RAPIDAPI_KEY")).toBe(false);
-	});
-
-	it("is read live, so a late-configured process is not stuck off", async () => {
-		expect(await enabled("RAPIDAPI_KEY")).toBe(false);
-		process.env.RAPIDAPI_KEY = "key";
-		expect(await enabled("RAPIDAPI_KEY")).toBe(true);
 	});
 
 	it("is unknown for a variable that is not a capability", async () => {
@@ -108,12 +94,12 @@ describe("the Context key is a setting, never a variable", () => {
 
 describe("the unavailable result", () => {
 	it("says retrying will not help", () => {
-		const result = unavailable("RAPIDAPI_KEY");
+		const result = unavailable("TAVILY_API_KEY");
 
 		expect(result.ok).toBe(false);
 		expect(result.configured).toBe(false);
 		expect(result.reason).toContain("retrying will not help");
-		expect(result.reason).toContain("RAPIDAPI_KEY");
+		expect(result.reason).toContain("TAVILY_API_KEY");
 	});
 });
 
@@ -126,17 +112,16 @@ describe("the capability briefing", () => {
 	});
 
 	it("lists what is on and what is off, separately", () => {
-		process.env.RAPIDAPI_KEY = "key";
+		process.env.TAVILY_API_KEY = "key";
 		const markdown = markdownFor(capabilitiesFrom(null));
 
 		expect(markdown).toContain("Available:");
-		expect(markdown).toContain("LinkedIn");
 		expect(markdown).toContain("Not configured here");
 		expect(markdown).toContain("Web research");
 	});
 
 	it("counts a stored Context key as configured", () => {
-		process.env.RAPIDAPI_KEY = "key";
+		process.env.TAVILY_API_KEY = "key";
 
 		const markdown = markdownFor(capabilitiesFrom("ctx"));
 

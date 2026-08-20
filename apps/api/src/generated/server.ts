@@ -16,7 +16,7 @@ const publicProcedure = t.procedure;
 import { createAcquisitionTargetInput, addAcquisitionTargetInput, acquisitionCandidateIdInput, updateAcquisitionTargetInput, acceptRecommendedStageInput, dismissRecommendedStageInput, acceptRecommendedActionInput, dismissRecommendedActionInput } from "../acquisition/acquisition.contracts";
 import { createAcquisitionEngagementInput, listAcquisitionEngagementsInput, engagementTargetOptionsInput, updateAcquisitionEngagementStageInput, updateAcquisitionEngagementInput } from "../acquisition/acquisition-engagements.contracts";
 import { listResearchRunsInput, researchRunIdInput } from "../acquisition/acquisition-research-runs.contracts";
-import { timelineInput, timelineCountsInput, myTasksInput, taskCountsInput, activityCreateInput, completeInput } from "../activities/activities.contracts";
+import { timelineInput, timelineCountsInput, myTasksInput, taskCountsInput, activityCreateInput, completeInput, activityDeleteInput } from "../activities/activities.contracts";
 import { companyListInput, companyIdInput, companyOptionsInput, companyCreateInput, companyUpdateArgs, companyBulkDeleteInput, companyBulkUpdateArgs, setPrimaryContactInput } from "../companies/companies.contracts";
 import { contactListInput, contactIdInput, contactCreateInput, contactUpdateArgs, contactBulkDeleteInput, contactBulkUpdateArgs, factDecisionInput } from "../contacts/contacts.contracts";
 import { conversationListInput, conversationEventsInput, conversationSaveInput, conversationIdInput } from "../conversations/conversations.contracts";
@@ -113,7 +113,10 @@ const appRouter = t.router({
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<ActivitiesRouter["create"]>>),
     complete: publicProcedure
       .input(completeInput)
-      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<ActivitiesRouter["complete"]>>)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<ActivitiesRouter["complete"]>>),
+    delete: publicProcedure
+      .input(activityDeleteInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<ActivitiesRouter["delete"]>>)
     }),
   companies: t.router({
     list: publicProcedure

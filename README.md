@@ -106,7 +106,7 @@ has, so it plans around what it actually has rather than discovering the gaps on
 failed call at a time, and it prints the list at startup:
 
 ```
-[agent] on   LinkedIn (RAPIDAPI_KEY)
+[agent] on   AnySearch (ANYSEARCH_API_KEY)
 [agent] off  Web research (TAVILY_API_KEY)
 [agent] off  Company brand data (Settings → General)
 ```
@@ -266,7 +266,6 @@ the short version:
 | `API_URL` / `APP_URL` | Where the two halves are served. Only needed off localhost. |
 | `OPENROUTER_API_KEY` | Runs the agent model; the default is Gemini 2.5 Flash-Lite. |
 | `TAVILY_API_KEY` | Lets the agent search the open web, with citations. |
-| `RAPIDAPI_KEY` | Lets the agent read LinkedIn profiles for identity. |
 | `AGENT_BRIDGE_SECRET` | Lets a rep talk to the agent from the **Agent** page and record tabs. |
 | `REDIS_URL` | A shared cache. Without it, per-instance and in-memory. |
 | `CRON_SECRET` | Guards the Gmail/Calendar sync route. Required to use it. |

@@ -5,9 +5,9 @@ import type { Evidence, EvidenceKind } from "../lib/evidence";
 import { WEIGHTS } from "../lib/evidence";
 import { recordFact } from "../lib/facts";
 import { focusOn } from "../lib/focus";
-import { slugFromLinkedinInput } from "../lib/linkdapi";
 import { createContact, writeError } from "../lib/record-writes";
 import { defineTool } from "../lib/tool";
+import { slugFromLinkedinInput } from "../lib/web-profile";
 
 export default defineTool({
 	description:

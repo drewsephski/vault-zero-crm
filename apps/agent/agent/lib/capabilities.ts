@@ -55,12 +55,6 @@ export function capabilitiesFrom(
 			enabled: crm,
 		},
 		{
-			...fromEnv("RAPIDAPI_KEY"),
-			label: "LinkedIn",
-			gives:
-				"a person's real name, current title, employer and tenure, self-reported, and so authoritative on identity",
-		},
-		{
 			...fromEnv("TAVILY_API_KEY"),
 			label: "Web research",
 			gives:

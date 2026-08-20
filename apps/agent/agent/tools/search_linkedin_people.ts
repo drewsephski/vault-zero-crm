@@ -1,14 +1,13 @@
 import { z } from "zod";
-import { enabled, unavailable } from "../lib/capabilities";
 import { isLikelyPersonName } from "../lib/external-person";
 import { spend } from "../lib/focus";
-import { lookupCompany, searchPeople } from "../lib/linkdapi";
 import { normalise } from "../lib/names";
 import { defineTool } from "../lib/tool";
+import { lookupCompany, searchPeople } from "../lib/web-profile";
 
 export default defineTool({
 	description:
-		"Search LinkedIn's professional index through RapidAPI for a person by name, optionally narrowed by company or title. Use this when a rep explicitly asks to search LinkedIn, including when the person is not in the CRM. Results are candidates, not verified CRM identity; never write a fact from this tool alone.",
+		"Search public LinkedIn pages through AnySearch and Tavily for a person by name, optionally narrowed by company or title. Results are candidates, not verified CRM identity; never write a fact from this tool alone.",
 	inputSchema: z.object({
 		name: z.string().trim().min(2).describe("The person's name to search for."),
 		companyName: z
@@ -32,10 +31,6 @@ export default defineTool({
 				reason:
 					"I need the person's actual first and last name before searching LinkedIn.",
 			};
-		}
-
-		if (!(await enabled("RAPIDAPI_KEY"))) {
-			return { found: false as const, ...unavailable("RAPIDAPI_KEY") };
 		}
 
 		let currentCompany: string | undefined;

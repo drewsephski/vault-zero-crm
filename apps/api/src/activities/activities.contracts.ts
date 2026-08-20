@@ -69,6 +69,8 @@ export const completeInput = z.object({
 	completed: z.boolean().default(true),
 });
 
+export const activityDeleteInput = z.object({ id: z.string() });
+
 export const myTasksInput = z.object({
 	window: z.enum(["today", "overdue", "upcoming", "all"]).default("today"),
 	limit: z.number().int().min(1).max(100).default(25),

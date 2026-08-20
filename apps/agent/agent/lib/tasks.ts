@@ -44,6 +44,25 @@ type CompanyProfileCompletionRead = (
 	taskId: string,
 ) => Promise<{ kind: string; briefs: number } | null>;
 
+export async function companyProfileRequester(
+	companyId: string,
+	read: (companyId: string) => Promise<string | null> = async (id) => {
+		const task = await db.agentTask.findFirst({
+			where: {
+				companyId: id,
+				kind: "company-profile",
+				finishedAt: null,
+				requestedById: { not: null },
+			},
+			orderBy: { createdAt: "desc" },
+			select: { requestedById: true },
+		});
+		return task?.requestedById ?? null;
+	},
+): Promise<string | null> {
+	return read(companyId);
+}
+
 export async function companyProfileCompletion(
 	taskId: string,
 	read: CompanyProfileCompletionRead = async (id) => {

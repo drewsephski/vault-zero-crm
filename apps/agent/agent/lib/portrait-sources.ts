@@ -1,6 +1,6 @@
 import { extract } from "./context-dev";
-import { getProfile, slugFromProfileUrl } from "./linkdapi";
 import { namesMatch } from "./names";
+import { getProfile, slugFromProfileUrl } from "./web-profile";
 
 export type PortraitSource = "linkedin" | "github" | "employer-site";
 

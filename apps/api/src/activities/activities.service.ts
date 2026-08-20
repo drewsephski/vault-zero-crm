@@ -181,6 +181,24 @@ export class ActivitiesService {
 		return serializeEntry(updated);
 	}
 
+	async delete(id: string): Promise<{ id: string }> {
+		const deleted = await this.db.$transaction(async (tx) => {
+			const activity = await tx.activity.findUnique({
+				where: { id },
+				select: { companyId: true, contactId: true, dealId: true },
+			});
+			if (!activity) throw new NotFoundException(`No activity with id ${id}.`);
+
+			const targets = await this.stamp.targetsOf({ id }, tx);
+			await tx.activity.delete({ where: { id } });
+			return { activity, targets };
+		});
+
+		await this.stamp.recomputeAfterDelete(deleted.targets, deleted.activity);
+		this.logger.log({ message: "Activity deleted", activityId: id });
+		return { id };
+	}
+
 	async myTasks(input: MyTasksInput, actingUserId: string) {
 		const { start, end } = taskDayWindow(new Date(), input.timezoneOffset);
 		const where: Prisma.ActivityWhereInput = {

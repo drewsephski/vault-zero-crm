@@ -1,10 +1,9 @@
 import { z } from "zod";
-import { enabled, unavailable } from "../lib/capabilities";
 import { spend } from "../lib/focus";
-import { getExperience, getProfile, getProfileByUrn } from "../lib/linkdapi";
 import { looksLikeSameCompany, nameMatchesLocalPart } from "../lib/names";
 import { storePortrait } from "../lib/portrait";
 import { defineTool } from "../lib/tool";
+import { getExperience, getProfile, getProfileByUrn } from "../lib/web-profile";
 
 export default defineTool({
 	description:
@@ -46,10 +45,6 @@ export default defineTool({
 				found: false as const,
 				reason: "A LinkedIn slug or URN is required.",
 			};
-		}
-
-		if (!(await enabled("RAPIDAPI_KEY"))) {
-			return { found: false as const, ...unavailable("RAPIDAPI_KEY") };
 		}
 
 		const charge = spend(includeHistory ? 2 : 1);

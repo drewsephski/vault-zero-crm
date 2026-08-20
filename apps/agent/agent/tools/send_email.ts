@@ -11,6 +11,35 @@ const inputSchema = z.object({
 	crmThreadId: z.string().min(1).optional(),
 });
 
+export function emailServiceFailure(status: number) {
+	if (status === 403) {
+		return {
+			outcome: "failed" as const,
+			code: "email-bridge-auth-mismatch" as const,
+			retryable: false,
+			reason:
+				"Email sending is unavailable because the agent and CRM API are not connected with matching credentials. Retrying will not help until an administrator repairs the deployment.",
+		};
+	}
+
+	if (status === 503) {
+		return {
+			outcome: "failed" as const,
+			code: "email-bridge-unconfigured" as const,
+			retryable: false,
+			reason:
+				"Email sending is not configured on this deployment. Retrying will not help until an administrator enables it.",
+		};
+	}
+
+	return {
+		outcome: "failed" as const,
+		code: "email-service-error" as const,
+		retryable: status >= 500,
+		reason: `The CRM email service returned HTTP ${status}.`,
+	};
+}
+
 export default defineTool({
 	description:
 		"Send one plain-text Gmail message as the current rep. The approval shows the exact recipients, subject, and complete body. Use crmThreadId only when replying to a CRM email thread. Never use for a batch, campaign, scheduled follow-up, or unattended task.",
@@ -61,10 +90,7 @@ export default defineTool({
 			});
 
 			if (!response.ok) {
-				return {
-					outcome: "failed" as const,
-					reason: `The CRM email service returned HTTP ${response.status}.`,
-				};
+				return emailServiceFailure(response.status);
 			}
 
 			const result = (await response.json()) as Record<string, unknown>;

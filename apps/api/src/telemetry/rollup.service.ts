@@ -146,7 +146,6 @@ export class RollupService {
 			postgres_version: postgres,
 			members_bucket: bucket(members),
 
-			cap_rapidapi: isSet("RAPIDAPI_KEY"),
 			cap_tavily: isSet("TAVILY_API_KEY"),
 			cap_context_dev: Boolean(contextKey?.contextDevApiKey?.trim()),
 			cap_blob: isSet("BLOB_READ_WRITE_TOKEN"),

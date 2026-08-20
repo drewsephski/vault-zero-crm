@@ -10,7 +10,10 @@ import {
 } from "../agent/lib/dispatch";
 import { collapsing } from "../agent/lib/pool";
 import type { LeasedTask } from "../agent/lib/tasks";
-import { companyProfileCompletion } from "../agent/lib/tasks";
+import {
+	companyProfileCompletion,
+	companyProfileRequester,
+} from "../agent/lib/tasks";
 
 function deferred() {
 	let release!: () => void;
@@ -117,12 +120,15 @@ describe("taskAuth", () => {
 	});
 
 	it("carries the record context", () => {
-		const auth = taskAuth(task({ companyId: "company_1" }));
+		const auth = taskAuth(
+			task({ companyId: "company_1", requestedById: "user_1" }),
+		);
 
 		expect(auth.attributes).toMatchObject({
 			taskKind: "identify",
 			contactId: "contact_1",
 			companyId: "company_1",
+			requestedById: "user_1",
 		});
 		expect(auth.attributes).not.toHaveProperty("budget");
 	});
@@ -143,6 +149,15 @@ describe("taskAuth", () => {
 });
 
 describe("company profile dispatch", () => {
+	it("uses the requester recorded on the active durable task", async () => {
+		const requester = await companyProfileRequester(
+			"company_1",
+			async () => "user_1",
+		);
+
+		expect(requester).toBe("user_1");
+	});
+
 	it("requires a durable brief even when website extraction is unavailable", () => {
 		const instruction = brief(
 			task({
