@@ -45,13 +45,27 @@ export const acquisitionCriteriaSchema = z
 export function validateCriterionAssessments(
 	expectedIds: readonly AcquisitionCriterionId[],
 	assessments: readonly AcquisitionCriterionAssessment[],
-): { ok: true } | { ok: false; reason: string } {
+):
+	| { ok: true; criteria: AcquisitionCriterionAssessment[] }
+	| { ok: false; reason: string } {
 	const receivedIds = assessments.map((assessment) => assessment.id);
+	const assessmentsById = new Map(
+		assessments.map((assessment) => [assessment.id, assessment]),
+	);
 	const matches =
 		expectedIds.length === receivedIds.length &&
-		expectedIds.every((id, index) => receivedIds[index] === id);
+		assessmentsById.size === receivedIds.length &&
+		expectedIds.every((id) => assessmentsById.has(id));
 
-	if (matches) return { ok: true };
+	if (matches) {
+		return {
+			ok: true,
+			criteria: expectedIds.flatMap((id) => {
+				const assessment = assessmentsById.get(id);
+				return assessment ? [assessment] : [];
+			}),
+		};
+	}
 
 	return {
 		ok: false,

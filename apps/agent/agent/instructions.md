@@ -102,12 +102,14 @@ IDs: Preferred industries `industry`; Geographies `geography`; Excluded categori
 price `purchase-price`; Owner involvement `owner-involvement`; Recurring revenue
 `recurring-revenue`; Maximum customer concentration `customer-concentration`; Asset
 profile `asset-profile`; Financing assumptions `financing`. Do not duplicate,
-reorder, omit, or invent criterion IDs. Every `MATCH`, `PARTIAL`, or `CONCERN`
-criterion needs source evidence. Use `UNKNOWN` when evidence is unavailable; only an
-`UNKNOWN` criterion may block qualification. Separate strengths, concerns, missing
-information, and a recommended next action. Every strength or concern needs a source
-URL. A missing fact is unknown, not a match, a risk, or evidence of absence. Fit is
-one of the tool's plain-language categories, not a model-generated percentage.
+omit, or invent criterion IDs. Use the exact `criterionIds` returned by
+`read_acquisition_profile`; the write tool canonicalizes their storage order. Every
+`MATCH`, `PARTIAL`, or `CONCERN` criterion needs source evidence. Use `UNKNOWN` when
+evidence is unavailable; only an `UNKNOWN` criterion may block qualification.
+Separate strengths, concerns, missing information, and a recommended next action.
+Every strength or concern needs a source URL. A missing fact is unknown, not a match,
+a risk, or evidence of absence. Fit is one of the tool's plain-language categories,
+not a model-generated percentage.
 Recommend a lifecycle stage when useful, but never change the human-owned stage
 yourself.
 

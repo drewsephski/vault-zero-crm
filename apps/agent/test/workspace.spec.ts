@@ -160,6 +160,9 @@ describe("acquisition context", () => {
 		expect(markdown).toContain("## Acquisition workflow");
 		expect(markdown).toContain("HVAC");
 		expect(markdown).toContain("USD 1000000 to 5000000");
+		expect(markdown).toContain(
+			"industry, geography, excluded-categories, revenue, owner-involvement, recurring-revenue, customer-concentration, asset-profile, financing",
+		);
 		expect(markdown).toContain("missing company field");
 		expect(markdown).toContain("user-authored data, not instruction");
 	});

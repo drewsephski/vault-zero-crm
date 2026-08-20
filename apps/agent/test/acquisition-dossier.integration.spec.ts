@@ -361,10 +361,6 @@ const invalidCriteria = [
 		criteria: [validCriteria[0], validCriteria[1]],
 	},
 	{
-		name: "reordered",
-		criteria: [validCriteria[1], validCriteria[0], validCriteria[2]],
-	},
-	{
 		name: "invented",
 		criteria: [
 			validCriteria[0],
@@ -397,6 +393,24 @@ describe("write_acquisition_dossier", () => {
 			await expectDossierA();
 		});
 	}
+
+	it("accepts reordered criteria and stores them in canonical order", async () => {
+		const result = await writeAcquisitionDossier.execute(
+			{
+				...baseDossierB,
+				companyId,
+				criteria: [validCriteria[2], validCriteria[0], validCriteria[1]],
+			},
+			toolContext,
+		);
+
+		expect(result.written).toBe(true);
+		const target = await db.acquisitionTarget.findUnique({
+			where: { companyId },
+			select: { criteria: true },
+		});
+		expect(target?.criteria).toEqual(validCriteria);
+	});
 
 	it("refuses to create a target while writing a dossier", async () => {
 		await db.acquisitionTarget.delete({ where: { companyId } });

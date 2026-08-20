@@ -104,11 +104,12 @@ export default defineTool({
 		if (!criterionValidation.ok) {
 			return { written: false as const, reason: criterionValidation.reason };
 		}
+		const criteria = criterionValidation.criteria;
 
 		const sourceUrls = [
 			...new Set(
-				[...input.strengths, ...input.concerns, ...input.criteria].flatMap(
-					(item) => item.evidence.map((itemEvidence) => itemEvidence.url),
+				[...input.strengths, ...input.concerns, ...criteria].flatMap((item) =>
+					item.evidence.map((itemEvidence) => itemEvidence.url),
 				),
 			),
 		];
@@ -128,7 +129,7 @@ export default defineTool({
 		const snapshot: AcquisitionDossierSnapshot = {
 			fit: input.fit,
 			summary: input.summary,
-			criteria: input.criteria,
+			criteria,
 			strengths: input.strengths,
 			concerns: input.concerns,
 			missingInformation: input.missingInformation,
@@ -147,7 +148,7 @@ export default defineTool({
 					summary: input.summary,
 					strengths: input.strengths,
 					concerns: input.concerns,
-					criteria: input.criteria,
+					criteria,
 					missingInformation: input.missingInformation,
 					recommendedAction: input.recommendedAction,
 					recommendedStage: input.recommendedStage,

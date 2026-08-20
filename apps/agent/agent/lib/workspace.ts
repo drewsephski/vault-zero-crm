@@ -1,4 +1,5 @@
 import { db, getOrganizationId, type Prisma, WorkspaceMode } from "@crm/db";
+import { expectedAcquisitionCriterionIds } from "@crm/db/acquisition";
 import {
 	readWorkspaceIdentity,
 	type WorkspaceIdentity,
@@ -92,6 +93,7 @@ export function acquisitionMarkdown(
 		"This workspace evaluates businesses to acquire. Compare targets against the",
 		"saved buy box when asked, but separate supported fit from unknowns and never",
 		"treat a missing company field as evidence of a match.",
+		`A dossier must assess these criterion IDs exactly once: ${expectedAcquisitionCriterionIds(profile).join(", ")}.`,
 		"<acquisition-profile>",
 		...criteria,
 		"</acquisition-profile>",

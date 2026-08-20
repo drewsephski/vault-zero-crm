@@ -1,4 +1,5 @@
 import { db, getOrganizationId } from "@crm/db";
+import { expectedAcquisitionCriterionIds } from "@crm/db/acquisition";
 import { z } from "zod";
 import {
 	ACQUISITION_PROFILE_SELECT,
@@ -10,7 +11,7 @@ import { defineTool } from "../lib/tool";
 
 export default defineTool({
 	description:
-		"Read the workspace's structured acquisition buy box and report whether it is empty. Call this before answering any request about a buy box, acquisition criteria, acquisition targets, target fit, or acquisition discovery.",
+		"Read the workspace's structured acquisition buy box, report whether it is empty, and return the exact criterion IDs required by write_acquisition_dossier. Call this before answering any request about a buy box, acquisition criteria, acquisition targets, target fit, or acquisition discovery.",
 	inputSchema: z.object({}),
 	async execute() {
 		if (!(await enabled(CRM))) return unavailableCapability("CRM database");
@@ -34,6 +35,7 @@ export default defineTool({
 				available: true as const,
 				mode: profile?.mode ?? null,
 				empty: acquisitionProfileIsEmpty(values),
+				criterionIds: expectedAcquisitionCriterionIds(values),
 				profile: values,
 			};
 		} catch (error) {

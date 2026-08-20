@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { validateCriterionAssessments } from "../agent/lib/acquisition-criteria";
 import { acquisitionProfileValues } from "../agent/lib/acquisition-profile";
 import createContact from "../agent/tools/create_contact";
 import getLinkedInProfile from "../agent/tools/get_linkedin_profile";
@@ -193,6 +194,40 @@ describe("agent tool contracts", () => {
 				criteria: [{ ...assessment, blocksQualification: true }],
 			}).success,
 		).toBe(false);
+	});
+
+	it("accepts the exact acquisition criteria in any order", () => {
+		const assessments = [
+			{
+				id: "revenue" as const,
+				result: "UNKNOWN" as const,
+				explanation: "No reliable source states annual company revenue.",
+				blocksQualification: true,
+				evidence: [],
+			},
+			{
+				id: "industry" as const,
+				result: "MATCH" as const,
+				explanation: "The company operates in a preferred service category.",
+				blocksQualification: false,
+				evidence: [
+					{
+						label: "Company service category",
+						url: "https://example-mechanical.test/services",
+					},
+				],
+			},
+		];
+
+		expect(
+			validateCriterionAssessments(["industry", "revenue"], assessments),
+		).toEqual({ ok: true, criteria: [assessments[1], assessments[0]] });
+		expect(
+			validateCriterionAssessments(
+				["industry", "revenue"],
+				[assessments[1], assessments[1]],
+			),
+		).toMatchObject({ ok: false });
 	});
 
 	it("rejects non-http acquisition criterion evidence", () => {
