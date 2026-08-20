@@ -8,6 +8,7 @@
 		"./activity-author": "./src/activity-author.ts",
 		"./acquisition": "./src/acquisition.ts",
 		"./acquisition-profile-revision": "./src/acquisition-profile-revision.ts",
+		"./acquisition-refresh": "./src/acquisition-refresh.ts",
 		"./acquisition-research-runs": "./src/acquisition-research-runs.ts",
 		"./acquisition-candidates": "./src/acquisition-candidates.ts",
 		"./agent-tasks": "./src/agent-tasks.ts",

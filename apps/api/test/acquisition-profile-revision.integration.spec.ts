@@ -220,4 +220,66 @@ describe("buy-box revisions", () => {
 			`,
 		).toEqual([{ buyBoxRevision: 1 }]);
 	});
+
+	it("increments once for concurrent identical semantic changes", async () => {
+		const before = await db.$queryRaw<Array<{ buyBoxRevision: number }>>`
+			SELECT "buyBoxRevision" FROM "acquisitionProfile" WHERE id = ${organizationId}
+		`;
+		const startingProfile = before[0];
+		if (!startingProfile) throw new Error("expected acquisition profile");
+		const discoveryBefore = discoveryRequests;
+		const next = { ...input, customerConcentrationMax: 18 };
+
+		await Promise.all(
+			Array.from({ length: 12 }, () =>
+				runInOrganization(organizationId, () =>
+					service.updateAcquisitionProfile(userId, next),
+				),
+			),
+		);
+
+		expect(
+			await db.$queryRaw<Array<{ buyBoxRevision: number }>>`
+				SELECT "buyBoxRevision" FROM "acquisitionProfile" WHERE id = ${organizationId}
+			`,
+		).toEqual([{ buyBoxRevision: startingProfile.buyBoxRevision + 1 }]);
+		expect(discoveryRequests).toBe(discoveryBefore + 1);
+	});
+
+	it("serializes different complete saves with the last lock holder winning", async () => {
+		const before = await db.$queryRaw<Array<{ buyBoxRevision: number }>>`
+			SELECT "buyBoxRevision" FROM "acquisitionProfile" WHERE id = ${organizationId}
+		`;
+		const startingProfile = before[0];
+		if (!startingProfile) throw new Error("expected acquisition profile");
+		const changes = [12, 24] as const;
+
+		await Promise.all(
+			changes.map((customerConcentrationMax) =>
+				runInOrganization(organizationId, () =>
+					service.updateAcquisitionProfile(userId, {
+						...input,
+						customerConcentrationMax,
+					}),
+				),
+			),
+		);
+
+		const profile = await db.$queryRaw<
+			Array<{ buyBoxRevision: number; customerConcentrationMax: number | null }>
+		>`
+			SELECT "buyBoxRevision", "customerConcentrationMax"
+			FROM "acquisitionProfile"
+			WHERE id = ${organizationId}
+		`;
+		const savedProfile = profile[0];
+		if (!savedProfile) throw new Error("expected saved acquisition profile");
+		expect(savedProfile.buyBoxRevision).toBe(
+			startingProfile.buyBoxRevision + 2,
+		);
+		expect(
+			savedProfile.customerConcentrationMax === 12 ||
+				savedProfile.customerConcentrationMax === 24,
+		).toBe(true);
+	});
 });

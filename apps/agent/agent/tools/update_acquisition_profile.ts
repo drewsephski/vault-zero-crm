@@ -8,7 +8,11 @@ import {
 	Prisma,
 	WorkspaceMode,
 } from "@crm/db";
-import { acquisitionProfileChanged } from "@crm/db/acquisition-profile-revision";
+import {
+	acquisitionProfileChanged,
+	withAcquisitionProfileLock,
+} from "@crm/db/acquisition-profile-revision";
+import { acquisitionRefreshTargetIds } from "@crm/db/acquisition-refresh";
 import { PRIORITY, queueAgentTask } from "@crm/db/agent-tasks";
 import { isCurrencyCode, normalizeCurrency } from "@crm/db/currency";
 import { z } from "zod";
@@ -130,52 +134,61 @@ export default defineTool({
 				};
 			}
 
-			const current = await db.acquisitionProfile.findUnique({
-				where: { id: organizationId },
-				select: ACQUISITION_PROFILE_SELECT,
-			});
-			const values = mergeValues(input, acquisitionProfileValues(current));
-			const rangeError = validateAcquisitionRanges(values);
-			if (rangeError) {
-				return { updated: false as const, reason: rangeError };
-			}
-
-			const fields = {
-				preferredIndustries: values.preferredIndustries,
-				geographies: values.geographies,
-				excludedCategories: values.excludedCategories,
-				currency: values.currency,
-				revenueMin: decimal(values.revenueMin),
-				revenueMax: decimal(values.revenueMax),
-				ebitdaMin: decimal(values.ebitdaMin),
-				ebitdaMax: decimal(values.ebitdaMax),
-				purchasePriceMin: decimal(values.purchasePriceMin),
-				purchasePriceMax: decimal(values.purchasePriceMax),
-				ownerInvolvement: values.ownerInvolvement,
-				recurringRevenuePreference: values.recurringRevenuePreference,
-				customerConcentrationMax: values.customerConcentrationMax,
-				assetPreference: values.assetPreference,
-				financingAssumptions: values.financingAssumptions,
-			};
-
-			const changed = acquisitionProfileChanged(current, fields);
-			const profile = !current
-				? await db.acquisitionProfile.create({
-						data: {
-							id: organizationId,
-							mode: WorkspaceMode.ACQUISITION,
-							buyBoxRevision: 0,
-							...fields,
-						},
+			const resolution = await withAcquisitionProfileLock(
+				db,
+				organizationId,
+				async (tx) => {
+					const current = await tx.acquisitionProfile.findUnique({
+						where: { id: organizationId },
 						select: ACQUISITION_PROFILE_SELECT,
-					})
-				: changed
-					? await db.acquisitionProfile.update({
-							where: { id: organizationId },
-							data: { ...fields, buyBoxRevision: { increment: 1 } },
-							select: ACQUISITION_PROFILE_SELECT,
-						})
-					: current;
+					});
+					const values = mergeValues(input, acquisitionProfileValues(current));
+					const rangeError = validateAcquisitionRanges(values);
+					if (rangeError) return { ok: false as const, reason: rangeError };
+
+					const fields = {
+						preferredIndustries: values.preferredIndustries,
+						geographies: values.geographies,
+						excludedCategories: values.excludedCategories,
+						currency: values.currency,
+						revenueMin: decimal(values.revenueMin),
+						revenueMax: decimal(values.revenueMax),
+						ebitdaMin: decimal(values.ebitdaMin),
+						ebitdaMax: decimal(values.ebitdaMax),
+						purchasePriceMin: decimal(values.purchasePriceMin),
+						purchasePriceMax: decimal(values.purchasePriceMax),
+						ownerInvolvement: values.ownerInvolvement,
+						recurringRevenuePreference: values.recurringRevenuePreference,
+						customerConcentrationMax: values.customerConcentrationMax,
+						assetPreference: values.assetPreference,
+						financingAssumptions: values.financingAssumptions,
+					};
+					const changed = acquisitionProfileChanged(current, fields);
+					const profile = !current
+						? await tx.acquisitionProfile.create({
+								data: {
+									id: organizationId,
+									mode: WorkspaceMode.ACQUISITION,
+									buyBoxRevision: 0,
+									...fields,
+								},
+								select: ACQUISITION_PROFILE_SELECT,
+							})
+						: changed
+							? await tx.acquisitionProfile.update({
+									where: { id: organizationId },
+									data: { ...fields, buyBoxRevision: { increment: 1 } },
+									select: ACQUISITION_PROFILE_SELECT,
+								})
+							: current;
+
+					return { ok: true as const, changed, profile };
+				},
+			);
+			if (!resolution.ok) {
+				return { updated: false as const, reason: resolution.reason };
+			}
+			const { changed, profile } = resolution;
 
 			let discoveryQueued = false;
 			if (
@@ -297,19 +310,16 @@ async function queueAcquisitionTargetRefreshes(
 	database: Db,
 	organizationId: string,
 ): Promise<void> {
-	const targets = await database.acquisitionTarget.findMany({
-		where: {
-			company: { is: { organizationId, domain: { not: null } } },
-		},
-		select: { companyId: true },
-		orderBy: { researchedAt: "asc" },
-		take: 50,
-	});
+	const companyIds = await acquisitionRefreshTargetIds(
+		database,
+		organizationId,
+		50,
+	);
 
 	await Promise.all(
-		targets.map((target) =>
+		companyIds.map((companyId) =>
 			queueAgentTask(database, {
-				companyId: target.companyId,
+				companyId,
 				kind: "acquisition-refresh",
 				reason: "Buy box changed — acquisition research refresh queued",
 				priority: PRIORITY.acquisitionRefresh,

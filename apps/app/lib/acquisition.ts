@@ -125,6 +125,14 @@ export function acquisitionProfileDossierReady(
 	});
 }
 
+export function legacyResearchRevisionNotice(
+	freshness: "current" | "older-buy-box" | "untracked",
+	researchedAt: string | null,
+): string | null {
+	if (freshness !== "untracked" || !researchedAt) return null;
+	return "This research predates buy-box revision tracking. Refresh it to confirm it still matches your current criteria.";
+}
+
 export type TargetResearchState =
 	| {
 			status: "idle" | "queued" | "running" | "retrying";

@@ -3,8 +3,10 @@ import {
 	ACQUISITION_TASK_INTERVAL_MS,
 	ACQUISITION_TASK_KINDS,
 } from "@crm/db/acquisition";
+import { acquisitionRefreshTargetIds } from "@crm/db/acquisition-refresh";
 import {
 	MAX_ATTEMPTS,
+	PRIORITY,
 	type QueueAgentTaskInput,
 	queueAgentTask,
 	RETIRED_OUTCOME,
@@ -125,7 +127,9 @@ export async function retireExhausted(): Promise<TaskSubject[]> {
 		);
 	}
 
-	const retired = await db.$queryRaw<TaskSubject[]>`
+	const retired = await db.$queryRaw<
+		Array<TaskSubject & { organizationId: string }>
+	>`
 		UPDATE "agentTask" AS t
 		SET "finishedAt" = ${now},
 			"outcome" = ${RETIRED_OUTCOME},
@@ -133,16 +137,22 @@ export async function retireExhausted(): Promise<TaskSubject[]> {
 		WHERE t."finishedAt" IS NULL
 			AND t."attempts" >= ${MAX_ATTEMPTS}
 			AND (t."leasedUntil" IS NULL OR t."leasedUntil" < ${now})
-		RETURNING t.id, t."contactId", t."companyId", t.kind;
+		RETURNING t.id, t."contactId", t."companyId", t.kind, t."organizationId";
 	`;
 
 	for (const task of retired) {
 		if (task.kind === "acquisition-refresh") {
-			await failAcquisitionResearchRun(task.id, RETIRED_OUTCOME);
+			await runInOrganization(task.organizationId, async () => {
+				await failAcquisitionResearchRun(task.id, RETIRED_OUTCOME);
+				await continueAcquisitionRefreshes(
+					task.organizationId,
+					task.companyId,
+				).catch(() => {});
+			});
 		}
 	}
 
-	return retired;
+	return retired.map(({ organizationId: _organizationId, ...task }) => task);
 }
 
 export async function completeTask(
@@ -153,7 +163,7 @@ export async function completeTask(
 ): Promise<TaskSubject | null> {
 	const now = new Date();
 
-	return db.$transaction(async (tx) => {
+	const completed = await db.$transaction(async (tx) => {
 		const { count } = await tx.agentTask.updateMany({
 			where: { id: taskId, finishedAt: null, outcome: null },
 			data: {
@@ -173,6 +183,7 @@ export async function completeTask(
 				contactId: true,
 				companyId: true,
 				kind: true,
+				organizationId: true,
 				reason: true,
 				priority: true,
 				budget: true,
@@ -209,8 +220,17 @@ export async function completeTask(
 			contactId: task.contactId,
 			companyId: task.companyId,
 			kind: task.kind,
+			organizationId: task.organizationId,
 		};
 	});
+	if (!completed) return null;
+	if (completed.kind === "acquisition-refresh") {
+		await continueAcquisitionRefreshes(completed.organizationId).catch(
+			() => {},
+		);
+	}
+	const { organizationId: _organizationId, ...subject } = completed;
+	return subject;
 }
 
 export async function failTask(
@@ -230,6 +250,7 @@ export async function failTask(
 			kind: true,
 			attempts: true,
 			finishedAt: true,
+			organizationId: true,
 		},
 	});
 
@@ -265,6 +286,10 @@ export async function failTask(
 
 		if (count === 1 && task.kind === "acquisition-refresh") {
 			await failAcquisitionResearchRun(taskId, failure);
+			await continueAcquisitionRefreshes(
+				task.organizationId,
+				task.companyId,
+			).catch(() => {});
 		}
 
 		return count === 1
@@ -347,6 +372,28 @@ export async function lastDecision(contactId: string) {
 }
 
 export type { Prisma };
+
+async function continueAcquisitionRefreshes(
+	organizationId: string,
+	excludedCompanyId?: string | null,
+): Promise<void> {
+	const companyIds = await acquisitionRefreshTargetIds(db, organizationId, 1, {
+		excludeQueued: true,
+		excludedCompanyIds: excludedCompanyId ? [excludedCompanyId] : [],
+	});
+	await Promise.all(
+		companyIds.map((companyId) =>
+			queueAgentTask(db, {
+				companyId,
+				kind: "acquisition-refresh",
+				reason: "Continue the stale acquisition research refresh queue",
+				priority: PRIORITY.acquisitionRefresh,
+				budget: 12,
+				dueAt: new Date(),
+			}),
+		),
+	);
+}
 
 function isAcquisitionTaskKind(
 	kind: string,

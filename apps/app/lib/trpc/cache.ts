@@ -25,6 +25,7 @@ export type CrmCache = {
 	settings(options?: Options): Promise<void>;
 	currency(options?: Options): Promise<void>;
 	workspace(options?: Options): Promise<void>;
+	buyBox(options?: Options): Promise<void>;
 	sso(options?: Options): Promise<void>;
 	everything(): Promise<void>;
 };
@@ -203,6 +204,17 @@ export function useCrmCache(): CrmCache {
 					trpc.workspace.acquisitionProfile.queryKey(),
 				],
 				[trpc.dashboard.summary.queryKey()],
+				options,
+			),
+
+		buyBox: (options) =>
+			run(
+				[trpc.workspace.acquisitionProfile.queryKey()],
+				[
+					trpc.dashboard.summary.queryKey(),
+					trpc.companies.byId.queryKey(),
+					trpc.companies.list.queryKey(),
+				],
 				options,
 			),
 

@@ -14,7 +14,11 @@ import {
 	WorkspaceMode,
 } from "@crm/db";
 import { isDiscoveryReady, isDossierReady } from "@crm/db/acquisition";
-import { acquisitionProfileChanged } from "@crm/db/acquisition-profile-revision";
+import {
+	acquisitionProfileChanged,
+	withAcquisitionProfileLock,
+} from "@crm/db/acquisition-profile-revision";
+import { acquisitionRefreshTargetIds } from "@crm/db/acquisition-refresh";
 import { readReportingCurrency } from "@crm/db/settings";
 import { isOnboarded, markOnboarded, workspaceSlug } from "@crm/db/workspace";
 import {
@@ -257,43 +261,51 @@ export class WorkspaceService {
 			assetPreference: input.assetPreference,
 			financingAssumptions: blankToNull(input.financingAssumptions ?? ""),
 		};
-		const current = await this.db.acquisitionProfile.findUnique({
-			where: { id: workspaceId },
-			select: {
-				preferredIndustries: true,
-				geographies: true,
-				excludedCategories: true,
-				currency: true,
-				revenueMin: true,
-				revenueMax: true,
-				ebitdaMin: true,
-				ebitdaMax: true,
-				purchasePriceMin: true,
-				purchasePriceMax: true,
-				ownerInvolvement: true,
-				recurringRevenuePreference: true,
-				customerConcentrationMax: true,
-				assetPreference: true,
-				financingAssumptions: true,
-			},
-		});
-		const changed = acquisitionProfileChanged(current, fields);
+		const changed = await withAcquisitionProfileLock(
+			this.db,
+			workspaceId,
+			async (tx) => {
+				const current = await tx.acquisitionProfile.findUnique({
+					where: { id: workspaceId },
+					select: {
+						preferredIndustries: true,
+						geographies: true,
+						excludedCategories: true,
+						currency: true,
+						revenueMin: true,
+						revenueMax: true,
+						ebitdaMin: true,
+						ebitdaMax: true,
+						purchasePriceMin: true,
+						purchasePriceMax: true,
+						ownerInvolvement: true,
+						recurringRevenuePreference: true,
+						customerConcentrationMax: true,
+						assetPreference: true,
+						financingAssumptions: true,
+					},
+				});
+				const profileChanged = acquisitionProfileChanged(current, fields);
 
-		if (!current) {
-			await this.db.acquisitionProfile.create({
-				data: {
-					id: workspaceId,
-					mode: WorkspaceMode.ACQUISITION,
-					buyBoxRevision: 0,
-					...fields,
-				},
-			});
-		} else if (changed) {
-			await this.db.acquisitionProfile.update({
-				where: { id: workspaceId },
-				data: { ...fields, buyBoxRevision: { increment: 1 } },
-			});
-		}
+				if (!current) {
+					await tx.acquisitionProfile.create({
+						data: {
+							id: workspaceId,
+							mode: WorkspaceMode.ACQUISITION,
+							buyBoxRevision: 0,
+							...fields,
+						},
+					});
+				} else if (profileChanged) {
+					await tx.acquisitionProfile.update({
+						where: { id: workspaceId },
+						data: { ...fields, buyBoxRevision: { increment: 1 } },
+					});
+				}
+
+				return profileChanged;
+			},
+		);
 
 		const discoveryQueued = changed && hasDiscoveryFocus(fields);
 		if (discoveryQueued) {
@@ -560,26 +572,18 @@ export class WorkspaceService {
 		organizationId: string,
 		reason: string,
 	): Promise<void> {
-		const targets = await this.db.acquisitionTarget.findMany({
-			where: {
-				company: { is: { organizationId, domain: { not: null } } },
-			},
-			select: {
-				companyId: true,
-				company: { select: { domain: true } },
-			},
-			orderBy: { researchedAt: "asc" },
-			take: 50,
-		});
+		const companyIds = await acquisitionRefreshTargetIds(
+			this.db,
+			organizationId,
+			50,
+		);
 
 		await Promise.all(
-			targets
-				.filter((target) => normalizeDomain(target.company.domain))
-				.map((target) =>
-					this.agent
-						.acquisitionTargetRequested(target.companyId, reason)
-						.catch(() => null),
-				),
+			companyIds.map((companyId) =>
+				this.agent
+					.acquisitionTargetRequested(companyId, reason)
+					.catch(() => null),
+			),
 		);
 	}
 }

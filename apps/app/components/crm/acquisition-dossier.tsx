@@ -59,6 +59,7 @@ import {
 	acquisitionProfileDossierReady,
 	acquisitionResearchActivity,
 	criterionGroups,
+	legacyResearchRevisionNotice,
 	safeAcquisitionEvidence,
 	targetResearchCopy,
 } from "@/lib/acquisition";
@@ -172,6 +173,10 @@ export function AcquisitionDossier({
 		dismissRecommendedStage.isPending ||
 		acceptRecommendedAction.isPending ||
 		dismissRecommendedAction.isPending;
+	const legacyRevisionNotice = legacyResearchRevisionNotice(
+		target.researchFreshness,
+		target.researchedAt,
+	);
 
 	return (
 		<DetailSheetBody>
@@ -215,6 +220,25 @@ export function AcquisitionDossier({
 			</DetailSheetSplit>
 
 			<DetailSheetSection title="Research">
+				{legacyRevisionNotice ? (
+					<Alert>
+						<AlertTitle>Buy-box revision is untracked</AlertTitle>
+						<AlertDescription>{legacyRevisionNotice}</AlertDescription>
+						{company.acquisitionResearch.status === "idle" &&
+						readinessState === null &&
+						buyBoxReady === true ? (
+							<AlertAction>
+								<Button
+									size="sm"
+									disabled={research.isPending}
+									onClick={() => research.mutate({ id: company.id })}
+								>
+									Refresh research
+								</Button>
+							</AlertAction>
+						) : null}
+					</Alert>
+				) : null}
 				{target.researchFreshness === "older-buy-box" ? (
 					<Alert>
 						<AlertTitle>Research uses an older buy box</AlertTitle>

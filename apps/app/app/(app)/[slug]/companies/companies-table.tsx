@@ -234,6 +234,10 @@ const RESEARCH_COLUMN: DataTableColumn<CompanyRow> = {
 				</span>
 				{row.acquisitionTarget.researchFreshness === "older-buy-box" ? (
 					<span className="text-warning-foreground text-xs">Older buy box</span>
+				) : row.acquisitionTarget.researchFreshness === "untracked" ? (
+					<span className="text-warning-foreground text-xs">
+						Revision untracked
+					</span>
 				) : null}
 			</span>
 		) : (

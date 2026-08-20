@@ -66,7 +66,7 @@ export function BuyBoxForm({
 	const save = useMutation(
 		trpc.workspace.updateAcquisitionProfile.mutationOptions({
 			onSuccess: async (result) => {
-				await cache.workspace();
+				await cache.buyBox();
 				setDraft(null);
 				setErrors({});
 				setStep(0);

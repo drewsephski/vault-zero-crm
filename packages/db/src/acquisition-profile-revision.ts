@@ -1,3 +1,6 @@
+import type { Db } from "./client";
+import type { Prisma } from "./generated/prisma/client";
+
 type DecimalValue = { toString(): string } | number | string | null;
 
 export type AcquisitionProfileRevisionFields = {
@@ -24,6 +27,22 @@ export function acquisitionProfileChanged(
 ): boolean {
 	if (!current) return true;
 	return profileFingerprint(current) !== profileFingerprint(next);
+}
+
+export async function withAcquisitionProfileLock<T>(
+	database: Db,
+	organizationId: string,
+	update: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+	return database.$transaction(async (tx) => {
+		const organizations = await tx.$queryRaw<Array<{ id: string }>>`
+			SELECT id FROM "organization" WHERE id = ${organizationId} FOR UPDATE
+		`;
+		if (organizations.length !== 1) {
+			throw new Error("The workspace no longer exists.");
+		}
+		return update(tx);
+	});
 }
 
 function profileFingerprint(profile: AcquisitionProfileRevisionFields): string {

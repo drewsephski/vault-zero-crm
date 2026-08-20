@@ -36,7 +36,7 @@ export function BuyBoxClearDialog({
 	const clear = useMutation(
 		trpc.workspace.updateAcquisitionProfile.mutationOptions({
 			onSuccess: async () => {
-				await cache.workspace();
+				await cache.buyBox();
 				onCleared?.();
 				toast.success("Buy box cleared.");
 			},

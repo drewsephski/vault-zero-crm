@@ -6,6 +6,7 @@ import {
 	acquisitionTargetCreateSubmission,
 	criterionGroups,
 	defaultCompanyTab,
+	legacyResearchRevisionNotice,
 	safeAcquisitionCandidateSource,
 	safeAcquisitionEvidence,
 	targetResearchCopy,
@@ -175,5 +176,17 @@ describe("acquisition presentation", () => {
 				blocker: "missing-buy-box",
 			}).action,
 		).toEqual({ kind: "buy-box", label: "Complete the buy box" });
+	});
+
+	it("warns conservatively for legacy research without revision provenance", () => {
+		expect(
+			legacyResearchRevisionNotice("untracked", "2026-01-01T00:00:00.000Z"),
+		).toBe(
+			"This research predates buy-box revision tracking. Refresh it to confirm it still matches your current criteria.",
+		);
+		expect(legacyResearchRevisionNotice("untracked", null)).toBeNull();
+		expect(
+			legacyResearchRevisionNotice("current", "2026-01-01T00:00:00.000Z"),
+		).toBeNull();
 	});
 });

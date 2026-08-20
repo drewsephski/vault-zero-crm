@@ -205,6 +205,33 @@ const dossierACriteria: AcquisitionCriterionAssessment[] = [
 ];
 
 describe("acquisition dossier read model", () => {
+	it("keeps pre-revision dossiers explicitly untracked", async () => {
+		const domain = `legacy-revision-${crypto.randomUUID()}.test`;
+		const company = await db.company.create({
+			data: {
+				name: "Legacy Research Target",
+				domain,
+				acquisitionTarget: {
+					create: {
+						researchedAt: new Date("2026-01-01T00:00:00.000Z"),
+						researchedBuyBoxRevision: null,
+						strengths: [],
+						concerns: [],
+						missingInformation: [],
+						sourceUrls: [],
+					},
+				},
+			},
+			select: { id: true },
+		});
+		domains.push(domain);
+		companyIds.push(company.id);
+
+		const target = (await companyService().byId(company.id)).acquisitionTarget;
+		expect(target?.researchedAt).toBe("2026-01-01T00:00:00.000Z");
+		expect(target?.researchFreshness).toBe("untracked");
+	});
+
 	it("reports open acquisition task state without replacing the persisted dossier", async () => {
 		const domain = `dossier-state-${crypto.randomUUID()}.test`;
 		const timestampA = new Date("2026-08-01T12:00:00.000Z");
