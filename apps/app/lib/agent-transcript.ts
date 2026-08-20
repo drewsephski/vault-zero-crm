@@ -39,6 +39,7 @@ const VERBS: Record<string, string> = {
 	identify_contact: "Put a name to the address",
 	record_fact: "Recorded what it found",
 	write_brief: "Wrote the background",
+	write_company_brief: "Wrote the company brief",
 	write_workspace_profile: "Wrote up who we are",
 	research_person: "Researched them on the web",
 	research_company: "Read the company's site",
@@ -55,6 +56,7 @@ const VERBS: Record<string, string> = {
 	update_acquisition_profile: "Updated the acquisition buy box",
 	propose_acquisition_candidates: "Prepared acquisition candidates for review",
 	write_acquisition_dossier: "Updated the acquisition dossier",
+	send_email: "Send email",
 
 	load_skill: "Read its instructions for this",
 	web_search: "Searched the web",
@@ -234,6 +236,28 @@ export function pendingQuestion(messages: readonly EveMessage[]) {
 
 		const request = part.toolMetadata?.eve?.inputRequest;
 		if (request) return request;
+	}
+
+	return null;
+}
+
+export function pendingReconnect(
+	messages: readonly EveMessage[],
+): { path: string } | null {
+	const latest = messages.at(-1);
+	if (latest?.role !== "assistant") return null;
+
+	for (const part of [...latest.parts].reverse()) {
+		if (toolName(part) !== "send_email") continue;
+
+		const result = output(part);
+		if (
+			result?.outcome === "needs-reconnect" &&
+			typeof result.reconnectAt === "string" &&
+			result.reconnectAt.startsWith("/")
+		) {
+			return { path: result.reconnectAt };
+		}
 	}
 
 	return null;

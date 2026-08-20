@@ -7,6 +7,7 @@ import {
 	outcomeTone,
 	pendingLinkedInFallback,
 	pendingQuestion,
+	pendingReconnect,
 	resolveThread,
 	sourcesOf,
 	TOOL_VERBS,
@@ -247,6 +248,39 @@ describe("pendingQuestion", () => {
 
 	it("finds nothing in an empty transcript", () => {
 		expect(pendingQuestion([])).toBeNull();
+	});
+});
+
+describe("pendingReconnect", () => {
+	it("offers the real recovery path after Gmail needs reconnecting", () => {
+		expect(
+			pendingReconnect([
+				message([
+					tool("send_email", {
+						output: {
+							outcome: "needs-reconnect",
+							reconnectAt: "/settings/connections",
+						},
+					}),
+				]),
+			]),
+		).toEqual({ path: "/settings/connections" });
+	});
+
+	it("does not keep an old reconnect action after the conversation moves on", () => {
+		expect(
+			pendingReconnect([
+				message([
+					tool("send_email", {
+						output: {
+							outcome: "needs-reconnect",
+							reconnectAt: "/settings/connections",
+						},
+					}),
+				]),
+				message([{ type: "text", text: "Something else." }]),
+			]),
+		).toBeNull();
 	});
 });
 

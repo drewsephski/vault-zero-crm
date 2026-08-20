@@ -55,6 +55,7 @@ import { StatusIndicator } from "@crm/ui/components/status-indicator";
 import { cn } from "@crm/ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEveAgent } from "eve/react";
+import Link from "next/link";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import {
 	type Conversation,
@@ -84,6 +85,7 @@ import {
 	NEW_THREAD,
 	pendingLinkedInFallback,
 	pendingQuestion,
+	pendingReconnect,
 	resolveThread,
 	type Source,
 	type Tone,
@@ -93,6 +95,7 @@ import {
 } from "@/lib/agent-transcript";
 import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
+import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 import { useRecordSheetView } from "./record-sheet/record-stack";
 
 type AgentChatDensity = "default" | "compact";
@@ -273,6 +276,7 @@ function Thread({
 	const messages = toTranscript(agent.data.messages);
 	const question = pendingQuestion(agent.data.messages);
 	const linkedinFallback = pendingLinkedInFallback(agent.data.messages);
+	const reconnect = pendingReconnect(agent.data.messages);
 	const latestMessage = messages.at(-1);
 	const hasStreamingText =
 		working && latestMessage?.mine === false
@@ -387,7 +391,11 @@ function Thread({
 								</MessageScrollerItem>
 							) : null}
 
-							{followUpsReady && followUps.length > 0 ? (
+							{reconnect && !working ? (
+								<ReconnectGoogle path={reconnect.path} />
+							) : null}
+
+							{followUpsReady && !reconnect && followUps.length > 0 ? (
 								<FollowUpPrompts
 									prompts={followUps}
 									disabled={locked}
@@ -463,6 +471,24 @@ function Thread({
 				</p>
 			</form>
 		</div>
+	);
+}
+
+function ReconnectGoogle({ path }: { path: string }) {
+	const workspaceUrl = useWorkspaceUrl();
+
+	return (
+		<MessageScrollerItem messageId="google-reconnect">
+			<div className="space-y-2 pt-2">
+				<p className="text-muted-foreground text-[11px]">
+					Google must grant Gmail sending before the agent can send this
+					message.
+				</p>
+				<Button asChild size="sm">
+					<Link href={workspaceUrl(path)}>Reconnect Google</Link>
+				</Button>
+			</div>
+		</MessageScrollerItem>
 	);
 }
 
