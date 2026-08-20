@@ -6,7 +6,11 @@ export async function acquisitionRefreshTargetIds(
 	database: Db,
 	organizationId: string,
 	limit: number,
-	options: { excludeQueued?: boolean; excludedCompanyIds?: string[] } = {},
+	options: {
+		excludeQueued?: boolean;
+		excludedCompanyIds?: string[];
+		includedCompanyIds?: string[];
+	} = {},
 ): Promise<string[]> {
 	if (limit <= 0) return [];
 
@@ -30,6 +34,13 @@ export async function acquisitionRefreshTargetIds(
 		...(options.excludedCompanyIds ?? []),
 		...unfinished.flatMap((task) => (task.companyId ? [task.companyId] : [])),
 	];
+	const includedCompanyIds = options.includedCompanyIds ?? [];
+	const companyIdWhere = (additionalExcluded: string[] = []) => ({
+		...(includedCompanyIds.length > 0 ? { in: includedCompanyIds } : {}),
+		...(excludedCompanyIds.length + additionalExcluded.length > 0
+			? { notIn: [...excludedCompanyIds, ...additionalExcluded] }
+			: {}),
+	});
 	const baseWhere: Prisma.AcquisitionTargetWhereInput = {
 		stage: { in: [...ACTIVE_ACQUISITION_STAGES] },
 		company: {
@@ -38,8 +49,8 @@ export async function acquisitionRefreshTargetIds(
 				domain: { not: null },
 			},
 		},
-		...(excludedCompanyIds.length > 0
-			? { companyId: { notIn: excludedCompanyIds } }
+		...(excludedCompanyIds.length > 0 || includedCompanyIds.length > 0
+			? { companyId: companyIdWhere() }
 			: {}),
 	};
 	const selected: string[] = [];
@@ -61,7 +72,7 @@ export async function acquisitionRefreshTargetIds(
 			await database.acquisitionTarget.findMany({
 				where: {
 					...baseWhere,
-					companyId: { notIn: [...excludedCompanyIds, ...selected] },
+					companyId: companyIdWhere(selected),
 					researchedAt: { not: null },
 					researchedBuyBoxRevision: {
 						not: null,
@@ -80,7 +91,7 @@ export async function acquisitionRefreshTargetIds(
 			await database.acquisitionTarget.findMany({
 				where: {
 					...baseWhere,
-					companyId: { notIn: [...excludedCompanyIds, ...selected] },
+					companyId: companyIdWhere(selected),
 					researchedAt: { not: null },
 					researchedBuyBoxRevision: null,
 				},

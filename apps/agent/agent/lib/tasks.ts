@@ -198,6 +198,14 @@ export async function completeTask(
 		) {
 			await finalizeAcquisitionResearchRunOnTaskComplete(taskId, tx);
 		}
+		const researchSucceeded =
+			task.kind === "acquisition-refresh" &&
+			(
+				await tx.acquisitionResearchRun.findUnique({
+					where: { agentTaskId: taskId },
+					select: { status: true },
+				})
+			)?.status === AcquisitionResearchRunStatus.SUCCEEDED;
 
 		if (isAcquisitionTaskKind(task.kind)) {
 			await tx.agentTask.create({
@@ -221,15 +229,26 @@ export async function completeTask(
 			companyId: task.companyId,
 			kind: task.kind,
 			organizationId: task.organizationId,
+			researchSucceeded,
 		};
 	});
 	if (!completed) return null;
 	if (completed.kind === "acquisition-refresh") {
+		if (completed.researchSucceeded && completed.companyId) {
+			await advanceStaleCompletedRefresh(
+				completed.organizationId,
+				completed.companyId,
+			).catch(() => {});
+		}
 		await continueAcquisitionRefreshes(completed.organizationId).catch(
 			() => {},
 		);
 	}
-	const { organizationId: _organizationId, ...subject } = completed;
+	const {
+		organizationId: _organizationId,
+		researchSucceeded: _researchSucceeded,
+		...subject
+	} = completed;
 	return subject;
 }
 
@@ -393,6 +412,24 @@ async function continueAcquisitionRefreshes(
 			}),
 		),
 	);
+}
+
+async function advanceStaleCompletedRefresh(
+	organizationId: string,
+	companyId: string,
+): Promise<void> {
+	const companyIds = await acquisitionRefreshTargetIds(db, organizationId, 1, {
+		includedCompanyIds: [companyId],
+	});
+	if (companyIds.length === 0) return;
+	await queueAgentTask(db, {
+		companyId,
+		kind: "acquisition-refresh",
+		reason: "Buy box changed during research — refresh again",
+		priority: PRIORITY.acquisitionRefresh,
+		budget: 12,
+		dueAt: new Date(),
+	});
 }
 
 function isAcquisitionTaskKind(

@@ -450,6 +450,20 @@ describe("acquisition research runs", () => {
 				select: { researchedBuyBoxRevision: true },
 			});
 			expect(target.researchedBuyBoxRevision).toBe(profile.buyBoxRevision);
+
+			await completeTask(task.id, "ran");
+			const pending = await db.agentTask.findMany({
+				where: {
+					companyId,
+					kind: "acquisition-refresh",
+					finishedAt: null,
+				},
+				select: { dueAt: true },
+			});
+			expect(pending).toHaveLength(1);
+			expect(pending[0]?.dueAt.getTime()).toBeLessThanOrEqual(
+				Date.now() + 1000,
+			);
 		} finally {
 			await db.acquisitionProfile.update({
 				where: { id: WORKSPACE_ID },
