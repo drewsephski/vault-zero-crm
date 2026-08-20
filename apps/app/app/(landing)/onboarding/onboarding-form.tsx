@@ -48,7 +48,7 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 
 				save.mutate({
 					name: String(form.get("name") ?? "").trim(),
-					website: String(form.get("website") ?? "").trim(),
+					website: String(form.get("website") ?? "").trim() || null,
 				});
 			}}
 			className="flex flex-col gap-6"
@@ -67,7 +67,9 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 				</Field>
 
 				<Field>
-					<FieldLabel htmlFor={websiteId}>Your company website</FieldLabel>
+					<FieldLabel htmlFor={websiteId}>
+						Your company website (optional)
+					</FieldLabel>
 					<InputGroup>
 						<InputGroupAddon>
 							<InputGroupText>https://</InputGroupText>
@@ -81,12 +83,11 @@ export function OnboardingForm({ placeholder }: { placeholder: string }) {
 							autoCorrect="off"
 							spellCheck={false}
 							inputMode="url"
-							required
 						/>
 					</InputGroup>
 					<FieldDescription>
-						Eve uses this context when researching and comparing acquisition
-						targets.
+						If provided, Eve uses this context when researching and comparing
+						acquisition targets.
 					</FieldDescription>
 				</Field>
 			</FieldGroup>

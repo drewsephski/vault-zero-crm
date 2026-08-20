@@ -88,8 +88,7 @@ export function WorkspaceForm() {
 							!canRename ||
 							save.isPending ||
 							!dirty ||
-							values.name.trim() === "" ||
-							values.website.trim() === ""
+							values.name.trim() === ""
 						}
 					>
 						{save.isPending ? <Spinner data-icon="inline-start" /> : null}
@@ -105,7 +104,7 @@ export function WorkspaceForm() {
 						event.preventDefault();
 						save.mutate({
 							name: values.name,
-							website: values.website.trim(),
+							website: values.website.trim() || null,
 						});
 					}}
 				>
@@ -127,7 +126,7 @@ export function WorkspaceForm() {
 						</Field>
 
 						<Field>
-							<FieldLabel htmlFor={websiteId}>Website</FieldLabel>
+							<FieldLabel htmlFor={websiteId}>Website (optional)</FieldLabel>
 							<InputGroup>
 								<InputGroupAddon>
 									<InputGroupText>https://</InputGroupText>
@@ -145,7 +144,9 @@ export function WorkspaceForm() {
 									disabled={!canRename || save.isPending}
 								/>
 							</InputGroup>
-							<FieldDescription>Your own company's website.</FieldDescription>
+							<FieldDescription>
+								Your own company's website, if you have one.
+							</FieldDescription>
 						</Field>
 					</FieldGroup>
 				</form>

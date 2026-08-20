@@ -346,7 +346,7 @@ export class WorkspaceService {
 
 		const website = normalizeDomain(input.website);
 
-		if (!website) {
+		if (input.website !== null && !website) {
 			throw new BadRequestException(
 				"That is not a website. Enter the domain, like acme.com.",
 			);
@@ -377,7 +377,7 @@ export class WorkspaceService {
 
 		this.logger.log({ message: "Workspace updated", userId });
 
-		if (website !== before?.website) {
+		if (website && website !== before?.website) {
 			await this.agent.workspaceChanged(
 				website,
 				before?.website

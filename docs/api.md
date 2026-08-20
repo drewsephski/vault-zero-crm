@@ -56,17 +56,18 @@ that row.
   `WorkspaceService` adds one invariant: **the last owner cannot be demoted**, with
   `FOR UPDATE` on the owner rows before counting.
 - **Reads and writes go through tRPC**, not `authClient.organization.*`.
-- **Name and website are required at onboarding and cannot be skipped**, in the form
-  *and* in `updateWorkspaceInput`, posting the same `workspace.update` as settings.
+- **Name is required at onboarding; website is optional**, in the form and in
+  `updateWorkspaceInput`, posting the same `workspace.update` as settings. A blank
+  website is stored as null and does not queue workspace-profile research.
 - **Onboarded state is `onboardedAt` inside the plugin's `metadata` blob**, not a
   column; `isOnboarded`/`markOnboarded` (`@crm/db/workspace`) are the only accessors,
   and `markOnboarded` preserves every other key.
 - **The name starts as `DEFAULT_WORKSPACE_NAME` (`My workspace`), a product default not an
   answer.** The header renders `<name> CRM`, so `workspaceLabel` tests the name rather
   than comparing to the default.
-- **The website queues the agent's `workspace-profile` task** and goes through
-  `normalizeDomain`, rejecting null. Stored canonical, so re-saving uncanonically
-  counts as a change and re-queues research.
+- **A provided website queues the agent's `workspace-profile` task** and goes through
+  `normalizeDomain`. Stored canonical, so re-saving uncanonically counts as a change
+  and re-queues research.
 
 ### Gates in `proxy.ts`
 

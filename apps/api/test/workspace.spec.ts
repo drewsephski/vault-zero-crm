@@ -1,9 +1,27 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { isWorkspaceEmail } from "@crm/auth/workspace";
 import { externalParticipants } from "../src/google/participants";
+import { updateWorkspaceInput } from "../src/workspace/workspace.contracts";
 
 beforeEach(() => {
 	process.env.ALLOWED_SIGN_IN = "acme.com";
+});
+
+describe("updateWorkspaceInput", () => {
+	it("accepts an omitted company website represented as null", () => {
+		expect(updateWorkspaceInput.parse({ name: "Acme", website: null })).toEqual(
+			{ name: "Acme", website: null },
+		);
+	});
+
+	it("still rejects a blank or missing website value", () => {
+		expect(
+			updateWorkspaceInput.safeParse({ name: "Acme", website: "" }).success,
+		).toBe(false);
+		expect(updateWorkspaceInput.safeParse({ name: "Acme" }).success).toBe(
+			false,
+		);
+	});
 });
 
 describe("isWorkspaceEmail", () => {
