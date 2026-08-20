@@ -2,6 +2,8 @@ import Logo from "@crm/ui/components/logo";
 import { Link } from "@crm/ui/components/link";
 import type { ReactNode } from "react";
 
+const COPYRIGHT_YEAR = 2026;
+
 export function LegalDocument({
 	title,
 	description,
@@ -46,7 +48,7 @@ export function LegalDocument({
 
 			<footer className="border-border border-t">
 				<div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-6 text-muted-foreground text-sm">
-					<p>© {new Date().getFullYear()} Vault Zero</p>
+					<p>© {COPYRIGHT_YEAR} Vault Zero</p>
 					<Link href="/privacy">Privacy</Link>
 					<Link href="/terms">Terms</Link>
 					<Link
