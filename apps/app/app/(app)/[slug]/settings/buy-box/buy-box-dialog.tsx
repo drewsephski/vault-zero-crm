@@ -29,7 +29,7 @@ export function BuyBoxDialog({
 						for screening and discovery.
 					</DialogDescription>
 				</DialogHeader>
-				<div className="px-4 pb-4">
+				<div className="px-4 pt-4 pb-4">
 					<BuyBoxForm
 						presentation="inline"
 						onSaved={() => onOpenChange(false)}
