@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import { organizationIdForUser } from "@crm/auth";
 import {
 	AGENT_URL,
 	bridgeConfigured,
@@ -19,6 +20,14 @@ async function handler(request: Request): Promise<Response> {
 	const session = await getSession();
 	if (!session) {
 		return Response.json({ error: "Not signed in." }, { status: 401 });
+	}
+
+	const organizationId = await organizationIdForUser(session.user.id);
+	if (!organizationId) {
+		return Response.json(
+			{ error: "No workspace is available for this account." },
+			{ status: 503 },
+		);
 	}
 
 	const url = new URL(request.url);
@@ -62,6 +71,7 @@ async function handler(request: Request): Promise<Response> {
 				companyId: cuid(companyId),
 				dealId: cuid(dealId),
 			},
+			organizationId,
 		)}`,
 	);
 

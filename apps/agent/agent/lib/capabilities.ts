@@ -1,6 +1,7 @@
 import "@crm/env/load";
 
 import { db } from "@crm/db";
+import { getOrganizationId } from "@crm/db/tenancy";
 import { readContextDevKey } from "@crm/db/settings";
 
 export const CONTEXT_DEV = "CONTEXT_DEV";
@@ -89,7 +90,11 @@ export function capabilitiesFrom(
 
 async function crmReady(): Promise<boolean> {
 	try {
-		await db.$queryRaw`SELECT 1`;
+		if (getOrganizationId()) {
+			await db.contact.findFirst({ select: { id: true } });
+		} else {
+			await db.$queryRaw`SELECT 1`;
+		}
 		return true;
 	} catch {
 		return false;

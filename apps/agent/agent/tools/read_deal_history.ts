@@ -1,4 +1,4 @@
-import { defineTool } from "eve/tools";
+import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { readDealHistory } from "../lib/accounts";
 import { CRM, enabled, unavailableCapability } from "../lib/capabilities";

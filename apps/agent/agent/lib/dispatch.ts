@@ -137,6 +137,7 @@ export function taskAuth(task: LeasedTask, base: AppAuth = APP_AUTH): AppAuth {
 		attributes: {
 			taskKind: task.kind,
 			reason: task.reason,
+			organizationId: task.organizationId,
 			...(task.contactId ? { contactId: task.contactId } : {}),
 			...(task.companyId ? { companyId: task.companyId } : {}),
 		},

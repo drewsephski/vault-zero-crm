@@ -1,5 +1,5 @@
 import { db, getOrganizationId } from "@crm/db";
-import { defineTool } from "eve/tools";
+import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import {
 	ACQUISITION_PROFILE_SELECT,

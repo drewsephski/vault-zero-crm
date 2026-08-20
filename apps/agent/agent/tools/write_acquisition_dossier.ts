@@ -11,7 +11,7 @@ import {
 	TARGET_LIFECYCLE_STAGES,
 } from "@crm/db/acquisition";
 import type { AcquisitionDossierSnapshot } from "@crm/db/acquisition-research-runs";
-import { defineTool } from "eve/tools";
+import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import {
 	acquisitionCriteriaSchema,

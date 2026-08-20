@@ -26,12 +26,22 @@ export function repFromCrm(secret: string): AuthFn<Request> {
 
 			if (!result.ok) return null;
 
-			const claims = result.sessionAuth;
+			const claims = result.sessionAuth as typeof result.sessionAuth & {
+				organizationId?: unknown;
+			};
 			const userId = claims.subject;
 			if (!userId) return null;
 
+			const organizationId =
+				typeof claims.organizationId === "string"
+					? claims.organizationId.trim()
+					: null;
+
 			return {
-				attributes: claims.attributes ?? {},
+				attributes: {
+					...(claims.attributes ?? {}),
+					...(organizationId ? { organizationId } : {}),
+				},
 				authenticator: "crm-app",
 				principalId: userId,
 				principalType: "user" as const,

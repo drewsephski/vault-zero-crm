@@ -1,4 +1,4 @@
-import { defineTool } from "eve/tools";
+import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { runBrand } from "../lib/brand";
 import { spend } from "../lib/focus";

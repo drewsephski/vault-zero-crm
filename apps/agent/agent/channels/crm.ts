@@ -5,6 +5,9 @@ import { brief, drainAll, taskAuth } from "../lib/dispatch";
 import { settle } from "../lib/enrichment";
 import { followUpRequestSchema, generateFollowUps } from "../lib/follow-ups";
 import { completeTask, failTask } from "../lib/tasks";
+import {
+	withTaskOrganizationScope,
+} from "../lib/tenant";
 import { authenticateCrmRep } from "./eve";
 
 const TASK_MARKER = "task:";
@@ -105,27 +108,31 @@ export default defineChannel({
 			const taskId = taskFromToken(channel.continuationToken);
 			if (!taskId) return;
 
-			const subject = await completeTask(
-				taskId,
-				"Research paused because it needs a rep's answer.",
-				undefined,
-				{ skipResearchRunFinalization: true },
-			);
-			if (subject) {
-				await settle(
-					subject,
-					EnrichmentStatus.FAILED,
-					"Research needs a rep's answer before it can continue.",
+			await withTaskOrganizationScope(taskId, async () => {
+				const subject = await completeTask(
+					taskId,
+					"Research paused because it needs a rep's answer.",
+					undefined,
+					{ skipResearchRunFinalization: true },
 				);
-			}
+				if (subject) {
+					await settle(
+						subject,
+						EnrichmentStatus.FAILED,
+						"Research needs a rep's answer before it can continue.",
+					);
+				}
+			});
 		},
 
 		async "session.waiting"(_data, channel) {
 			const taskId = taskFromToken(channel.continuationToken);
 			if (!taskId) return;
 
-			const subject = await completeTask(taskId, "ran");
-			if (subject) await settle(subject, EnrichmentStatus.COMPLETE);
+			await withTaskOrganizationScope(taskId, async () => {
+				const subject = await completeTask(taskId, "ran");
+				if (subject) await settle(subject, EnrichmentStatus.COMPLETE);
+			});
 		},
 
 		async "turn.failed"(data, channel) {
@@ -137,14 +144,16 @@ export default defineChannel({
 					? String((data as { error: unknown }).error)
 					: "The research turn failed.";
 
-			const result = await failTask(taskId, reason);
-			if (!result) return;
+			await withTaskOrganizationScope(taskId, async () => {
+				const result = await failTask(taskId, reason);
+				if (!result) return;
 
-			await settle(
-				result.subject,
-				result.retrying ? EnrichmentStatus.PENDING : EnrichmentStatus.FAILED,
-				result.retrying ? "Research failed; retrying shortly." : reason,
-			);
+				await settle(
+					result.subject,
+					result.retrying ? EnrichmentStatus.PENDING : EnrichmentStatus.FAILED,
+					result.retrying ? "Research failed; retrying shortly." : reason,
+				);
+			});
 		},
 	},
 

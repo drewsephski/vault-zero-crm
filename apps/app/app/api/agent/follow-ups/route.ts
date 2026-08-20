@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import { organizationIdForUser } from "@crm/auth";
 import {
 	AGENT_URL,
 	bridgeConfigured,
@@ -24,6 +25,14 @@ export async function POST(request: Request): Promise<Response> {
 		return Response.json({ error: "Not signed in." }, { status: 401 });
 	}
 
+	const organizationId = await organizationIdForUser(session.user.id);
+	if (!organizationId) {
+		return Response.json(
+			{ error: "No workspace is available for this account." },
+			{ status: 503 },
+		);
+	}
+
 	const body = await request.text();
 	if (body.length > MAX_BODY_LENGTH) {
 		return Response.json(
@@ -37,11 +46,15 @@ export async function POST(request: Request): Promise<Response> {
 		upstream = await fetch(new URL(AGENT_FOLLOW_UPS_PATH, AGENT_URL), {
 			method: "POST",
 			headers: {
-				authorization: `Bearer ${await mintBridgeToken({
-					id: session.user.id,
-					email: session.user.email,
-					name: session.user.name,
-				})}`,
+				authorization: `Bearer ${await mintBridgeToken(
+					{
+						id: session.user.id,
+						email: session.user.email,
+						name: session.user.name,
+					},
+					{},
+					organizationId,
+				)}`,
 				"content-type": "application/json",
 			},
 			body,

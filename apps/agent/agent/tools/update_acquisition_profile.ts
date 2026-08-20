@@ -10,7 +10,7 @@ import {
 } from "@crm/db";
 import { PRIORITY, queueAgentTask } from "@crm/db/agent-tasks";
 import { isCurrencyCode, normalizeCurrency } from "@crm/db/currency";
-import { defineTool } from "eve/tools";
+import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import {
 	ACQUISITION_PROFILE_SELECT,
@@ -105,11 +105,10 @@ export default defineTool({
 		if (!(await enabled(CRM))) return unavailableCapability("CRM database");
 
 		const userId = ctx.session.auth.current?.principalId;
-		if (!userId || !(await canManageAcquisition(userId))) {
+		if (!userId) {
 			return {
 				updated: false as const,
-				reason:
-					"Only a workspace owner or admin can change the acquisition buy box.",
+				reason: "This session is not attached to a workspace.",
 			};
 		}
 
@@ -119,6 +118,14 @@ export default defineTool({
 				return {
 					updated: false as const,
 					reason: "This session is not attached to a workspace.",
+				};
+			}
+
+			if (!(await canManageAcquisition(userId, organizationId))) {
+				return {
+					updated: false as const,
+					reason:
+						"Only a workspace owner or admin can change the acquisition buy box.",
 				};
 			}
 
@@ -247,10 +254,10 @@ export function mergeValues(
 	};
 }
 
-async function canManageAcquisition(userId: string): Promise<boolean> {
-	const organizationId = getOrganizationId();
-	if (!organizationId) return false;
-
+async function canManageAcquisition(
+	userId: string,
+	organizationId: string,
+): Promise<boolean> {
 	const membership = await db.member.findUnique({
 		where: {
 			organizationId_userId: { organizationId, userId },

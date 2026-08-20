@@ -1,7 +1,7 @@
 import { db, getOrganizationId, WorkspaceMode } from "@crm/db";
 import { isAcquisitionEvidenceUrl } from "@crm/db/acquisition";
 import { proposeAcquisitionCandidates } from "@crm/db/acquisition-candidates";
-import { defineTool } from "eve/tools";
+import { defineTool } from "../lib/tool";
 import { z } from "zod";
 import { normalizeDomain } from "../lib/record-writes";
 
