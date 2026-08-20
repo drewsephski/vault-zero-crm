@@ -20,6 +20,42 @@ const PLACEHOLDER = "Ask Eve about this target";
  */
 export function AskCard() {
 	const [asked, setAsked] = useState<string | null>(null);
+	const [prompt, setPrompt] = useState("");
+	const [answer, setAnswer] = useState("");
+	const [isStreaming, setIsStreaming] = useState(false);
+
+	async function askQuestion(question: string) {
+		const trimmedQuestion = question.trim();
+		if (!trimmedQuestion || isStreaming) return;
+
+		setAsked(trimmedQuestion);
+		setPrompt("");
+		setAnswer("");
+		setIsStreaming(true);
+
+		try {
+			const response = await fetch("/api/landing/ask", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ prompt: trimmedQuestion }),
+			});
+			if (!response.ok || !response.body) throw new Error("Unable to answer");
+
+			const reader = response.body.getReader();
+			const decoder = new TextDecoder();
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				setAnswer(
+					(current) => current + decoder.decode(value, { stream: true }),
+				);
+			}
+		} catch {
+			setAnswer("This demo is temporarily unavailable. Try another question.");
+		} finally {
+			setIsStreaming(false);
+		}
+	}
 
 	return (
 		<BentoCard className="grow gap-6">
@@ -37,7 +73,7 @@ export function AskCard() {
 						key={question}
 						type="button"
 						aria-pressed={asked === question}
-						onClick={() => setAsked(question)}
+						onClick={() => askQuestion(question)}
 						className={cn(
 							"flex h-[38px] shrink-0 cursor-pointer select-none items-center rounded-md px-3 text-left text-[13px]/[18px] transition-colors",
 							asked === question
@@ -48,21 +84,41 @@ export function AskCard() {
 						{question}
 					</button>
 				))}
+				{(answer || isStreaming) && (
+					<div
+						aria-live="polite"
+						className="rounded-md bg-muted p-3 text-[13px]/[19px] text-muted-foreground"
+					>
+						{answer}
+						{isStreaming && <span aria-hidden="true">▋</span>}
+					</div>
+				)}
 			</div>
 
-			<div className="flex h-11 shrink-0 items-center gap-2.5 rounded-md border border-border bg-[#1A1A1A] pr-1.5 pl-3.5 transition-colors focus-within:border-ring">
-				<span
-					className={cn(
-						"min-w-0 grow truncate text-[13px]/[18px]",
-						asked ? "text-foreground" : "text-[#6E6E6E]",
-					)}
+			<form
+				onSubmit={(event) => {
+					event.preventDefault();
+					void askQuestion(prompt);
+				}}
+				className="flex h-11 shrink-0 items-center gap-2.5 rounded-md border border-border bg-[#1A1A1A] pr-1.5 pl-3.5 transition-colors focus-within:border-ring"
+			>
+				<input
+					value={prompt}
+					onChange={(event) => setPrompt(event.target.value)}
+					placeholder={asked ?? PLACEHOLDER}
+					disabled={isStreaming}
+					aria-label="Ask Eve about this target"
+					className="min-w-0 grow bg-transparent text-[13px]/[18px] text-foreground outline-none placeholder:text-[#6E6E6E]"
+				/>
+				<button
+					type="submit"
+					disabled={!prompt.trim() || isStreaming}
+					aria-label="Send question"
+					className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-primary disabled:cursor-not-allowed disabled:opacity-50"
 				>
-					{asked ?? PLACEHOLDER}
-				</span>
-				<span className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-primary">
 					<SendArrow className="size-3.5 text-primary-foreground" />
-				</span>
-			</div>
+				</button>
+			</form>
 		</BentoCard>
 	);
 }
