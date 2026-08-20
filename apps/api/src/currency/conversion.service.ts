@@ -60,6 +60,13 @@ export class ConversionService {
 		amount: PrismaTypes.Decimal | null,
 		currency: string,
 	): Promise<DealFxFields> {
+		return this.amountFields(amount, currency);
+	}
+
+	async amountFields(
+		amount: PrismaTypes.Decimal | null,
+		currency: string,
+	): Promise<DealFxFields> {
 		const converted = await this.convert(amount, currency);
 
 		if (!converted) {

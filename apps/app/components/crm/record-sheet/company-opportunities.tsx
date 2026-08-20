@@ -2,6 +2,7 @@
 
 import Add from "@carbon/icons-react/es/Add";
 import Partnership from "@carbon/icons-react/es/Partnership";
+import { CURRENCIES, normalizeCurrency } from "@crm/db/currency";
 import { AcquisitionEngagementStage } from "@crm/db/enums";
 import { Button } from "@crm/ui/components/button";
 import { EmptyCellValue } from "@crm/ui/components/empty-cell";
@@ -17,9 +18,16 @@ import {
 	showsAcquisitionEngagementStageMenu,
 } from "@/components/crm/acquisition-engagement-stage";
 import { AcquisitionEngagementStageMenu } from "@/components/crm/acquisition-engagement-stage-menu";
+import {
+	InlineDateField,
+	InlineField,
+	InlineSelectField,
+	savingField,
+} from "@/components/crm/inline-field";
 import { OwnerCell } from "@/components/crm/owner-cell";
 import {
 	DetailSheetEmpty,
+	DetailSheetProperties,
 	DetailSheetSection,
 } from "@/components/detail-sheet";
 import { useCrmCache } from "@/lib/trpc/cache";
@@ -43,6 +51,12 @@ const COLUMNS = [
 	{ header: "Expected close", width: "w-[22%]" },
 	{ header: "Owner", width: "w-[20%]" },
 ];
+
+const UNASSIGNED_OWNER = "unassigned";
+const CURRENCY_OPTIONS = CURRENCIES.map((currency) => ({
+	value: currency.code,
+	label: `${currency.code} · ${currency.name}`,
+}));
 
 function EngagementRowCells({ engagement }: { engagement: EngagementRow }) {
 	return (
@@ -99,6 +113,7 @@ export function CompanyOpportunities({ company }: { company: Company }) {
 			stage: "all",
 		}),
 	);
+	const users = useQuery(trpc.users.list.queryOptions());
 
 	const { active, history } = useMemo(() => {
 		const rows = engagements.data?.rows ?? [];
@@ -114,6 +129,14 @@ export function CompanyOpportunities({ company }: { company: Company }) {
 				await cache.engagement(company.id);
 				toast.success("Opportunity opened.");
 				idempotencyKey.current = crypto.randomUUID();
+			},
+			onError: (error) => toast.error(error.message),
+		}),
+	);
+	const update = useMutation(
+		trpc.acquisition.updateEngagement.mutationOptions({
+			onSuccess: async () => {
+				await cache.engagement(company.id);
 			},
 			onError: (error) => toast.error(error.message),
 		}),
@@ -157,13 +180,88 @@ export function CompanyOpportunities({ company }: { company: Company }) {
 		<div className="flex flex-col gap-6">
 			{active.length > 0 ? (
 				<DetailSheetSection title="Active opportunity">
-					<SimpleTable variant="panel" columns={COLUMNS}>
-						{active.map((engagement) => (
-							<SimpleTableRow key={engagement.id}>
-								<EngagementRowCells engagement={engagement} />
-							</SimpleTableRow>
-						))}
-					</SimpleTable>
+					{active.map((engagement) => {
+						const save = (data: {
+							ownerId?: string | null;
+							amountCents?: number | null;
+							currency?: string;
+							expectedCloseDate?: string | null;
+						}) => update.mutate({ engagementId: engagement.id, ...data });
+						const isSaving = savingField({
+							isPending: update.isPending,
+							variables: update.variables
+								? { data: update.variables }
+								: undefined,
+						});
+						const currency = normalizeCurrency(engagement.currency);
+						return (
+							<div key={engagement.id} className="flex flex-col gap-3">
+								<AcquisitionEngagementStageMenu
+									engagementId={engagement.id}
+									stage={engagement.stage}
+									variant="control"
+								/>
+								<DetailSheetProperties>
+									<InlineField
+										label="Amount"
+										value={
+											engagement.amountCents === null
+												? null
+												: String(engagement.amountCents / 100)
+										}
+										placeholder="Add amount"
+										saving={isSaving("amountCents")}
+										onSave={(value) => {
+											if (!value) return save({ amountCents: null });
+											const amount = Number.parseFloat(value);
+											if (!Number.isFinite(amount) || amount < 0) {
+												toast.error("Amount has to be a positive number.");
+												return;
+											}
+											save({ amountCents: Math.round(amount * 100) });
+										}}
+										render={(value) =>
+											formatMoney(Math.round(Number(value) * 100), currency)
+										}
+									/>
+									<InlineSelectField
+										label="Currency"
+										value={currency}
+										options={CURRENCY_OPTIONS}
+										onSave={(next) => save({ currency: next })}
+									/>
+									<InlineDateField
+										label="Expected close"
+										value={engagement.expectedCloseDate}
+										saving={isSaving("expectedCloseDate")}
+										onSave={(next) =>
+											save({
+												expectedCloseDate: next
+													? new Date(`${next}T12:00:00.000Z`).toISOString()
+													: null,
+											})
+										}
+									/>
+									<InlineSelectField
+										label="Owner"
+										value={engagement.ownerId ?? UNASSIGNED_OWNER}
+										options={[
+											{ value: UNASSIGNED_OWNER, label: "Unassigned" },
+											...(users.data ?? []).map((user) => ({
+												value: user.id,
+												label: user.name,
+											})),
+										]}
+										onSave={(next) =>
+											save({
+												ownerId: next === UNASSIGNED_OWNER ? null : next,
+											})
+										}
+									/>
+								</DetailSheetProperties>
+							</div>
+						);
+					})}
 				</DetailSheetSection>
 			) : (
 				<DetailSheetSection title="Active opportunity">

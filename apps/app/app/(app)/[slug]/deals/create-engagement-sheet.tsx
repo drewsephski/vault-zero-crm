@@ -38,6 +38,7 @@ import { useTRPC } from "@/lib/trpc/client";
 import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
 
 const UNSET = "";
+const AUTOMATIC_OWNER = "automatic";
 
 function AddButton(props: ComponentProps<typeof Button>) {
 	const labels = useWorkspaceLabels();
@@ -69,15 +70,12 @@ function CreateEngagementForm({ companyId }: { companyId?: string }) {
 		parseAsBoolean.withDefault(false),
 	);
 	const [company, setCompany] = useState(companyId ?? UNSET);
-	const [ownerId, setOwnerId] = useState(UNSET);
+	const [ownerId, setOwnerId] = useState(AUTOMATIC_OWNER);
 
 	const users = useQuery(trpc.users.list.queryOptions());
-	const me = useQuery(trpc.users.me.queryOptions());
 	const targets = useQuery(
 		trpc.acquisition.engagementTargetOptions.queryOptions({ q: "" }),
 	);
-
-	const resolvedOwner = ownerId || me.data?.id || UNSET;
 
 	const resetAttempt = () => {
 		idempotencyKey.current = crypto.randomUUID();
@@ -90,7 +88,7 @@ function CreateEngagementForm({ companyId }: { companyId?: string }) {
 				toast.success("Opportunity opened.");
 				await setOpen(null);
 				setCompany(companyId ?? UNSET);
-				setOwnerId(UNSET);
+				setOwnerId(AUTOMATIC_OWNER);
 				resetAttempt();
 				openRecord({ kind: "company", id: engagement.companyId });
 			},
@@ -128,7 +126,7 @@ function CreateEngagementForm({ companyId }: { companyId?: string }) {
 						create.mutate({
 							companyId: company,
 							idempotencyKey: idempotencyKey.current,
-							ownerId: resolvedOwner === UNSET ? undefined : resolvedOwner,
+							ownerId: ownerId === AUTOMATIC_OWNER ? undefined : ownerId,
 							stage: AcquisitionEngagementStage.OUTREACH,
 						});
 					}}
@@ -163,11 +161,14 @@ function CreateEngagementForm({ companyId }: { companyId?: string }) {
 
 						<Field>
 							<FieldLabel htmlFor="create-engagement-owner">Owner</FieldLabel>
-							<Select value={resolvedOwner} onValueChange={setOwnerId}>
+							<Select value={ownerId} onValueChange={setOwnerId}>
 								<SelectTrigger id="create-engagement-owner">
 									<SelectValue placeholder="Choose an owner" />
 								</SelectTrigger>
 								<SelectContent>
+									<SelectItem value={AUTOMATIC_OWNER}>
+										Automatic (company owner)
+									</SelectItem>
 									{(users.data ?? []).map((user) => (
 										<SelectItem key={user.id} value={user.id}>
 											{user.name}

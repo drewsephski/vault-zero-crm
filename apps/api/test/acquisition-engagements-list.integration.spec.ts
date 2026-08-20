@@ -110,6 +110,15 @@ function service() {
 		db,
 		companyService(),
 		new AgentTriggerService(db),
+		{
+			reportingCurrency: async () => "USD",
+			amountFields: async () => ({
+				baseAmount: null,
+				baseCurrency: null,
+				fxRate: null,
+				fxRateAt: null,
+			}),
+		} as never,
 	);
 }
 
@@ -385,7 +394,11 @@ describe("acquisition engagement list read model", () => {
 			ownerId: ownerA,
 		});
 		await service().updateEngagementStage(
-			{ engagementId: passed.id, stage: AcquisitionEngagementStage.PASSED },
+			{
+				engagementId: passed.id,
+				stage: AcquisitionEngagementStage.PASSED,
+				closedReason: "Not a fit for this pursuit.",
+			},
 			actingUserId,
 		);
 
@@ -595,6 +608,7 @@ describe("acquisition engagement list read model", () => {
 			{
 				engagementId: closedEngagement.id,
 				stage: AcquisitionEngagementStage.PASSED,
+				closedReason: "Closed before checking available targets.",
 			},
 			actingUserId,
 		);

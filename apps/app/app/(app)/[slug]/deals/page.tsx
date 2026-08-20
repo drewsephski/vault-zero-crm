@@ -15,7 +15,10 @@ import { getServerQueryClient, getServerTrpc } from "@/lib/trpc/server";
 import { workspaceLabels } from "@/lib/workspace-mode";
 import { DealsPageCreateAction, DealsPageTable } from "./deals-page-content";
 import { dealsSearchParams } from "./deals-search-params";
-import { opportunitiesSearchParams } from "./opportunities-search-params";
+import {
+	acquisitionEngagementListInput,
+	opportunitiesSearchParams,
+} from "./opportunities-search-params";
 
 export const metadata: Metadata = {
 	title: "Deals",
@@ -61,7 +64,9 @@ async function Deals({
 		await Promise.all([
 			queryClient.prefetchQuery(
 				trpc.acquisition.listEngagements.queryOptions(
-					opportunitiesSearchParams.toInput(values),
+					acquisitionEngagementListInput(
+						opportunitiesSearchParams.toInput(values),
+					),
 				),
 			),
 			queryClient.prefetchQuery(trpc.workspace.get.queryOptions()),

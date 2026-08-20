@@ -23,7 +23,10 @@ import { useTableQuery } from "@/components/data-table/use-table-query";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
 import { useWorkspaceLabels } from "@/lib/use-workspace-labels";
-import { opportunitiesSearchParams } from "./opportunities-search-params";
+import {
+	acquisitionEngagementListInput,
+	opportunitiesSearchParams,
+} from "./opportunities-search-params";
 
 type EngagementRow =
 	RouterOutputs["acquisition"]["listEngagements"]["rows"][number];
@@ -119,7 +122,9 @@ export function OpportunitiesTable() {
 	const { query, input } = useTableQuery(opportunitiesSearchParams);
 
 	const engagements = useQuery({
-		...trpc.acquisition.listEngagements.queryOptions(input),
+		...trpc.acquisition.listEngagements.queryOptions(
+			acquisitionEngagementListInput(input),
+		),
 		placeholderData: (previous) => previous,
 	});
 	const users = useQuery(trpc.users.list.queryOptions());

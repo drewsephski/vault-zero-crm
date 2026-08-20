@@ -73,6 +73,15 @@ function service() {
 			{ reportingCurrency: async () => "USD" } as never,
 		),
 		new AgentTriggerService(db),
+		{
+			reportingCurrency: async () => "USD",
+			amountFields: async () => ({
+				baseAmount: null,
+				baseCurrency: null,
+				fxRate: null,
+				fxRateAt: null,
+			}),
+		} as never,
 	);
 }
 

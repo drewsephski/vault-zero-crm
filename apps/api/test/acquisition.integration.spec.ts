@@ -119,7 +119,15 @@ function companyService() {
 }
 
 function service(agent = new AgentTriggerService(db)) {
-	return new AcquisitionService(db, companyService(), agent);
+	return new AcquisitionService(db, companyService(), agent, {
+		reportingCurrency: async () => "USD",
+		amountFields: async () => ({
+			baseAmount: null,
+			baseCurrency: null,
+			fxRate: null,
+			fxRateAt: null,
+		}),
+	} as never);
 }
 
 async function createEngagementTargetCompany(
@@ -1466,6 +1474,21 @@ describe("eve recommendations and acquisition engagements", () => {
 			"reviewer-1",
 		);
 		expect(updated.stage).toBe(AcquisitionEngagementStage.ENGAGED);
+
+		const expectedCloseDate = new Date(Date.now() + 30 * 86_400_000);
+		const edited = await acquisition.updateEngagement({
+			engagementId: created.id,
+			ownerId: null,
+			amountCents: 450_000_00,
+			currency: "USD",
+			expectedCloseDate: expectedCloseDate.toISOString(),
+		});
+		expect(edited).toMatchObject({
+			ownerId: null,
+			amountCents: 450_000_00,
+			currency: "USD",
+			expectedCloseDate: expectedCloseDate.toISOString(),
+		});
 	});
 
 	it("rejects engagement creation for a company without a target", async () => {
@@ -1683,12 +1706,32 @@ describe("eve recommendations and acquisition engagements", () => {
 				},
 				actingUserId,
 			);
+			if (terminalStage === AcquisitionEngagementStage.PASSED) {
+				await expect(
+					acquisition.updateEngagementStage(
+						{ engagementId: first.id, stage: terminalStage },
+						actingUserId,
+					),
+				).rejects.toThrow("Add a reason before passing");
+			}
 			const closed = await acquisition.updateEngagementStage(
-				{ engagementId: first.id, stage: terminalStage },
+				{
+					engagementId: first.id,
+					stage: terminalStage,
+					closedReason:
+						terminalStage === AcquisitionEngagementStage.PASSED
+							? "Seller expectations exceed the buy box."
+							: undefined,
+				},
 				actingUserId,
 			);
 			expect(closed.status).toBe(AcquisitionEngagementStatus.TERMINAL);
 			expect(closed.closedAt).not.toBeNull();
+			expect(closed.closedReason).toBe(
+				terminalStage === AcquisitionEngagementStage.PASSED
+					? "Seller expectations exceed the buy box."
+					: null,
+			);
 
 			await expect(
 				acquisition.updateEngagementStage(
@@ -1775,6 +1818,7 @@ describe("eve recommendations and acquisition engagements", () => {
 			{
 				engagementId: firstSuccess.id,
 				stage: AcquisitionEngagementStage.PASSED,
+				closedReason: "Closed before replaying the shared request.",
 			},
 			actingUserId,
 		);

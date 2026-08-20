@@ -15,6 +15,7 @@ import {
 	parseAcquisitionDossierSnapshot,
 	researchRunListSnapshot,
 } from "@crm/db/acquisition-research-runs";
+import { normalizeCurrency } from "@crm/db/currency";
 import { getOrganizationId } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
 import {
@@ -28,7 +29,8 @@ import type { z } from "zod";
 import { AgentTriggerService } from "../agent/agent-trigger.service";
 import { CompaniesService } from "../companies/companies.service";
 import { normalizeDomain } from "../companies/domain";
-import { toCents } from "../crm/values";
+import { decimalFromCents, fromCents, toCents } from "../crm/values";
+import { ConversionService } from "../currency/conversion.service";
 import { InjectDatabase } from "../database/database.constants";
 import {
 	countsByKey,
@@ -43,6 +45,7 @@ import type {
 	CreateAcquisitionEngagementInput,
 	EngagementTargetOptionsInput,
 	ListAcquisitionEngagementsInput,
+	UpdateAcquisitionEngagementInput,
 	UpdateAcquisitionEngagementStageInput,
 } from "./acquisition-engagements.contracts";
 import {
@@ -156,6 +159,7 @@ export class AcquisitionService {
 		@InjectDatabase() private readonly db: Db,
 		private readonly companies: CompaniesService,
 		private readonly agent: AgentTriggerService,
+		private readonly conversion: ConversionService,
 	) {}
 
 	async createTarget(
@@ -805,6 +809,11 @@ export class AcquisitionService {
 			organizationId,
 		);
 		const stage = input.stage ?? AcquisitionEngagementStage.OUTREACH;
+		const currency = normalizeCurrency(
+			input.currency ?? (await this.conversion.reportingCurrency()),
+		);
+		const amount = decimalFromCents(input.amountCents);
+		const fx = await this.conversion.amountFields(amount, currency);
 
 		try {
 			const engagement = await this.db.$transaction(async (tx) => {
@@ -813,6 +822,12 @@ export class AcquisitionService {
 						organizationId,
 						companyId: input.companyId,
 						ownerId,
+						amount: fromCents(input.amountCents),
+						currency,
+						expectedCloseDate: input.expectedCloseDate
+							? new Date(input.expectedCloseDate)
+							: null,
+						...fx,
 						stage,
 						status: AcquisitionEngagementStatus.ACTIVE,
 						createRequest: {
@@ -916,6 +931,12 @@ export class AcquisitionService {
 		if (engagement.status === AcquisitionEngagementStatus.TERMINAL) {
 			throw new BadRequestException(TERMINAL_ENGAGEMENT_CONFLICT);
 		}
+		const closedReason = input.closedReason?.trim() || null;
+		if (input.stage === AcquisitionEngagementStage.PASSED && !closedReason) {
+			throw new BadRequestException(
+				"Add a reason before passing on this opportunity.",
+			);
+		}
 
 		const terminal = TERMINAL_ENGAGEMENT_STAGES.has(input.stage);
 		const updated = await this.db.$transaction(async (tx) => {
@@ -928,6 +949,7 @@ export class AcquisitionService {
 						: AcquisitionEngagementStatus.ACTIVE,
 					stageChangedAt: new Date(),
 					closedAt: terminal ? new Date() : null,
+					closedReason: terminal ? closedReason : null,
 				},
 				select: ENGAGEMENT_SELECT,
 			});
@@ -936,6 +958,7 @@ export class AcquisitionService {
 					data: {
 						type: ActivityType.STAGE_CHANGE,
 						subject: `Moved ${engagement.company.name} engagement to ${input.stage.toLowerCase()}`,
+						body: closedReason,
 						companyId: engagement.companyId,
 						engagementId: engagement.id,
 						createdById: actingUserId,
@@ -945,6 +968,60 @@ export class AcquisitionService {
 			return row;
 		});
 
+		return this.serializeEngagement(updated);
+	}
+
+	async updateEngagement(input: UpdateAcquisitionEngagementInput) {
+		const organizationId = getOrganizationId() ?? WORKSPACE_ID;
+		const current = await this.db.acquisitionEngagement.findUnique({
+			where: { id: input.engagementId },
+			select: { amount: true, currency: true, status: true },
+		});
+		if (!current) {
+			throw new NotFoundException("That engagement no longer exists.");
+		}
+		if (current.status === AcquisitionEngagementStatus.TERMINAL) {
+			throw new BadRequestException(TERMINAL_ENGAGEMENT_CONFLICT);
+		}
+		if (input.ownerId) {
+			const member = await this.db.member.findFirst({
+				where: { organizationId, userId: input.ownerId },
+				select: { id: true },
+			});
+			if (!member) {
+				throw new BadRequestException("That owner is not in this workspace.");
+			}
+		}
+
+		const data: Prisma.AcquisitionEngagementUpdateInput = {};
+		if (input.ownerId !== undefined) {
+			data.owner = input.ownerId
+				? { connect: { id: input.ownerId } }
+				: { disconnect: true };
+		}
+		if (input.amountCents !== undefined)
+			data.amount = fromCents(input.amountCents);
+		if (input.currency !== undefined)
+			data.currency = normalizeCurrency(input.currency);
+		if (input.expectedCloseDate !== undefined) {
+			data.expectedCloseDate = input.expectedCloseDate
+				? new Date(input.expectedCloseDate)
+				: null;
+		}
+		if (input.amountCents !== undefined || input.currency !== undefined) {
+			const amount =
+				input.amountCents !== undefined
+					? decimalFromCents(input.amountCents)
+					: current.amount;
+			const currency = normalizeCurrency(input.currency ?? current.currency);
+			Object.assign(data, await this.conversion.amountFields(amount, currency));
+		}
+
+		const updated = await this.db.acquisitionEngagement.update({
+			where: { id: input.engagementId },
+			data,
+			select: ENGAGEMENT_SELECT,
+		});
 		return this.serializeEngagement(updated);
 	}
 
@@ -971,12 +1048,13 @@ export class AcquisitionService {
 	}
 
 	private async resolveEngagementOwner(
-		explicitOwnerId: string | undefined,
+		explicitOwnerId: string | null | undefined,
 		companyOwnerId: string | null,
 		actingUserId: string,
 		organizationId: string,
 	): Promise<string | null> {
 		if (explicitOwnerId !== undefined) {
+			if (explicitOwnerId === null) return null;
 			const member = await this.db.member.findFirst({
 				where: { organizationId, userId: explicitOwnerId },
 				select: { id: true },
@@ -986,8 +1064,15 @@ export class AcquisitionService {
 			}
 			return explicitOwnerId;
 		}
-		if (companyOwnerId) return companyOwnerId;
-		return actingUserId;
+		for (const candidate of [companyOwnerId, actingUserId]) {
+			if (!candidate) continue;
+			const member = await this.db.member.findFirst({
+				where: { organizationId, userId: candidate },
+				select: { id: true },
+			});
+			if (member) return candidate;
+		}
+		return null;
 	}
 
 	private async recoverCreateEngagement(

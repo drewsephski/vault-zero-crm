@@ -25,6 +25,7 @@ import {
 	createAcquisitionEngagementInput,
 	engagementTargetOptionsInput,
 	listAcquisitionEngagementsInput,
+	updateAcquisitionEngagementInput,
 	updateAcquisitionEngagementStageInput,
 } from "./acquisition-engagements.contracts";
 import {
@@ -156,6 +157,13 @@ export class AcquisitionRouter {
 		@Input() input: z.infer<typeof updateAcquisitionEngagementStageInput>,
 	) {
 		return this.acquisition.updateEngagementStage(input, ctx.user.id);
+	}
+
+	@Mutation({ input: updateAcquisitionEngagementInput })
+	async updateEngagement(
+		@Input() input: z.infer<typeof updateAcquisitionEngagementInput>,
+	) {
+		return this.acquisition.updateEngagement(input);
 	}
 
 	@Query({ input: listResearchRunsInput })

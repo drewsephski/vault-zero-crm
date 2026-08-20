@@ -14,7 +14,7 @@ import { z } from "zod";
 const t = initTRPC.create();
 const publicProcedure = t.procedure;
 import { createAcquisitionTargetInput, addAcquisitionTargetInput, acquisitionCandidateIdInput, updateAcquisitionTargetInput, acceptRecommendedStageInput, dismissRecommendedStageInput, acceptRecommendedActionInput, dismissRecommendedActionInput } from "../acquisition/acquisition.contracts";
-import { createAcquisitionEngagementInput, listAcquisitionEngagementsInput, engagementTargetOptionsInput, updateAcquisitionEngagementStageInput } from "../acquisition/acquisition-engagements.contracts";
+import { createAcquisitionEngagementInput, listAcquisitionEngagementsInput, engagementTargetOptionsInput, updateAcquisitionEngagementStageInput, updateAcquisitionEngagementInput } from "../acquisition/acquisition-engagements.contracts";
 import { listResearchRunsInput, researchRunIdInput } from "../acquisition/acquisition-research-runs.contracts";
 import { timelineInput, timelineCountsInput, myTasksInput, taskCountsInput, activityCreateInput, completeInput } from "../activities/activities.contracts";
 import { companyListInput, companyIdInput, companyOptionsInput, companyCreateInput, companyUpdateArgs, companyBulkDeleteInput, companyBulkUpdateArgs, setPrimaryContactInput } from "../companies/companies.contracts";
@@ -85,6 +85,9 @@ const appRouter = t.router({
     updateEngagementStage: publicProcedure
       .input(updateAcquisitionEngagementStageInput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["updateEngagementStage"]>>),
+    updateEngagement: publicProcedure
+      .input(updateAcquisitionEngagementInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["updateEngagement"]>>),
     listResearchRuns: publicProcedure
       .input(listResearchRunsInput)
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<AcquisitionRouter["listResearchRuns"]>>),
