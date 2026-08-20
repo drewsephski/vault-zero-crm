@@ -1,4 +1,5 @@
 import type { Db } from "./client";
+import { Prisma } from "./generated/prisma/client";
 import { AcquisitionCandidateStatus } from "./generated/prisma/enums";
 
 const BLOCKED_STATUSES = new Set<AcquisitionCandidateStatus>([
@@ -22,6 +23,13 @@ export type ProposeAcquisitionCandidatesResult = {
 	saved: number;
 	revived: number;
 	skipped: number;
+};
+
+type ExistingCandidate = {
+	id: string;
+	domain: string;
+	status: AcquisitionCandidateStatus;
+	dismissedBuyBoxRevision: number | null;
 };
 
 export async function proposeAcquisitionCandidates(
@@ -71,57 +79,146 @@ export async function proposeAcquisitionCandidates(
 	let skipped = candidates.length - unique.length;
 
 	for (const item of unique) {
-		if (companyDomains.has(item.domain)) {
-			skipped += 1;
-			continue;
-		}
+		const outcome = await proposeOneCandidate(
+			db,
+			organizationId,
+			item,
+			buyBoxRevision,
+			companyDomains,
+			candidateByDomain.get(item.domain),
+		);
 
-		const existing = candidateByDomain.get(item.domain);
-		if (!existing) {
-			await db.acquisitionCandidate.create({
-				data: {
-					...item,
-					organizationId,
-					status: AcquisitionCandidateStatus.PROPOSED,
-				},
-			});
-			saved += 1;
-			continue;
-		}
-
-		if (BLOCKED_STATUSES.has(existing.status)) {
-			skipped += 1;
-			continue;
-		}
-
-		if (existing.status === AcquisitionCandidateStatus.DISMISSED) {
-			const dismissedRevision = existing.dismissedBuyBoxRevision ?? 0;
-			if (buyBoxRevision > dismissedRevision) {
-				await db.acquisitionCandidate.update({
-					where: { id: existing.id },
-					data: {
-						name: item.name,
-						website: item.website,
-						rationale: item.rationale,
-						evidence: item.evidence,
-						sourceUrl: item.sourceUrl,
-						sourceTitle: item.sourceTitle ?? null,
-						sourceSessionId: item.sourceSessionId ?? null,
-						status: AcquisitionCandidateStatus.PROPOSED,
-						dismissedAt: null,
-						dismissedBuyBoxRevision: null,
-						dismissedReason: null,
-					},
-				});
-				revived += 1;
-			} else {
-				skipped += 1;
-			}
-			continue;
-		}
-
-		skipped += 1;
+		if (outcome === "saved") saved += 1;
+		else if (outcome === "revived") revived += 1;
+		else skipped += 1;
 	}
 
 	return { saved, revived, skipped };
+}
+
+async function proposeOneCandidate(
+	db: Db,
+	organizationId: string,
+	item: AcquisitionCandidateProposal,
+	buyBoxRevision: number,
+	companyDomains: Set<string>,
+	existingFromBatch: ExistingCandidate | undefined,
+): Promise<"saved" | "revived" | "skipped"> {
+	if (companyDomains.has(item.domain)) {
+		return "skipped";
+	}
+
+	if (existingFromBatch) {
+		return resolveExistingCandidate(
+			db,
+			organizationId,
+			item,
+			existingFromBatch,
+			buyBoxRevision,
+		);
+	}
+
+	try {
+		await db.acquisitionCandidate.create({
+			data: {
+				...item,
+				organizationId,
+				status: AcquisitionCandidateStatus.PROPOSED,
+			},
+		});
+		return "saved";
+	} catch (error) {
+		if (!isUniqueConflict(error)) throw error;
+	}
+
+	const existing = await db.acquisitionCandidate.findFirst({
+		where: { domain: item.domain },
+		select: {
+			id: true,
+			domain: true,
+			status: true,
+			dismissedBuyBoxRevision: true,
+		},
+	});
+
+	if (!existing) {
+		throw new Error(
+			`Acquisition candidate for ${item.domain} conflicted but was not found.`,
+		);
+	}
+
+	return resolveExistingCandidate(
+		db,
+		organizationId,
+		item,
+		existing,
+		buyBoxRevision,
+	);
+}
+
+async function resolveExistingCandidate(
+	db: Db,
+	organizationId: string,
+	item: AcquisitionCandidateProposal,
+	existing: ExistingCandidate,
+	buyBoxRevision: number,
+): Promise<"revived" | "skipped"> {
+	if (BLOCKED_STATUSES.has(existing.status)) {
+		return "skipped";
+	}
+
+	if (existing.status === AcquisitionCandidateStatus.DISMISSED) {
+		const revived = await reviveDismissedCandidate(
+			db,
+			organizationId,
+			item,
+			buyBoxRevision,
+		);
+		return revived ? "revived" : "skipped";
+	}
+
+	return "skipped";
+}
+
+async function reviveDismissedCandidate(
+	db: Db,
+	organizationId: string,
+	item: AcquisitionCandidateProposal,
+	buyBoxRevision: number,
+): Promise<boolean> {
+	const { count } = await db.acquisitionCandidate.updateMany({
+		where: {
+			organizationId,
+			domain: item.domain,
+			status: AcquisitionCandidateStatus.DISMISSED,
+			OR: [
+				{ dismissedBuyBoxRevision: null },
+				{ dismissedBuyBoxRevision: { lt: buyBoxRevision } },
+			],
+		},
+		data: {
+			name: item.name,
+			website: item.website,
+			rationale: item.rationale,
+			evidence: item.evidence,
+			sourceUrl: item.sourceUrl,
+			sourceTitle: item.sourceTitle ?? null,
+			sourceSessionId: item.sourceSessionId ?? null,
+			status: AcquisitionCandidateStatus.PROPOSED,
+			dismissedAt: null,
+			dismissedBuyBoxRevision: null,
+			dismissedReason: null,
+		},
+	});
+
+	return count === 1;
+}
+
+function isUniqueConflict(
+	error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+	return (
+		error instanceof Prisma.PrismaClientKnownRequestError &&
+		error.code === "P2002"
+	);
 }
