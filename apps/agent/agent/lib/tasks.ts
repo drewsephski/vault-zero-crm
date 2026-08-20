@@ -10,6 +10,8 @@ import {
 	RETIRED_OUTCOME,
 	RETRYING_OUTCOME_PREFIX,
 } from "@crm/db/agent-tasks";
+import { AcquisitionResearchRunStatus } from "@crm/db/enums";
+import { runInOrganization } from "@crm/db/tenancy";
 import {
 	failAcquisitionResearchRun,
 	finalizeAcquisitionResearchRunOnTaskComplete,
@@ -104,6 +106,24 @@ export async function claimDue(
 
 export async function retireExhausted(): Promise<TaskSubject[]> {
 	const now = new Date();
+	const successful = await db.$queryRaw<
+		Array<{ id: string; organizationId: string }>
+	>`
+		SELECT t.id, t."organizationId"
+		FROM "agentTask" AS t
+		JOIN "acquisitionResearchRun" AS r ON r."agentTaskId" = t.id
+		WHERE t."finishedAt" IS NULL
+			AND t."attempts" >= ${MAX_ATTEMPTS}
+			AND (t."leasedUntil" IS NULL OR t."leasedUntil" < ${now})
+			AND r.status = 'SUCCEEDED'
+	`;
+	for (const task of successful) {
+		await runInOrganization(task.organizationId, () =>
+			completeTask(task.id, "Dossier refreshed", undefined, {
+				skipResearchRunFinalization: true,
+			}),
+		);
+	}
 
 	const retired = await db.$queryRaw<TaskSubject[]>`
 		UPDATE "agentTask" AS t
@@ -196,7 +216,11 @@ export async function completeTask(
 export async function failTask(
 	taskId: string,
 	reason: string,
-): Promise<{ subject: TaskSubject; retrying: boolean } | null> {
+): Promise<{
+	subject: TaskSubject;
+	retrying: boolean;
+	completed: boolean;
+} | null> {
 	const task = await db.agentTask.findUnique({
 		where: { id: taskId },
 		select: {
@@ -210,6 +234,21 @@ export async function failTask(
 	});
 
 	if (!task || task.finishedAt) return null;
+	if (task.kind === "acquisition-refresh") {
+		const run = await db.acquisitionResearchRun.findUnique({
+			where: { agentTaskId: taskId },
+			select: { status: true },
+		});
+		if (run?.status === AcquisitionResearchRunStatus.SUCCEEDED) {
+			const subject = await completeTask(
+				taskId,
+				"Dossier refreshed",
+				undefined,
+				{ skipResearchRunFinalization: true },
+			);
+			return subject ? { subject, retrying: false, completed: true } : null;
+		}
+	}
 
 	if (task.attempts >= MAX_ATTEMPTS) {
 		const now = new Date();
@@ -237,6 +276,7 @@ export async function failTask(
 						kind: task.kind,
 					},
 					retrying: false,
+					completed: false,
 				}
 			: null;
 	}
@@ -263,6 +303,7 @@ export async function failTask(
 					kind: task.kind,
 				},
 				retrying: true,
+				completed: false,
 			}
 		: null;
 }

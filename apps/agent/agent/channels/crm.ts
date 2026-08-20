@@ -148,8 +148,16 @@ export default defineChannel({
 
 				await settle(
 					result.subject,
-					result.retrying ? EnrichmentStatus.PENDING : EnrichmentStatus.FAILED,
-					result.retrying ? "Research failed; retrying shortly." : reason,
+					result.completed
+						? EnrichmentStatus.COMPLETE
+						: result.retrying
+							? EnrichmentStatus.PENDING
+							: EnrichmentStatus.FAILED,
+					result.completed
+						? "Dossier refreshed"
+						: result.retrying
+							? "Research failed; retrying shortly."
+							: reason,
 				);
 			});
 		},

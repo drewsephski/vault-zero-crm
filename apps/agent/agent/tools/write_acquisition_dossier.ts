@@ -17,7 +17,10 @@ import {
 	acquisitionCriteriaSchema,
 	validateCriterionAssessments,
 } from "../lib/acquisition-criteria";
-import { succeedAcquisitionResearchRun } from "../lib/acquisition-research-run";
+import {
+	acquisitionResearchRunProvenance,
+	succeedAcquisitionResearchRun,
+} from "../lib/acquisition-research-run";
 import { defineTool } from "../lib/tool";
 
 const evidence = z.object({
@@ -136,10 +139,15 @@ export default defineTool({
 		};
 
 		const written = await db.$transaction(async (tx) => {
-			const profile = await tx.acquisitionProfile.findUnique({
-				where: { id: getOrganizationId() ?? "workspace" },
-				select: { buyBoxRevision: true },
-			});
+			const provenance = await acquisitionResearchRunProvenance(
+				{ sessionId: ctx.session.id, companyId: company.id },
+				tx,
+			);
+			if (!provenance) {
+				throw new Error(
+					"Could not finalize the running acquisition research run.",
+				);
+			}
 			const { count } = await tx.acquisitionTarget.updateMany({
 				where: { companyId: company.id },
 				data: {
@@ -153,7 +161,7 @@ export default defineTool({
 					recommendedStage: input.recommendedStage,
 					sourceUrls,
 					researchedAt,
-					researchedBuyBoxRevision: profile?.buyBoxRevision ?? null,
+					researchedBuyBoxRevision: provenance.buyBoxRevision,
 					sourceSessionId: ctx.session.id,
 				},
 			});

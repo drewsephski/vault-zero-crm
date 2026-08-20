@@ -326,6 +326,184 @@ describe("acquisition research runs", () => {
 		});
 	});
 
+	it("settles a successful dossier when turn failure arrives before waiting", async () => {
+		const task = await queueRefresh("Scheduled acquisition refresh");
+		await db.agentTask.update({
+			where: { id: task.id },
+			data: { sessionId, attempts: 1 },
+		});
+		await ensureAcquisitionResearchRun({
+			id: task.id,
+			contactId: null,
+			companyId,
+			organizationId: WORKSPACE_ID,
+			kind: "acquisition-refresh",
+			reason: "Scheduled acquisition refresh",
+			budget: 12,
+			attempts: 1,
+			priority: 300,
+			dueAt: new Date(Date.now() - 1000),
+		});
+		await noteAcquisitionResearchSession(task.id, sessionId);
+
+		const written = await writeAcquisitionDossier.execute(
+			{ ...dossierInput, companyId },
+			{
+				session: {
+					id: sessionId,
+					auth: {
+						current: { attributes: { organizationId: WORKSPACE_ID } },
+					},
+				},
+			} as never,
+		);
+		expect(written.written).toBe(true);
+
+		const dossier = await db.acquisitionTarget.findUniqueOrThrow({
+			where: { companyId },
+			select: { summary: true, researchedAt: true },
+		});
+		const result = await failTask(task.id, "turn failed after tool completion");
+
+		expect(result?.retrying).toBe(false);
+		const completed = await db.agentTask.findUniqueOrThrow({
+			where: { id: task.id },
+		});
+		expect(completed.finishedAt).not.toBeNull();
+		expect(completed.lastError).toBeNull();
+		expect(completed.outcome).toBe("Dossier refreshed");
+		expect(
+			await db.agentTask.count({
+				where: {
+					companyId,
+					kind: "acquisition-refresh",
+					finishedAt: null,
+				},
+			}),
+		).toBe(1);
+		const run = await db.acquisitionResearchRun.findUniqueOrThrow({
+			where: { agentTaskId: task.id },
+		});
+		expect(run.status).toBe(AcquisitionResearchRunStatus.SUCCEEDED);
+		expect(run.outcome).toBeNull();
+		expect(
+			await db.acquisitionTarget.findUniqueOrThrow({
+				where: { companyId },
+				select: { summary: true, researchedAt: true },
+			}),
+		).toEqual(dossier);
+	});
+
+	it("keeps research stale when the buy box changes during the session", async () => {
+		const profile = await db.acquisitionProfile.findUniqueOrThrow({
+			where: { id: WORKSPACE_ID },
+			select: { preferredIndustries: true, buyBoxRevision: true },
+		});
+		const task = await queueRefresh("Scheduled acquisition refresh");
+		await db.agentTask.update({
+			where: { id: task.id },
+			data: { sessionId },
+		});
+		await ensureAcquisitionResearchRun({
+			id: task.id,
+			contactId: null,
+			companyId,
+			organizationId: WORKSPACE_ID,
+			kind: "acquisition-refresh",
+			reason: "Scheduled acquisition refresh",
+			budget: 12,
+			attempts: 1,
+			priority: 300,
+			dueAt: new Date(Date.now() - 1000),
+		});
+		await noteAcquisitionResearchSession(task.id, sessionId);
+		const startedRun = await db.acquisitionResearchRun.findUniqueOrThrow({
+			where: { agentTaskId: task.id },
+			select: { buyBoxRevision: true },
+		});
+		expect(startedRun.buyBoxRevision).toBe(profile.buyBoxRevision);
+
+		try {
+			await db.acquisitionProfile.update({
+				where: { id: WORKSPACE_ID },
+				data: {
+					preferredIndustries: ["Updated commercial services"],
+					buyBoxRevision: { increment: 1 },
+				},
+			});
+
+			const result = await writeAcquisitionDossier.execute(
+				{ ...dossierInput, companyId },
+				{
+					session: {
+						id: sessionId,
+						auth: {
+							current: { attributes: { organizationId: WORKSPACE_ID } },
+						},
+					},
+				} as never,
+			);
+			expect(result.written).toBe(true);
+
+			const target = await db.acquisitionTarget.findUniqueOrThrow({
+				where: { companyId },
+				select: { researchedBuyBoxRevision: true },
+			});
+			expect(target.researchedBuyBoxRevision).toBe(profile.buyBoxRevision);
+		} finally {
+			await db.acquisitionProfile.update({
+				where: { id: WORKSPACE_ID },
+				data: {
+					preferredIndustries: profile.preferredIndustries,
+					buyBoxRevision: profile.buyBoxRevision,
+				},
+			});
+		}
+	});
+
+	it("keeps legacy run provenance untracked on successful completion", async () => {
+		const task = await queueRefresh("Legacy acquisition refresh");
+		await db.agentTask.update({
+			where: { id: task.id },
+			data: { sessionId },
+		});
+		await ensureAcquisitionResearchRun({
+			id: task.id,
+			contactId: null,
+			companyId,
+			organizationId: WORKSPACE_ID,
+			kind: "acquisition-refresh",
+			reason: "Legacy acquisition refresh",
+			budget: 12,
+			attempts: 1,
+			priority: 300,
+			dueAt: new Date(Date.now() - 1000),
+		});
+		await db.acquisitionResearchRun.update({
+			where: { agentTaskId: task.id },
+			data: { buyBoxRevision: null, sessionId },
+		});
+
+		const result = await writeAcquisitionDossier.execute(
+			{ ...dossierInput, companyId },
+			{
+				session: {
+					id: sessionId,
+					auth: {
+						current: { attributes: { organizationId: WORKSPACE_ID } },
+					},
+				},
+			} as never,
+		);
+		expect(result.written).toBe(true);
+		expect(
+			await db.acquisitionTarget.findUniqueOrThrow({
+				where: { companyId },
+				select: { researchedBuyBoxRevision: true },
+			}),
+		).toEqual({ researchedBuyBoxRevision: null });
+	});
+
 	it("rolls the dossier back when its running audit row cannot be finalized", async () => {
 		const [before, activityCount] = await Promise.all([
 			db.acquisitionTarget.findUniqueOrThrow({
@@ -441,6 +619,57 @@ describe("acquisition research runs", () => {
 			where: { agentTaskId: task.id },
 		});
 		expect(run.status).toBe(AcquisitionResearchRunStatus.FAILED);
+	});
+
+	it("settles an exhausted task whose dossier already succeeded", async () => {
+		const task = await queueRefresh("Scheduled acquisition refresh");
+		await db.agentTask.update({
+			where: { id: task.id },
+			data: { attempts: MAX_ATTEMPTS, sessionId },
+		});
+		await ensureAcquisitionResearchRun({
+			id: task.id,
+			contactId: null,
+			companyId,
+			organizationId: WORKSPACE_ID,
+			kind: "acquisition-refresh",
+			reason: "Scheduled acquisition refresh",
+			budget: 12,
+			attempts: MAX_ATTEMPTS,
+			priority: 300,
+			dueAt: new Date(Date.now() - 1000),
+		});
+		await noteAcquisitionResearchSession(task.id, sessionId);
+		await writeAcquisitionDossier.execute({ ...dossierInput, companyId }, {
+			session: {
+				id: sessionId,
+				auth: {
+					current: { attributes: { organizationId: WORKSPACE_ID } },
+				},
+			},
+		} as never);
+
+		expect(await retireExhausted()).toEqual([]);
+		const completed = await db.agentTask.findUniqueOrThrow({
+			where: { id: task.id },
+		});
+		expect(completed.finishedAt).not.toBeNull();
+		expect(completed.outcome).toBe("Dossier refreshed");
+		expect(
+			await db.agentTask.count({
+				where: {
+					companyId,
+					kind: "acquisition-refresh",
+					finishedAt: null,
+				},
+			}),
+		).toBe(1);
+		expect(
+			await db.acquisitionResearchRun.findUniqueOrThrow({
+				where: { agentTaskId: task.id },
+				select: { status: true },
+			}),
+		).toEqual({ status: AcquisitionResearchRunStatus.SUCCEEDED });
 	});
 
 	it("preserves independent snapshots across two successful refreshes", async () => {
