@@ -1291,6 +1291,11 @@ describe("acquisition candidate review", () => {
 
 describe("eve recommendations and acquisition engagements", () => {
 	it("accepts and dismisses Eve stage recommendations", async () => {
+		await ensureWorkspaceMember(
+			"reviewer-1",
+			"reviewer-1@example.com",
+			"Reviewer",
+		);
 		const domain = `eve-stage-${crypto.randomUUID()}.test`;
 		domains.push(domain);
 		const company = await db.company.create({
@@ -1355,6 +1360,11 @@ describe("eve recommendations and acquisition engagements", () => {
 	});
 
 	it("accepts and dismisses Eve action recommendations", async () => {
+		await ensureWorkspaceMember(
+			"reviewer-1",
+			"reviewer-1@example.com",
+			"Reviewer",
+		);
 		const domain = `eve-action-${crypto.randomUUID()}.test`;
 		domains.push(domain);
 		const company = await db.company.create({
