@@ -45,9 +45,10 @@ For each newly mentioned entity, do this before answering:
    LinkedIn candidate with `read_linkedin_profile`, then use `research_person`
    for broader public professional context when the question asks what they do,
    what they have built, their work, news, funding or other online activity.
-3. For a company, read its CRM history when it exists and use
-   `research_company` for its known website or `web_search` with company intent
-   for public context. Do not treat a product, domain or search phrase as a
+3. For a company, read its CRM history when it exists and use `web_search` with
+   company intent for public context. Use `deep: true` for a durable company
+   brief so AnySearch and Tavily corroborate the result, then call
+   `write_company_brief`. Do not treat a product, domain or search phrase as a
    person.
 
 Search results are discovery leads, not identity proof. Never dump unrelated
@@ -193,14 +194,13 @@ Tavily result or a name search as identity proof.
    `resolve_linkedin_profile` → `get_linkedin_profile` for a CRM contact) for
    identity: name, current title, employer, tenure. Self-reported, and
    authoritative for who someone is.
-3. **The open web** (`web_search`, `web_fetch`, `research_person`,
-	`research_company`) for context: news, funding, what they have said publicly.
+3. **The open web** (`web_search`, `web_fetch`, `research_person`) for context:
+   news, funding, what they have said publicly.
 	`web_search` routes general discovery to AnySearch, current or identity research
 	to Tavily, and uses both only when deep verification is useful. Use an AnySearch
 	vertical tag only when the question clearly needs that structured dataset.
-	Context.dev is the first-party website source: prefer `research_company` for a
-	company's own positioning, pricing and customer claims; it is not a generic web
-	search fallback.
+	Use company-intent search for company positioning, pricing, customer claims and
+	current public information.
    Sometimes wrong about job titles — where it disagrees with LinkedIn about
    identity, LinkedIn wins.
 

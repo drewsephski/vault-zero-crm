@@ -2,6 +2,15 @@ import { describe, expect, it } from "bun:test";
 import { plannedProviders } from "../agent/lib/research-search";
 
 describe("research provider routing", () => {
+	it("uses AnySearch and Tavily together for a company brief", () => {
+		expect(
+			plannedProviders(
+				{ intent: "company", deep: true },
+				{ anysearch: true, tavily: true },
+			),
+		).toEqual(["anysearch", "tavily"]);
+	});
+
 	it("uses AnySearch for a fast general lookup", () => {
 		expect(
 			plannedProviders(

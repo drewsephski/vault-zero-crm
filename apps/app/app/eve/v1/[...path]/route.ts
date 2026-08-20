@@ -22,7 +22,10 @@ async function handler(request: Request): Promise<Response> {
 		return Response.json({ error: "Not signed in." }, { status: 401 });
 	}
 
-	const organizationId = await organizationIdForUser(session.user.id);
+	const organizationId = await organizationIdForUser(
+		session.user.id,
+		session.session.activeOrganizationId,
+	);
 	if (!organizationId) {
 		return Response.json(
 			{ error: "No workspace is available for this account." },

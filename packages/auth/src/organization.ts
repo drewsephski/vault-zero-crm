@@ -35,7 +35,22 @@ export function canManageCurrency(role: WorkspaceRole | null): boolean {
 
 export async function organizationIdForUser(
 	userId: string,
+	preferredOrganizationId?: string | null,
 ): Promise<string | undefined> {
+	if (preferredOrganizationId) {
+		const preferred = await db.member.findUnique({
+			where: {
+				organizationId_userId: {
+					organizationId: preferredOrganizationId,
+					userId,
+				},
+			},
+			select: { organizationId: true },
+		});
+
+		if (preferred) return preferred.organizationId;
+	}
+
 	const member = await db.member.findFirst({
 		where: { userId },
 		orderBy: { createdAt: "asc" },
@@ -49,19 +64,33 @@ export async function organizationIdForUser(
 
 export async function ensureWorkspaceMembership(
 	userId: string,
+	preferredOrganizationId?: string | null,
 ): Promise<string | undefined> {
 	try {
 		return await db.$transaction(async (tx) => {
-			const existing = await tx.member.findFirst({
-				where: { userId },
-				orderBy: { createdAt: "asc" },
-				select: { organizationId: true },
-			});
+			const existing = preferredOrganizationId
+				? await tx.member.findUnique({
+						where: {
+							organizationId_userId: {
+								organizationId: preferredOrganizationId,
+								userId,
+							},
+						},
+						select: { organizationId: true },
+					})
+				: null;
+			const membership =
+				existing ??
+				(await tx.member.findFirst({
+					where: { userId },
+					orderBy: { createdAt: "asc" },
+					select: { organizationId: true },
+				}));
 
-			if (existing) {
-				await repairOwner(tx, existing.organizationId);
+			if (membership) {
+				await repairOwner(tx, membership.organizationId);
 				const workspace = await tx.organization.findUnique({
-					where: { id: existing.organizationId },
+					where: { id: membership.organizationId },
 					select: { id: true, name: true, slug: true },
 				});
 
@@ -81,7 +110,7 @@ export async function ensureWorkspaceMembership(
 					}
 				}
 
-				return existing.organizationId;
+				return membership.organizationId;
 			}
 
 			const user = await tx.user.findUnique({

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { APP_AUTH } from "../agent/lib/app-auth";
 import { isAutomated } from "../agent/lib/approval";
 import {
+	brief,
 	dispatchReceipt,
 	requestQueueRefill,
 	researchSlots,
@@ -9,6 +10,7 @@ import {
 } from "../agent/lib/dispatch";
 import { collapsing } from "../agent/lib/pool";
 import type { LeasedTask } from "../agent/lib/tasks";
+import { companyProfileCompletion } from "../agent/lib/tasks";
 
 function deferred() {
 	let release!: () => void;
@@ -137,6 +139,42 @@ describe("taskAuth", () => {
 
 		expect(auth).toMatchObject({ issuer: "eve" });
 		expect(isAutomated({ auth: { current: auth } })).toBe(true);
+	});
+});
+
+describe("company profile dispatch", () => {
+	it("requires a durable brief even when website extraction is unavailable", () => {
+		const instruction = brief(
+			task({
+				contactId: null,
+				companyId: "company_1",
+				kind: "company-profile",
+			}),
+		);
+
+		expect(instruction).toContain("write_company_brief");
+		expect(instruction).toContain("does not complete");
+	});
+
+	it("rejects a parked session that did not persist a brief", async () => {
+		const result = await companyProfileCompletion("task_1", async () => ({
+			kind: "company-profile",
+			briefs: 0,
+		}));
+
+		expect(result).toEqual({
+			ok: false,
+			reason: "Research finished without saving a company brief.",
+		});
+	});
+
+	it("accepts a company profile only after a brief is persisted", async () => {
+		const result = await companyProfileCompletion("task_1", async () => ({
+			kind: "company-profile",
+			briefs: 1,
+		}));
+
+		expect(result).toEqual({ ok: true });
 	});
 });
 

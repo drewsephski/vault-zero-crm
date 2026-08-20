@@ -16,6 +16,7 @@ import { AgentModel } from "./agent-model";
 import { ResearchKey } from "./research-key";
 import { WorkflowModeForm } from "./workflow-mode-form";
 import { WorkspaceForm } from "./workspace-form";
+import { WorkspacePicker } from "./workspace-picker";
 
 export const metadata: Metadata = {
 	title: "General",
@@ -50,6 +51,7 @@ async function Settings() {
 
 	await Promise.all([
 		queryClient.prefetchQuery(trpc.workspace.get.queryOptions()),
+		queryClient.prefetchQuery(trpc.workspace.list.queryOptions()),
 		queryClient.prefetchQuery(trpc.settings.agentModel.queryOptions()),
 		queryClient.prefetchQuery(trpc.settings.modelCatalog.queryOptions()),
 		queryClient.prefetchQuery(trpc.settings.researchKey.queryOptions()),
@@ -58,6 +60,7 @@ async function Settings() {
 	return (
 		<HydrateClient>
 			<div className="flex max-w-3xl flex-col gap-6">
+				<WorkspacePicker />
 				<WorkspaceForm />
 				<WorkflowModeForm />
 				<ResearchKey />

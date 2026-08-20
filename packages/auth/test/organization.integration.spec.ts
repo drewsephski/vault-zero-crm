@@ -8,7 +8,11 @@ import {
 } from "bun:test";
 import { db } from "@crm/db";
 import { acquireCanonicalWorkspaceFixture } from "../../db/test/canonical-workspace-fixture";
-import { ensureWorkspaceMembership, WORKSPACE_ID } from "../src/organization";
+import {
+	ensureWorkspaceMembership,
+	organizationIdForUser,
+	WORKSPACE_ID,
+} from "../src/organization";
 
 const suffix = process.env.TEST_RUN_ID ?? "organization-spec";
 
@@ -160,6 +164,32 @@ describe("ensureWorkspaceMembership", () => {
 			organizationId: secondWorkspace,
 			role: "owner",
 		});
+	});
+
+	it("uses a preferred workspace only when the user belongs to it", async () => {
+		const firstWorkspace = await ensureWorkspaceMembership(firstId);
+		const secondWorkspace = await ensureWorkspaceMembership(secondId);
+		if (!firstWorkspace || !secondWorkspace) {
+			throw new Error("expected both workspaces");
+		}
+
+		expect(await organizationIdForUser(firstId, secondWorkspace)).toBe(
+			firstWorkspace,
+		);
+
+		await db.member.create({
+			data: {
+				id: crypto.randomUUID(),
+				organizationId: secondWorkspace,
+				userId: firstId,
+				role: "member",
+				createdAt: new Date(),
+			},
+		});
+
+		expect(await organizationIdForUser(firstId, secondWorkspace)).toBe(
+			secondWorkspace,
+		);
 	});
 
 	it("is idempotent, so signing in again neither duplicates nor re-roles", async () => {

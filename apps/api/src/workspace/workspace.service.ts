@@ -20,7 +20,13 @@ import {
 } from "@crm/db/acquisition-profile-revision";
 import { acquisitionRefreshTargetIds } from "@crm/db/acquisition-refresh";
 import { readReportingCurrency } from "@crm/db/settings";
-import { isOnboarded, markOnboarded, workspaceSlug } from "@crm/db/workspace";
+import { getOrganizationId } from "@crm/db/tenancy";
+import {
+	isOnboarded,
+	markOnboarded,
+	uniqueWorkspaceSlug,
+	workspaceSlug,
+} from "@crm/db/workspace";
 import {
 	BadRequestException,
 	ForbiddenException,
@@ -41,6 +47,7 @@ import {
 	resolveOrderBy,
 } from "../trpc/list-input";
 import type {
+	CreateWorkspaceInput,
 	MemberListInput,
 	SetMemberRoleInput,
 	SetWorkspaceModeInput,
@@ -132,6 +139,99 @@ export class WorkspaceService {
 		@InjectDatabase() private readonly db: Db,
 		private readonly agent: AgentTriggerService,
 	) {}
+
+	async list(userId: string, activeOrganizationId: string) {
+		const rows = await this.db.member.findMany({
+			where: { userId },
+			orderBy: { createdAt: "asc" },
+			select: {
+				organizationId: true,
+				role: true,
+				organization: { select: { name: true, slug: true } },
+			},
+		});
+
+		return rows.map((row) => ({
+			id: row.organizationId,
+			name: row.organization.name,
+			slug: row.organization.slug,
+			role: row.role,
+			active: row.organizationId === activeOrganizationId,
+		}));
+	}
+
+	async create(userId: string, sessionId: string, input: CreateWorkspaceInput) {
+		const website = normalizeDomain(input.website);
+
+		if (input.website !== null && !website) {
+			throw new BadRequestException(
+				"That is not a website. Enter the domain, like acme.com.",
+			);
+		}
+
+		const slug = await uniqueWorkspaceSlug(
+			async (candidate) =>
+				Boolean(
+					await this.db.organization.findUnique({
+						where: { slug: candidate },
+						select: { id: true },
+					}),
+				),
+			input.name,
+			userId,
+		);
+		const organizationId = crypto.randomUUID();
+
+		await this.db.$transaction([
+			this.db.organization.create({
+				data: {
+					id: organizationId,
+					name: input.name,
+					slug,
+					website,
+					metadata: markOnboarded(null, new Date()),
+					createdAt: new Date(),
+				},
+			}),
+			this.db.member.create({
+				data: {
+					id: crypto.randomUUID(),
+					organizationId,
+					userId,
+					role: "owner",
+					createdAt: new Date(),
+				},
+			}),
+			this.db.session.update({
+				where: { id: sessionId },
+				data: { activeOrganizationId: organizationId },
+			}),
+		]);
+
+		return { id: organizationId, name: input.name, slug };
+	}
+
+	async switch(userId: string, sessionId: string, organizationId: string) {
+		const membership = await this.db.member.findUnique({
+			where: {
+				organizationId_userId: { organizationId, userId },
+			},
+			select: {
+				organization: { select: { slug: true } },
+			},
+		});
+
+		if (!membership) {
+			throw new NotFoundException("That workspace is not available.");
+		}
+
+		await this.db.session.update({
+			where: { id: sessionId },
+			data: { activeOrganizationId: organizationId },
+		});
+
+		return { id: organizationId, slug: membership.organization.slug };
+	}
 
 	async get(userId: string): Promise<Workspace> {
 		const workspaceId = await this.requireWorkspaceId(userId);
@@ -519,7 +619,8 @@ export class WorkspaceService {
 	}
 
 	private async requireWorkspaceId(userId: string): Promise<string> {
-		const workspaceId = await organizationIdForUser(userId);
+		const workspaceId =
+			getOrganizationId() ?? (await organizationIdForUser(userId));
 		if (!workspaceId) {
 			throw new ServiceUnavailableException(
 				"The workspace could not be created. Sign in again in a moment.",

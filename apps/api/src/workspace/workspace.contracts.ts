@@ -20,6 +20,12 @@ export const updateWorkspaceInput = z.object({
 	website: z.string().trim().min(1).max(255).nullable(),
 });
 
+export const createWorkspaceInput = updateWorkspaceInput;
+
+export const switchWorkspaceInput = z.object({
+	organizationId: z.string().min(1),
+});
+
 const acquisitionList = z
 	.array(z.string().trim().min(1).max(80))
 	.max(25)
@@ -104,6 +110,7 @@ export const setMemberRoleInput = z.object({
 });
 
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceInput>;
+export type CreateWorkspaceInput = z.infer<typeof createWorkspaceInput>;
 export type SetMemberRoleInput = z.infer<typeof setMemberRoleInput>;
 export type SetWorkspaceModeInput = z.infer<typeof setWorkspaceModeInput>;
 export type UpdateAcquisitionProfileInput = z.infer<

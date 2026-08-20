@@ -14,15 +14,17 @@ import type { AuthedTrpcContext, BaseTrpcContext } from "../context.types";
 export class AuthMiddleware implements TRPCMiddleware {
 	async use(opts: MiddlewareOptions): Promise<MiddlewareResponse> {
 		const ctx = opts.ctx as BaseTrpcContext;
-		const user = ctx.session?.user;
+		const session = ctx.session;
+		const user = session?.user;
 
-		if (!user) {
+		if (!session || !user) {
 			throw new TRPCError({ code: "UNAUTHORIZED" });
 		}
 
-		const organizationId =
-			ctx.session?.session.activeOrganizationId ??
-			(await organizationIdForUser(user.id));
+		const organizationId = await organizationIdForUser(
+			user.id,
+			session.session.activeOrganizationId,
+		);
 
 		if (!organizationId) {
 			throw new TRPCError({
@@ -34,7 +36,12 @@ export class AuthMiddleware implements TRPCMiddleware {
 
 		setRequestUserId(user.id);
 
-		const nextCtx: AuthedTrpcContext = { ...ctx, user, organizationId };
+		const nextCtx: AuthedTrpcContext = {
+			...ctx,
+			session,
+			user,
+			organizationId,
+		};
 		return runInOrganization(organizationId, () => opts.next({ ctx: nextCtx }));
 	}
 }

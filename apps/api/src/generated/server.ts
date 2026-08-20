@@ -27,7 +27,7 @@ import { setAutoCreateInput, suppressDomainInput, threadInput, calendarEventInpu
 import { outreachListInput, outreachStatusInput } from "../outreach/outreach.contracts";
 import { setAgentModelInput, setResearchKeyInput } from "../settings/settings.contracts";
 import { ssoProviderListInput, registerSsoProviderInput, deleteSsoProviderInput } from "../sso/sso.contracts";
-import { memberListInput, updateWorkspaceInput, setWorkspaceModeInput, updateAcquisitionProfileInput, setMemberRoleInput } from "../workspace/workspace.contracts";
+import { memberListInput, updateWorkspaceInput, createWorkspaceInput, switchWorkspaceInput, setWorkspaceModeInput, updateAcquisitionProfileInput, setMemberRoleInput } from "../workspace/workspace.contracts";
 import type { AcquisitionRouter } from "../acquisition/acquisition.router";
 import type { ActivitiesRouter } from "../activities/activities.router";
 import type { CompaniesRouter } from "../companies/companies.router";
@@ -306,6 +306,8 @@ const appRouter = t.router({
   workspace: t.router({
     get: publicProcedure
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["get"]>>),
+    list: publicProcedure
+      .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["list"]>>),
     acquisitionProfile: publicProcedure
       .query(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["acquisitionProfile"]>>),
     members: publicProcedure
@@ -314,6 +316,12 @@ const appRouter = t.router({
     update: publicProcedure
       .input(updateWorkspaceInput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["update"]>>),
+    create: publicProcedure
+      .input(createWorkspaceInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["create"]>>),
+    switch: publicProcedure
+      .input(switchWorkspaceInput)
+      .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["switch"]>>),
     setMode: publicProcedure
       .input(setWorkspaceModeInput)
       .mutation(async () => "PLACEHOLDER_DO_NOT_REMOVE" as unknown as Awaited<ReturnType<WorkspaceRouter["setMode"]>>),

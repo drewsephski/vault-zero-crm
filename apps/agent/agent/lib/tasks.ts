@@ -40,6 +40,48 @@ export type TaskSubject = {
 	kind: string;
 };
 
+type CompanyProfileCompletionRead = (
+	taskId: string,
+) => Promise<{ kind: string; briefs: number } | null>;
+
+export async function companyProfileCompletion(
+	taskId: string,
+	read: CompanyProfileCompletionRead = async (id) => {
+		const task = await db.agentTask.findUnique({
+			where: { id },
+			select: {
+				kind: true,
+				companyId: true,
+				startedAt: true,
+				createdAt: true,
+			},
+		});
+		if (!task) return null;
+		if (task.kind !== "company-profile" || !task.companyId) {
+			return { kind: task.kind, briefs: 0 };
+		}
+
+		const briefs = await db.activity.count({
+			where: {
+				companyId: task.companyId,
+				type: "ENRICHMENT",
+				subject: { startsWith: "Research brief —" },
+				createdAt: { gte: task.startedAt ?? task.createdAt },
+			},
+		});
+		return { kind: task.kind, briefs };
+	},
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+	const result = await read(taskId);
+	if (result?.kind === "company-profile" && result.briefs === 0) {
+		return {
+			ok: false,
+			reason: "Research finished without saving a company brief.",
+		};
+	}
+	return { ok: true };
+}
+
 const LEASE_MS = 10 * 60_000;
 const RETRY_DELAY_MS = 30_000;
 

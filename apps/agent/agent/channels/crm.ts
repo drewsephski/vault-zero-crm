@@ -10,7 +10,7 @@ import {
 } from "../lib/dispatch";
 import { settle } from "../lib/enrichment";
 import { followUpRequestSchema, generateFollowUps } from "../lib/follow-ups";
-import { completeTask, failTask } from "../lib/tasks";
+import { companyProfileCompletion, completeTask, failTask } from "../lib/tasks";
 import { withTaskOrganizationScope } from "../lib/tenant";
 import { authenticateCrmRep } from "./eve";
 
@@ -152,6 +152,14 @@ export default defineChannel({
 			if (!taskId) return;
 
 			await withTaskOrganizationScope(taskId, async () => {
+				const completion = await companyProfileCompletion(taskId);
+				if (!completion.ok) {
+					const subject = await completeTask(taskId, completion.reason);
+					if (subject) {
+						await settle(subject, EnrichmentStatus.FAILED, completion.reason);
+					}
+					return;
+				}
 				const subject = await completeTask(taskId, "ran");
 				if (subject) await settle(subject, EnrichmentStatus.COMPLETE);
 			});

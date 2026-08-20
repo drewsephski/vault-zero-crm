@@ -223,7 +223,7 @@ function work(kind: string, reason: string): string {
 		case "company-details":
 			return "Refresh this company's structured public details: its website, industry, location and company links. Read what the CRM already has, cite the public sources you use, and do not produce an acquisition assessment or overwrite human-entered values.";
 		case "company-profile":
-			return "Read this company's CRM history and current public information, then write a useful account brief. Structured brand and directory details are refreshed separately. Do not produce an acquisition assessment.";
+			return "Read this company's CRM history, then use web_search with company intent and deep=true so AnySearch and Tavily research its current public information. Finish by calling write_company_brief with the sourced result. A prose response alone does not complete this task. Structured brand and directory details are refreshed separately. Do not produce an acquisition assessment.";
 		case "acquisition-discovery":
 			return "Use the saved buy box to discover a small set of real acquisition candidates. Search broadly, verify each company's website, deduplicate against the CRM, and save at most ten candidates for human review. Do not create company records.";
 		case "acquisition-refresh":
