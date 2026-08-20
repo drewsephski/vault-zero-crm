@@ -904,22 +904,6 @@ export class AcquisitionService {
 		input: UpdateAcquisitionEngagementStageInput,
 		actingUserId: string,
 	) {
-		const engagement = await this.db.acquisitionEngagement.findUnique({
-			where: { id: input.engagementId },
-			select: {
-				id: true,
-				stage: true,
-				status: true,
-				companyId: true,
-				company: { select: { name: true } },
-			},
-		});
-		if (!engagement) {
-			throw new NotFoundException("That engagement no longer exists.");
-		}
-		if (engagement.status === AcquisitionEngagementStatus.TERMINAL) {
-			throw new BadRequestException(TERMINAL_ENGAGEMENT_CONFLICT);
-		}
 		const closedReason = input.closedReason?.trim() || null;
 		if (input.stage === AcquisitionEngagementStage.PASSED && !closedReason) {
 			throw new BadRequestException(
@@ -928,7 +912,34 @@ export class AcquisitionService {
 		}
 
 		const terminal = TERMINAL_ENGAGEMENT_STAGES.has(input.stage);
+		const organizationId = getOrganizationId() ?? WORKSPACE_ID;
 		const updated = await this.db.$transaction(async (tx) => {
+			const locked = await tx.$queryRaw<Array<{ id: string }>>`
+				SELECT id
+				FROM "acquisitionEngagement"
+				WHERE id = ${input.engagementId}
+				AND "organizationId" = ${organizationId}
+				FOR UPDATE
+			`;
+			if (locked.length !== 1) {
+				throw new NotFoundException("That engagement no longer exists.");
+			}
+			const engagement = await tx.acquisitionEngagement.findUnique({
+				where: { id: input.engagementId },
+				select: {
+					id: true,
+					stage: true,
+					status: true,
+					companyId: true,
+					company: { select: { name: true } },
+				},
+			});
+			if (!engagement) {
+				throw new NotFoundException("That engagement no longer exists.");
+			}
+			if (engagement.status === AcquisitionEngagementStatus.TERMINAL) {
+				throw new BadRequestException(TERMINAL_ENGAGEMENT_CONFLICT);
+			}
 			const row = await tx.acquisitionEngagement.update({
 				where: { id: input.engagementId },
 				data: {
@@ -962,54 +973,71 @@ export class AcquisitionService {
 
 	async updateEngagement(input: UpdateAcquisitionEngagementInput) {
 		const organizationId = getOrganizationId() ?? WORKSPACE_ID;
-		const current = await this.db.acquisitionEngagement.findUnique({
-			where: { id: input.engagementId },
-			select: { amount: true, currency: true, status: true },
-		});
-		if (!current) {
-			throw new NotFoundException("That engagement no longer exists.");
-		}
-		if (current.status === AcquisitionEngagementStatus.TERMINAL) {
-			throw new BadRequestException(TERMINAL_ENGAGEMENT_CONFLICT);
-		}
-		if (input.ownerId) {
-			const member = await this.db.member.findFirst({
-				where: { organizationId, userId: input.ownerId },
-				select: { id: true },
-			});
-			if (!member) {
-				throw new BadRequestException("That owner is not in this workspace.");
+		const updated = await this.db.$transaction(async (tx) => {
+			const locked = await tx.$queryRaw<Array<{ id: string }>>`
+				SELECT id
+				FROM "acquisitionEngagement"
+				WHERE id = ${input.engagementId}
+				AND "organizationId" = ${organizationId}
+				FOR UPDATE
+			`;
+			if (locked.length !== 1) {
+				throw new NotFoundException("That engagement no longer exists.");
 			}
-		}
+			const current = await tx.acquisitionEngagement.findUnique({
+				where: { id: input.engagementId },
+				select: { amount: true, currency: true, status: true },
+			});
+			if (!current) {
+				throw new NotFoundException("That engagement no longer exists.");
+			}
+			if (current.status === AcquisitionEngagementStatus.TERMINAL) {
+				throw new BadRequestException(TERMINAL_ENGAGEMENT_CONFLICT);
+			}
+			if (input.ownerId) {
+				const member = await tx.member.findFirst({
+					where: { organizationId, userId: input.ownerId },
+					select: { id: true },
+				});
+				if (!member) {
+					throw new BadRequestException("That owner is not in this workspace.");
+				}
+			}
 
-		const data: Prisma.AcquisitionEngagementUpdateInput = {};
-		if (input.ownerId !== undefined) {
-			data.owner = input.ownerId
-				? { connect: { id: input.ownerId } }
-				: { disconnect: true };
-		}
-		if (input.amountCents !== undefined)
-			data.amount = fromCents(input.amountCents);
-		if (input.currency !== undefined)
-			data.currency = normalizeCurrency(input.currency);
-		if (input.expectedCloseDate !== undefined) {
-			data.expectedCloseDate = input.expectedCloseDate
-				? new Date(input.expectedCloseDate)
-				: null;
-		}
-		if (input.amountCents !== undefined || input.currency !== undefined) {
-			const amount =
-				input.amountCents !== undefined
-					? decimalFromCents(input.amountCents)
-					: current.amount;
-			const currency = normalizeCurrency(input.currency ?? current.currency);
-			Object.assign(data, await this.conversion.amountFields(amount, currency));
-		}
+			const data: Prisma.AcquisitionEngagementUpdateInput = {};
+			if (input.ownerId !== undefined) {
+				data.owner = input.ownerId
+					? { connect: { id: input.ownerId } }
+					: { disconnect: true };
+			}
+			if (input.amountCents !== undefined) {
+				data.amount = fromCents(input.amountCents);
+			}
+			if (input.currency !== undefined) {
+				data.currency = normalizeCurrency(input.currency);
+			}
+			if (input.expectedCloseDate !== undefined) {
+				data.expectedCloseDate = input.expectedCloseDate
+					? new Date(input.expectedCloseDate)
+					: null;
+			}
+			if (input.amountCents !== undefined || input.currency !== undefined) {
+				const amount =
+					input.amountCents !== undefined
+						? decimalFromCents(input.amountCents)
+						: current.amount;
+				const currency = normalizeCurrency(input.currency ?? current.currency);
+				Object.assign(
+					data,
+					await this.conversion.amountFields(amount, currency),
+				);
+			}
 
-		const updated = await this.db.acquisitionEngagement.update({
-			where: { id: input.engagementId },
-			data,
-			select: ENGAGEMENT_SELECT,
+			return tx.acquisitionEngagement.update({
+				where: { id: input.engagementId },
+				data,
+				select: ENGAGEMENT_SELECT,
+			});
 		});
 		return this.serializeEngagement(updated);
 	}

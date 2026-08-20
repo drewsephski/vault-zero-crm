@@ -16,6 +16,7 @@ import {
 	ActivityType,
 	db,
 	EnrichmentStatus,
+	Prisma,
 	RecordSource,
 	WorkspaceMode,
 } from "@crm/db";
@@ -28,6 +29,7 @@ import { AcquisitionService } from "../src/acquisition/acquisition.service";
 import { AgentQueueService } from "../src/agent/agent-queue.service";
 import { AgentTriggerService } from "../src/agent/agent-trigger.service";
 import { CompaniesService } from "../src/companies/companies.service";
+import type { ConversionService } from "../src/currency/conversion.service";
 
 const domains: string[] = [];
 const companyIds: string[] = [];
@@ -118,8 +120,9 @@ function companyService() {
 	);
 }
 
-function service(agent = new AgentTriggerService(db)) {
-	return new AcquisitionService(db, companyService(), agent, {
+function service(
+	agent = new AgentTriggerService(db),
+	conversion: Pick<ConversionService, "reportingCurrency" | "amountFields"> = {
 		reportingCurrency: async () => "USD",
 		amountFields: async () => ({
 			baseAmount: null,
@@ -127,7 +130,14 @@ function service(agent = new AgentTriggerService(db)) {
 			fxRate: null,
 			fxRateAt: null,
 		}),
-	} as never);
+	},
+) {
+	return new AcquisitionService(
+		db,
+		companyService(),
+		agent,
+		conversion as ConversionService,
+	);
 }
 
 async function createEngagementTargetCompany(
@@ -1903,6 +1913,270 @@ describe("eve recommendations and acquisition engagements", () => {
 			expect(rows.rows).toHaveLength(2);
 		});
 	}
+
+	it("allows exactly one concurrent terminal engagement outcome", async () => {
+		const suffix = crypto.randomUUID();
+		const actingUserId = `terminal-race-${suffix}`;
+		await ensureWorkspaceMember(
+			actingUserId,
+			`terminal-race-${suffix}@example.com`,
+			"Terminal Race User",
+		);
+		const company = await createEngagementTargetCompany(
+			`terminal-race-${suffix}.test`,
+		);
+		const acquisition = service();
+		const engagement = await acquisition.createEngagement(
+			{ companyId: company.id, idempotencyKey: crypto.randomUUID() },
+			actingUserId,
+		);
+		const activityCount = await db.activity.count({
+			where: { engagementId: engagement.id },
+		});
+
+		const results = await Promise.allSettled([
+			acquisition.updateEngagementStage(
+				{
+					engagementId: engagement.id,
+					stage: AcquisitionEngagementStage.PASSED,
+					closedReason: "The seller terms do not fit the mandate.",
+				},
+				actingUserId,
+			),
+			acquisition.updateEngagementStage(
+				{
+					engagementId: engagement.id,
+					stage: AcquisitionEngagementStage.ACQUIRED,
+				},
+				actingUserId,
+			),
+		]);
+		expect(
+			results.filter((result) => result.status === "fulfilled"),
+		).toHaveLength(1);
+		expect(
+			results.filter((result) => result.status === "rejected"),
+		).toHaveLength(1);
+		const stored = await db.acquisitionEngagement.findUniqueOrThrow({
+			where: { id: engagement.id },
+		});
+		expect(stored.status).toBe(AcquisitionEngagementStatus.TERMINAL);
+		expect(
+			stored.stage === AcquisitionEngagementStage.PASSED ||
+				stored.stage === AcquisitionEngagementStage.ACQUIRED,
+		).toBeTrue();
+		expect(stored.closedAt).not.toBeNull();
+		expect(
+			await db.activity.count({ where: { engagementId: engagement.id } }),
+		).toBe(activityCount + 1);
+	});
+
+	it("does not allow an engagement edit to commit after terminal close", async () => {
+		const suffix = crypto.randomUUID();
+		const actingUserId = `edit-close-race-${suffix}`;
+		await ensureWorkspaceMember(
+			actingUserId,
+			`edit-close-race-${suffix}@example.com`,
+			"Edit Close Race User",
+		);
+		const company = await createEngagementTargetCompany(
+			`edit-close-race-${suffix}.test`,
+		);
+		const created = await service().createEngagement(
+			{
+				companyId: company.id,
+				idempotencyKey: crypto.randomUUID(),
+				amountCents: 10_000,
+				currency: "USD",
+			},
+			actingUserId,
+		);
+		let entered!: () => void;
+		const conversionEntered = new Promise<void>((resolve) => {
+			entered = resolve;
+		});
+		let release!: () => void;
+		const released = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const acquisition = service(new AgentTriggerService(db), {
+			reportingCurrency: async () => "USD",
+			amountFields: async () => {
+				entered();
+				await released;
+				return {
+					baseAmount: null,
+					baseCurrency: null,
+					fxRate: null,
+					fxRateAt: null,
+				};
+			},
+		} as never);
+
+		const edit = acquisition.updateEngagement({
+			engagementId: created.id,
+			amountCents: 20_000,
+		});
+		await conversionEntered;
+		const close = acquisition.updateEngagementStage(
+			{
+				engagementId: created.id,
+				stage: AcquisitionEngagementStage.PASSED,
+				closedReason: "Closed while an edit was pending.",
+			},
+			actingUserId,
+		);
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		release();
+		await Promise.allSettled([edit, close]);
+
+		const stored = await db.acquisitionEngagement.findUniqueOrThrow({
+			where: { id: created.id },
+		});
+		expect(stored.status).toBe(AcquisitionEngagementStatus.TERMINAL);
+		expect(stored.closedAt).not.toBeNull();
+		if (!stored.closedAt) throw new Error("expected terminal close time");
+		expect(stored.updatedAt.getTime() - stored.closedAt.getTime()).toBeLessThan(
+			100,
+		);
+	});
+
+	it("does not let a nonterminal move overwrite an acquired close", async () => {
+		const suffix = crypto.randomUUID();
+		const actingUserId = `move-close-race-${suffix}`;
+		await ensureWorkspaceMember(
+			actingUserId,
+			`move-close-race-${suffix}@example.com`,
+			"Move Close Race User",
+		);
+		const company = await createEngagementTargetCompany(
+			`move-close-race-${suffix}.test`,
+		);
+		const acquisition = service();
+		const created = await acquisition.createEngagement(
+			{ companyId: company.id, idempotencyKey: crypto.randomUUID() },
+			actingUserId,
+		);
+
+		const results = await Promise.allSettled([
+			acquisition.updateEngagementStage(
+				{
+					engagementId: created.id,
+					stage: AcquisitionEngagementStage.ACQUIRED,
+				},
+				actingUserId,
+			),
+			acquisition.updateEngagementStage(
+				{
+					engagementId: created.id,
+					stage: AcquisitionEngagementStage.UNDERWRITING,
+				},
+				actingUserId,
+			),
+		]);
+		expect(results[0]?.status).toBe("fulfilled");
+		const stored = await db.acquisitionEngagement.findUniqueOrThrow({
+			where: { id: created.id },
+		});
+		expect(stored.status).toBe(AcquisitionEngagementStatus.TERMINAL);
+		expect(stored.stage).toBe(AcquisitionEngagementStage.ACQUIRED);
+		expect(stored.closedAt).not.toBeNull();
+	});
+
+	it("keeps the amount and currency conversion tuple coherent under races", async () => {
+		const suffix = crypto.randomUUID();
+		const actingUserId = `currency-race-${suffix}`;
+		await ensureWorkspaceMember(
+			actingUserId,
+			`currency-race-${suffix}@example.com`,
+			"Currency Race User",
+		);
+		const company = await createEngagementTargetCompany(
+			`currency-race-${suffix}.test`,
+		);
+		const created = await service().createEngagement(
+			{
+				companyId: company.id,
+				idempotencyKey: crypto.randomUUID(),
+				amountCents: 10_000,
+				currency: "USD",
+			},
+			actingUserId,
+		);
+		let amountConversionEntered!: () => void;
+		const amountEntered = new Promise<void>((resolve) => {
+			amountConversionEntered = resolve;
+		});
+		let calls = 0;
+		const acquisition = service(new AgentTriggerService(db), {
+			reportingCurrency: async () => "USD",
+			amountFields: async (amount: Prisma.Decimal | null, currency: string) => {
+				calls += 1;
+				if (calls === 1) amountConversionEntered();
+				await new Promise((resolve) =>
+					setTimeout(resolve, currency === "EUR" ? 100 : 50),
+				);
+				if (!amount) {
+					return {
+						baseAmount: null,
+						baseCurrency: null,
+						fxRate: null,
+						fxRateAt: null,
+					};
+				}
+				const rate =
+					currency === "EUR" ? new Prisma.Decimal(2) : new Prisma.Decimal(1);
+				return {
+					baseAmount: amount.mul(rate),
+					baseCurrency: "USD",
+					fxRate: rate,
+					fxRateAt: new Date("2026-08-20T12:00:00.000Z"),
+				};
+			},
+		} as never);
+
+		const amountUpdate = acquisition.updateEngagement({
+			engagementId: created.id,
+			amountCents: 20_000,
+		});
+		await amountEntered;
+		const currencyUpdate = acquisition.updateEngagement({
+			engagementId: created.id,
+			currency: "EUR",
+		});
+		await Promise.all([amountUpdate, currencyUpdate]);
+
+		const stored = await db.acquisitionEngagement.findUniqueOrThrow({
+			where: { id: created.id },
+		});
+		expect(stored.amount?.toString()).toBe("200");
+		expect(stored.currency).toBe("EUR");
+		expect(stored.baseAmount?.toString()).toBe("400");
+		expect(stored.baseCurrency).toBe("USD");
+		expect(stored.fxRate?.toString()).toBe("2");
+		expect(stored.fxRateAt?.toISOString()).toBe("2026-08-20T12:00:00.000Z");
+
+		const unavailable = service(new AgentTriggerService(db), {
+			reportingCurrency: async () => "USD",
+			amountFields: async () => ({
+				baseAmount: null,
+				baseCurrency: null,
+				fxRate: null,
+				fxRateAt: null,
+			}),
+		} as never);
+		await unavailable.updateEngagement({
+			engagementId: created.id,
+			currency: "JPY",
+		});
+		const cleared = await db.acquisitionEngagement.findUniqueOrThrow({
+			where: { id: created.id },
+		});
+		expect(cleared.baseAmount).toBeNull();
+		expect(cleared.baseCurrency).toBeNull();
+		expect(cleared.fxRate).toBeNull();
+		expect(cleared.fxRateAt).toBeNull();
+	});
 
 	it("converges concurrent engagement creation on one active row", async () => {
 		const suffix = crypto.randomUUID();
