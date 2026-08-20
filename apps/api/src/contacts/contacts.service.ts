@@ -32,6 +32,10 @@ import {
 	paginate,
 	resolveOrderBy,
 } from "../trpc/list-input";
+import {
+	assertWorkspaceCompany,
+	assertWorkspaceMember,
+} from "../users/workspace-relations";
 import type {
 	ContactBulkUpdateInput,
 	ContactCreateInput,
@@ -268,6 +272,10 @@ export class ContactsService {
 	}
 
 	async create(input: ContactCreateInput) {
+		await Promise.all([
+			assertWorkspaceMember(this.db, input.ownerId),
+			assertWorkspaceCompany(this.db, input.companyId),
+		]);
 		const email = normalizeEmail(input.email ?? "");
 
 		if (email) {
@@ -438,6 +446,10 @@ export class ContactsService {
 		ids: string[],
 		input: ContactBulkUpdateInput,
 	): Promise<{ ids: string[]; count: number }> {
+		await Promise.all([
+			assertWorkspaceMember(this.db, input.ownerId),
+			assertWorkspaceCompany(this.db, input.companyId),
+		]);
 		const uniqueIds = [...new Set(ids)];
 		const data: Prisma.ContactUncheckedUpdateManyInput = {};
 		if (Object.hasOwn(input, "companyId")) data.companyId = input.companyId;
@@ -467,6 +479,10 @@ export class ContactsService {
 	}
 
 	async update(id: string, input: ContactUpdateInput) {
+		await Promise.all([
+			assertWorkspaceMember(this.db, input.ownerId),
+			assertWorkspaceCompany(this.db, input.companyId),
+		]);
 		const data: Prisma.ContactUpdateInput = {};
 
 		if (input.firstName !== undefined) data.firstName = input.firstName.trim();

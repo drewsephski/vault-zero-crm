@@ -33,6 +33,10 @@ import {
 	resolveOrderBy,
 } from "../trpc/list-input";
 import {
+	assertWorkspaceCompany,
+	assertWorkspaceMember,
+} from "../users/workspace-relations";
+import {
 	CLOSED_DEAL_STAGES,
 	isClosedStage,
 	LOSING_DEAL_STAGES,
@@ -220,6 +224,10 @@ export class DealsService {
 	}
 
 	async create(input: DealCreateInput) {
+		await Promise.all([
+			assertWorkspaceMember(this.db, input.ownerId),
+			assertWorkspaceCompany(this.db, input.companyId),
+		]);
 		const stage = input.stage ?? "DEMO_BOOKED";
 		const closed = isClosedStage(stage);
 		const now = new Date();
@@ -258,6 +266,10 @@ export class DealsService {
 	}
 
 	async update(id: string, input: DealUpdateInput) {
+		await Promise.all([
+			assertWorkspaceMember(this.db, input.ownerId),
+			assertWorkspaceCompany(this.db, input.companyId),
+		]);
 		const data: Prisma.DealUpdateInput = {};
 
 		if (input.name !== undefined) data.name = input.name.trim();

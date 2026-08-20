@@ -355,7 +355,8 @@ export class AcquisitionService {
 		try {
 			queued = await this.agent.acquisitionTargetRequested(
 				companyId,
-				`Acquisition analysis requested by a rep (${actingUserId})`,
+				"Acquisition analysis requested by a rep",
+				actingUserId,
 			);
 		} catch {
 			queued = null;

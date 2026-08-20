@@ -18,11 +18,6 @@ export type AcquisitionDossierSnapshot = {
 	sourceSessionId: string;
 };
 
-export function parseResearchTriggeredById(reason: string): string | null {
-	const match = reason.match(/requested by a rep \(([^)]+)\)/i);
-	return match?.[1] ?? null;
-}
-
 export function researchRunListSnapshot(snapshot: unknown): {
 	fit: AcquisitionFit | null;
 	summary: string | null;

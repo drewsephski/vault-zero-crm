@@ -202,10 +202,11 @@ async function cleanup(): Promise<void> {
 	await db.user.deleteMany({ where: { email: userEmail } });
 }
 
-async function queueRefresh(reason: string) {
+async function queueRefresh(reason: string, requestedById?: string) {
 	return db.agentTask.create({
 		data: {
 			companyId,
+			requestedById,
 			kind: "acquisition-refresh",
 			reason,
 			dueAt: new Date(Date.now() - 1000),
@@ -219,7 +220,8 @@ async function queueRefresh(reason: string) {
 describe("acquisition research runs", () => {
 	it("creates exactly one run when execution begins", async () => {
 		const task = await queueRefresh(
-			`Acquisition analysis requested by a rep (${userId})`,
+			"Acquisition analysis requested by a rep",
+			userId,
 		);
 		const [claimed] = await claimDue(1, { except: DIRECT_KINDS });
 		expect(claimed?.id).toBe(task.id);

@@ -19,6 +19,7 @@ export type LeasedTask = {
 	id: string;
 	contactId: string | null;
 	companyId: string | null;
+	requestedById?: string | null;
 	organizationId: string;
 	kind: string;
 	reason: string;
@@ -71,7 +72,7 @@ export async function claimDue(
 			FOR UPDATE SKIP LOCKED
 		) AS due
 		WHERE t.id = due.id
-		RETURNING t.id, t."contactId", t."companyId", t."organizationId", t.kind, t.reason,
+		RETURNING t.id, t."contactId", t."companyId", t."requestedById", t."organizationId", t.kind, t.reason,
 			t.budget, t.attempts, t.priority, t."dueAt";
 	`
 			: await db.$queryRaw<LeasedTask[]>`
@@ -92,7 +93,7 @@ export async function claimDue(
 			FOR UPDATE SKIP LOCKED
 		) AS due
 		WHERE t.id = due.id
-		RETURNING t.id, t."contactId", t."companyId", t."organizationId", t.kind, t.reason,
+		RETURNING t.id, t."contactId", t."companyId", t."requestedById", t."organizationId", t.kind, t.reason,
 			t.budget, t.attempts, t.priority, t."dueAt";
 	`;
 

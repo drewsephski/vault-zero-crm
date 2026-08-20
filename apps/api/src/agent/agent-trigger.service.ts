@@ -90,9 +90,11 @@ export class AgentTriggerService {
 	async companyResearchRequested(
 		companyId: string,
 		reason: string,
+		requestedById?: string,
 	): Promise<EnqueueResult> {
 		return this.enqueue({
 			companyId,
+			requestedById,
 			kind: "company-profile",
 			reason,
 			priority: PRIORITY.requested,
@@ -103,9 +105,11 @@ export class AgentTriggerService {
 	async acquisitionTargetRequested(
 		companyId: string,
 		reason: string,
+		requestedById?: string,
 	): Promise<EnqueueResult> {
 		return this.enqueue({
 			companyId,
+			requestedById,
 			kind: "acquisition-refresh",
 			reason,
 			priority: PRIORITY.requested,
@@ -211,6 +215,7 @@ export class AgentTriggerService {
 	private async enqueue(task: {
 		contactId?: string;
 		companyId?: string;
+		requestedById?: string;
 		kind: string;
 		reason: string;
 		priority: number;

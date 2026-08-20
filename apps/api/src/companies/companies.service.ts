@@ -44,6 +44,7 @@ import {
 	paginate,
 	resolveOrderBy,
 } from "../trpc/list-input";
+import { assertWorkspaceMember } from "../users/workspace-relations";
 import type {
 	CompanyBulkUpdateInput,
 	CompanyCreateInput,
@@ -351,6 +352,7 @@ export class CompaniesService {
 		acquisitionTarget?: Prisma.AcquisitionTargetCreateWithoutCompanyInput,
 		acquisitionTargetCreateRequestKey?: string,
 	) {
+		await assertWorkspaceMember(this.db, input.ownerId);
 		const domain = normalizeDomain(input.domain);
 
 		if (domain) {
@@ -405,6 +407,7 @@ export class CompaniesService {
 	}
 
 	async update(id: string, input: CompanyUpdateInput) {
+		await assertWorkspaceMember(this.db, input.ownerId);
 		const data: Prisma.CompanyUpdateInput = {};
 
 		if (input.name !== undefined) data.name = input.name.trim();
@@ -572,6 +575,7 @@ export class CompaniesService {
 		ids: string[],
 		input: CompanyBulkUpdateInput,
 	): Promise<{ ids: string[]; count: number }> {
+		await assertWorkspaceMember(this.db, input.ownerId);
 		const uniqueIds = [...new Set(ids)];
 		let result: { count: number };
 		try {
@@ -676,7 +680,8 @@ export class CompaniesService {
 
 		await this.agent.companyResearchRequested(
 			id,
-			`Company briefing requested by a rep (${actingUserId})`,
+			"Company briefing requested by a rep",
+			actingUserId,
 		);
 
 		return {
@@ -712,7 +717,8 @@ export class CompaniesService {
 
 		await this.agent.acquisitionTargetRequested(
 			id,
-			`Acquisition analysis requested by a rep (${actingUserId})`,
+			"Acquisition analysis requested by a rep",
+			actingUserId,
 		);
 
 		return {

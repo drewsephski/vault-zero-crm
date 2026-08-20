@@ -1,6 +1,5 @@
 import { db, getOrganizationId, Prisma, type PrismaClient } from "@crm/db";
 import type { AcquisitionDossierSnapshot } from "@crm/db/acquisition-research-runs";
-import { parseResearchTriggeredById } from "@crm/db/acquisition-research-runs";
 import { AcquisitionResearchRunStatus } from "@crm/db/enums";
 import type { LeasedTask } from "./tasks";
 
@@ -22,7 +21,7 @@ export async function ensureAcquisitionResearchRun(
 				companyId: task.companyId,
 				kind: task.kind,
 				agentTaskId: task.id,
-				triggeredById: parseResearchTriggeredById(task.reason),
+				triggeredById: task.requestedById ?? null,
 				status: AcquisitionResearchRunStatus.RUNNING,
 			},
 			select: { id: true },

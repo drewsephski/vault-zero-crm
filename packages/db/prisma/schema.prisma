@@ -27,6 +27,7 @@ model User {
   ownedDeals     Deal[]              @relation("DealOwner")
   ownedAcquisitionEngagements AcquisitionEngagement[] @relation("AcquisitionEngagementOwner")
   acquisitionResearchRuns AcquisitionResearchRun[] @relation("AcquisitionResearchRunTrigger")
+  requestedAgentTasks AgentTask[] @relation("AgentTaskRequester")
   activities     Activity[]          @relation("ActivityAuthor")
   mailboxSyncs   MailboxSync[]
   factDecisions  ContactFact[]       @relation("FactDecider")
@@ -630,6 +631,8 @@ model AgentTask {
   id        String  @id @default(cuid())
   contactId String?
   companyId String?
+  requestedById String?
+  requestedBy User? @relation("AgentTaskRequester", fields: [requestedById], references: [id], onDelete: SetNull)
 
 	organizationId String @default("workspace")
 	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -655,6 +658,7 @@ model AgentTask {
   @@index([organizationId, dueAt, leasedUntil])
   @@index([dueAt, leasedUntil])
   @@index([contactId])
+  @@index([requestedById])
   @@map("agentTask")
 }
 

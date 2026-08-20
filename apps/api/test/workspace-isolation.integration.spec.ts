@@ -159,4 +159,68 @@ describe("workspace data isolation", () => {
 			await db.user.deleteMany({ where: { id: { in: [userA.id, userB.id] } } });
 		}
 	});
+
+	it("rejects an owner from another workspace", async () => {
+		const service = companies();
+		const [userA, userB] = await Promise.all([
+			db.user.create({
+				data: {
+					id: `iso-owner-a-${suffix}`,
+					name: "Isolation Owner A",
+					email: `iso-owner-a.${suffix}@example.test`,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+			}),
+			db.user.create({
+				data: {
+					id: `iso-owner-b-${suffix}`,
+					name: "Isolation Owner B",
+					email: `iso-owner-b.${suffix}@example.test`,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				},
+			}),
+		]);
+
+		await Promise.all([
+			db.member.create({
+				data: {
+					id: crypto.randomUUID(),
+					organizationId: orgA,
+					userId: userA.id,
+					role: "owner",
+					createdAt: new Date(),
+				},
+			}),
+			db.member.create({
+				data: {
+					id: crypto.randomUUID(),
+					organizationId: orgB,
+					userId: userB.id,
+					role: "owner",
+					createdAt: new Date(),
+				},
+			}),
+		]);
+
+		try {
+			await expect(
+				runInOrganization(orgA, () =>
+					service.create({
+						name: "Foreign Owner Company",
+						ownerId: userB.id,
+					}),
+				),
+			).rejects.toThrow("owner is not in this workspace");
+		} finally {
+			await db.company.deleteMany({ where: { name: "Foreign Owner Company" } });
+			await db.member.deleteMany({
+				where: { userId: { in: [userA.id, userB.id] } },
+			});
+			await db.user.deleteMany({
+				where: { id: { in: [userA.id, userB.id] } },
+			});
+		}
+	});
 });

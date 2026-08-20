@@ -80,6 +80,7 @@ export const PRIORITY = {
 export type QueueAgentTaskInput = {
 	contactId?: string | null;
 	companyId?: string | null;
+	requestedById?: string | null;
 	kind: string;
 	reason: string;
 	dueAt: Date;
@@ -122,6 +123,7 @@ export async function queueAgentTask(
 			const created = await database.agentTask.create({
 				data: {
 					...subject,
+					requestedById: input.requestedById ?? null,
 					kind: input.kind,
 					reason: input.reason,
 					dueAt: input.dueAt,
@@ -155,6 +157,7 @@ async function advanceAgentTask(
 		},
 		data: {
 			dueAt: input.dueAt,
+			requestedById: input.requestedById ?? null,
 			reason: input.reason,
 			priority: input.priority ?? 0,
 			budget: input.budget ?? 4,
