@@ -3,7 +3,6 @@
 import Launch from "@carbon/icons-react/es/Launch";
 import Warning from "@carbon/icons-react/es/Warning";
 import { authClient } from "@crm/auth/client";
-import { SYNC_SCOPES } from "@crm/auth/scopes";
 import {
 	Alert,
 	AlertAction,
@@ -43,8 +42,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import { isSyncing, SYNC_POLL_MS } from "@/components/crm/sync-status";
+import { googleConnectionRequest } from "@/lib/google-connection";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
+import { useWorkspaceUrl } from "@/lib/use-workspace-url";
 
 const SOURCES = {
 	calendar: {
@@ -128,18 +129,16 @@ const CONNECT_ERRORS: Record<string, string> = {
 
 function ConnectGoogle({ connectError }: { connectError?: string }) {
 	const [pending, setPending] = useState(false);
+	const workspaceUrl = useWorkspaceUrl();
 
 	async function handleConnect() {
 		setPending(true);
 
 		const origin = window.location.origin;
 
-		const { error } = await authClient.linkSocial({
-			provider: "google",
-			scopes: [...SYNC_SCOPES],
-			callbackURL: `${origin}/settings/connections`,
-			errorCallbackURL: `${origin}/settings/connections`,
-		});
+		const { error } = await authClient.linkSocial(
+			googleConnectionRequest(origin, workspaceUrl()),
+		);
 
 		if (error) {
 			toast.error(error.message ?? "Could not reach Google.");
@@ -196,6 +195,20 @@ export function GoogleConnection({ connectError }: { connectError?: string }) {
 	const trpc = useTRPC();
 	const cache = useCrmCache();
 	const queryClient = useQueryClient();
+	const workspaceUrl = useWorkspaceUrl();
+	const [reconnecting, setReconnecting] = useState(false);
+
+	async function handleReconnect() {
+		setReconnecting(true);
+		const { error } = await authClient.linkSocial(
+			googleConnectionRequest(window.location.origin, workspaceUrl()),
+		);
+
+		if (error) {
+			toast.error(error.message ?? "Could not reach Google.");
+			setReconnecting(false);
+		}
+	}
 
 	const status = useQuery({
 		...trpc.google.status.queryOptions(),
@@ -302,7 +315,20 @@ export function GoogleConnection({ connectError }: { connectError?: string }) {
 					<Alert variant="destructive" attention={insistence}>
 						<Icon icon={Warning} />
 						<AlertTitle>Google did not return a refresh token</AlertTitle>
-						<AlertDescription>Sign out and back in.</AlertDescription>
+						<AlertDescription>
+							Reconnect Google to keep Gmail and Calendar available after the
+							current access token expires.
+						</AlertDescription>
+						<AlertAction>
+							<Button
+								disabled={reconnecting}
+								onClick={handleReconnect}
+								size="xs"
+								variant="contrast"
+							>
+								{reconnecting ? "Connecting…" : "Reconnect Google"}
+							</Button>
+						</AlertAction>
 					</Alert>
 				) : failing.length > 0 ? (
 					failing.map((source) => {
@@ -375,6 +401,14 @@ export function GoogleConnection({ connectError }: { connectError?: string }) {
 
 				<CardFooter>
 					<div className="-ml-2 flex flex-wrap items-center gap-1 text-muted-foreground">
+						<Button
+							disabled={reconnecting}
+							onClick={handleReconnect}
+							size="xs"
+							variant="ghost"
+						>
+							{reconnecting ? "Connecting…" : "Reconnect Google"}
+						</Button>
 						<AlertDialog>
 							<AlertDialogTrigger asChild>
 								<Button variant="ghost" size="xs" disabled={purge.isPending}>
