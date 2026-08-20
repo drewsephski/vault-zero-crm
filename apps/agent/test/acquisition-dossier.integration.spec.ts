@@ -8,6 +8,7 @@ import {
 } from "bun:test";
 import {
 	AcquisitionFit,
+	AcquisitionResearchRunStatus,
 	AcquisitionStage,
 	ActivityType,
 	db,
@@ -295,6 +296,7 @@ async function cleanup(): Promise<void> {
 
 async function seedDossierA(): Promise<void> {
 	await db.activity.deleteMany({ where: { companyId } });
+	await db.acquisitionResearchRun.deleteMany({ where: { companyId } });
 	await db.agentTask.deleteMany({ where: { companyId } });
 	await db.acquisitionTarget.upsert({
 		where: { companyId },
@@ -332,6 +334,33 @@ async function seedDossierA(): Promise<void> {
 		where: { id: companyId },
 		data: { ownerId: userId, lastActivityAt: timestampA },
 	});
+}
+
+async function seedRunningResearchRun() {
+	const task = await db.agentTask.create({
+		data: {
+			organizationId: WORKSPACE_ID,
+			companyId,
+			kind: "acquisition-refresh",
+			reason: "Test acquisition refresh",
+			dueAt: new Date(),
+			startedAt: new Date(),
+			sessionId: toolContext.session.id,
+		},
+		select: { id: true },
+	});
+	await db.acquisitionResearchRun.create({
+		data: {
+			organizationId: WORKSPACE_ID,
+			companyId,
+			kind: "acquisition-refresh",
+			agentTaskId: task.id,
+			sessionId: toolContext.session.id,
+			status: AcquisitionResearchRunStatus.RUNNING,
+			buyBoxRevision: 7,
+		},
+	});
+	return task;
 }
 
 async function expectDossierA(): Promise<void> {
@@ -408,6 +437,7 @@ describe("write_acquisition_dossier", () => {
 	}
 
 	it("accepts reordered criteria and stores them in canonical order", async () => {
+		await seedRunningResearchRun();
 		const result = await writeAcquisitionDossier.execute(
 			{
 				...baseDossierB,
@@ -449,6 +479,7 @@ describe("write_acquisition_dossier", () => {
 	});
 
 	it("commits dossier B, evidence sources, activity, and timestamps together", async () => {
+		const task = await seedRunningResearchRun();
 		const startedAt = new Date();
 		const result = await writeAcquisitionDossier.execute(
 			{
@@ -461,7 +492,7 @@ describe("write_acquisition_dossier", () => {
 		const finishedAt = new Date();
 
 		expect(result.written).toBe(true);
-		const [target, company, activities, tasks] = await Promise.all([
+		const [target, company, activities, tasks, run] = await Promise.all([
 			db.acquisitionTarget.findUnique({ where: { companyId } }),
 			db.company.findUnique({
 				where: { id: companyId },
@@ -469,6 +500,9 @@ describe("write_acquisition_dossier", () => {
 			}),
 			db.activity.findMany({ where: { companyId } }),
 			db.agentTask.findMany({ where: { companyId } }),
+			db.acquisitionResearchRun.findUnique({
+				where: { agentTaskId: task.id },
+			}),
 		]);
 
 		expect(target).toMatchObject({
@@ -506,7 +540,8 @@ describe("write_acquisition_dossier", () => {
 			createdById: userId,
 		});
 		expect(activities[0]?.body).toContain(baseDossierB.summary);
-		expect(tasks).toHaveLength(0);
+		expect(tasks).toHaveLength(1);
+		expect(run?.status).toBe(AcquisitionResearchRunStatus.SUCCEEDED);
 	});
 
 	it("preserves dossier A when no activity author exists", async () => {
