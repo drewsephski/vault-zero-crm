@@ -11,7 +11,7 @@ are in `docs/setup.md`.
 
 ## Model
 
-Default `google/gemini-2.5-flash` through OpenRouter;
+Default `openai/gpt-5.6-luna` through OpenRouter;
 `DEFAULT_AGENT_MODEL` in `@crm/db/settings` because the agent and the API both need
 the same ID and context window.
 

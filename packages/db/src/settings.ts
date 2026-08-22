@@ -8,8 +8,8 @@ import {
 export const SETTINGS_ID = "app";
 
 export const DEFAULT_AGENT_MODEL = {
-	id: "google/gemini-3.7-flash",
-	contextWindowTokens: 1_048_576,
+	id: "openai/gpt-5.6-luna",
+	contextWindowTokens: 1_050_000,
 } as const;
 
 export interface AgentModelSetting {
