@@ -226,7 +226,7 @@ function work(kind: string, reason: string): string {
 		case "company-profile":
 			return "Read this company's CRM history, then use web_search with company intent and deep=true so AnySearch and Tavily research its current public information. Finish by calling write_company_brief with the sourced result. A prose response alone does not complete this task. Structured brand and directory details are refreshed separately. Do not produce an acquisition assessment.";
 		case "acquisition-discovery":
-			return "Use the saved buy box to discover a small set of real acquisition candidates. Search broadly, verify each company's website, deduplicate against the CRM, and save at most ten candidates for human review. Do not create company records.";
+			return "Use the saved buy box to discover a small set of independently owned small-business acquisition candidates. Search one industry and geography combination at a time, verify each company's website, corroborate it with a separate official or directory source, exclude chains and franchises, deduplicate against the CRM, and save at most ten candidates for human review. Do not create company records.";
 		case "acquisition-refresh":
 			return "Refresh this acquisition target's dossier. Read the CRM first, verify what changed from current public sources, preserve unknowns, and write a new evidence-backed fit assessment and recommended next action.";
 		case "workspace-profile":

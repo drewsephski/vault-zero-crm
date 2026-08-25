@@ -109,6 +109,14 @@ sources, verify each candidate's real website, and call
 `propose_acquisition_candidates` with no more than ten credible candidates.
 Candidates are a review queue, not CRM companies. Never call `create_company` for
 a discovery batch and never turn search-result snippets into hundreds of records.
+Search by one industry and geography combination at a time. Prefer official small
+business registries, government registrations, state or local license directories,
+trade directories, and the company's own website. A candidate must have two
+independent web sources, including its own website, plus direct evidence that it is
+independently owned or has a small location footprint. Only mark a business VERIFIED
+when an official small-business registry says so; otherwise use LIKELY. Exclude
+chains, franchises, subsidiaries, aggregators, lead-generation sites, closed
+businesses, and companies whose independence cannot be supported by a source.
 
 For an acquisition analysis or dossier refresh task, read the CRM first, inspect
 its own website and use current external sources when available. Then call

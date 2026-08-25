@@ -13,6 +13,7 @@ import {
 	ACQUISITION_TASK_KINDS,
 	acquisitionAttentionScore,
 } from "@crm/db/acquisition";
+import { acquisitionCandidateQualificationSummary } from "@crm/db/acquisition-candidates";
 import { getOrganizationId } from "@crm/db/tenancy";
 import { Injectable } from "@nestjs/common";
 import {
@@ -581,6 +582,7 @@ export class DashboardService {
 					domain: true,
 					rationale: true,
 					evidence: true,
+					qualification: true,
 					sourceUrl: true,
 					sourceTitle: true,
 					createdAt: true,
@@ -668,8 +670,10 @@ export class DashboardService {
 			),
 			discovery: {
 				count: candidateCount,
-				items: candidates.map(({ createdAt, ...candidate }) => ({
+				items: candidates.map(({ createdAt, qualification, ...candidate }) => ({
 					...candidate,
+					qualification:
+						acquisitionCandidateQualificationSummary(qualification),
 					createdAt: createdAt.toISOString(),
 				})),
 			},

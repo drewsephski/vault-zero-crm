@@ -1036,6 +1036,24 @@ describe("acquisition candidate review", () => {
 			rationale:
 				"Updated thesis still points at the same operating company profile.",
 			evidence: "Fresh evidence from the company website confirms services.",
+			qualification: {
+				smallBusinessStatus: "LIKELY" as const,
+				independenceStatus: "INDEPENDENT" as const,
+				signals: [
+					{
+						type: "company-website" as const,
+						claim: "The company website confirms current services.",
+						url: `https://${domain}/services`,
+						title: "Company website",
+					},
+					{
+						type: "location-count" as const,
+						claim: "The directory shows one operating location.",
+						url: `https://directory.test/business/${domain}`,
+						title: "Business directory",
+					},
+				],
+			},
 			sourceUrl: `https://${domain}/services`,
 		};
 

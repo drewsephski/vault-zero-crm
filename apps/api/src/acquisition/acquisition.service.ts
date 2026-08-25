@@ -11,6 +11,7 @@ import {
 	RecordSource,
 } from "@crm/db";
 import { isDossierReady, isTargetLifecycleStage } from "@crm/db/acquisition";
+import { acquisitionCandidateSourceUrls } from "@crm/db/acquisition-candidates";
 import {
 	parseAcquisitionDossierSnapshot,
 	researchRunListSnapshot,
@@ -231,6 +232,12 @@ export class AcquisitionService {
 				"This candidate was dismissed and cannot be approved.",
 			);
 		}
+		const sourceUrls = [
+			...new Set([
+				candidate.sourceUrl,
+				...acquisitionCandidateSourceUrls(candidate.qualification),
+			]),
+		];
 		if (candidate.companyId) {
 			const result = await this.addTarget(candidate.companyId, actingUserId);
 			return { candidateId: id, ...result };
@@ -248,7 +255,7 @@ export class AcquisitionService {
 				const company = await this.companies.create(
 					{ name: candidate.name, domain: candidate.domain },
 					RecordSource.DISCOVERY,
-					acquisitionTargetData([candidate.sourceUrl]),
+					acquisitionTargetData(sourceUrls),
 				);
 				existing = { id: company.id, source: RecordSource.DISCOVERY };
 				created = true;
@@ -264,9 +271,7 @@ export class AcquisitionService {
 		}
 
 		if (!targetCreated) {
-			targetCreated = await this.ensureTarget(existing.id, [
-				candidate.sourceUrl,
-			]);
+			targetCreated = await this.ensureTarget(existing.id, sourceUrls);
 		}
 
 		const status =

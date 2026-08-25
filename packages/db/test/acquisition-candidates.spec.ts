@@ -1,8 +1,32 @@
 import { describe, expect, it } from "bun:test";
 import { AcquisitionCandidateStatus, db, WorkspaceMode } from "@crm/db";
-import { proposeAcquisitionCandidates } from "@crm/db/acquisition-candidates";
+import {
+	assertCandidateQualification,
+	proposeAcquisitionCandidates,
+} from "@crm/db/acquisition-candidates";
 import { runInOrganization } from "@crm/db/tenancy";
 import { WORKSPACE_ID } from "@crm/db/workspace";
+
+function qualification(domain: string) {
+	return {
+		smallBusinessStatus: "LIKELY" as const,
+		independenceStatus: "INDEPENDENT" as const,
+		signals: [
+			{
+				type: "company-website" as const,
+				claim: "The company operates this website.",
+				url: `https://${domain}/about`,
+				title: "Company website",
+			},
+			{
+				type: "location-count" as const,
+				claim: "The directory shows one operating location.",
+				url: `https://directory.test/business/${domain}`,
+				title: "Business directory",
+			},
+		],
+	};
+}
 
 function proposal(domain: string): {
 	name: string;
@@ -10,6 +34,7 @@ function proposal(domain: string): {
 	website: string;
 	rationale: string;
 	evidence: string;
+	qualification: ReturnType<typeof qualification>;
 	sourceUrl: string;
 } {
 	return {
@@ -18,6 +43,7 @@ function proposal(domain: string): {
 		website: `https://${domain}`,
 		rationale: "Updated rationale long enough for validation rules.",
 		evidence: "Updated evidence long enough for validation rules.",
+		qualification: qualification(domain),
 		sourceUrl: `https://${domain}/about`,
 	};
 }
@@ -43,6 +69,29 @@ async function upsertBuyBoxRevision(
 }
 
 describe("proposeAcquisitionCandidates", () => {
+	it("requires website, independent-source, and ownership evidence", () => {
+		expect(() =>
+			assertCandidateQualification(
+				"candidate.test",
+				qualification("candidate.test"),
+			),
+		).not.toThrow();
+		expect(() =>
+			assertCandidateQualification("candidate.test", {
+				...qualification("candidate.test"),
+				signals: qualification("candidate.test").signals.filter(
+					(signal) => signal.type !== "location-count",
+				),
+			}),
+		).toThrow("two to eight evidence signals");
+		expect(() =>
+			assertCandidateQualification("candidate.test", {
+				...qualification("candidate.test"),
+				smallBusinessStatus: "VERIFIED",
+			}),
+		).toThrow("official small-business registry");
+	});
+
 	it("revives dismissed candidates when buy box revision advances", async () => {
 		const domain = `propose-revive-${crypto.randomUUID()}.test`;
 		const candidate = await db.acquisitionCandidate.create({
@@ -69,6 +118,7 @@ describe("proposeAcquisitionCandidates", () => {
 				website: `https://${domain}`,
 				rationale: "Updated rationale long enough for validation rules.",
 				evidence: "Updated evidence long enough for validation rules.",
+				qualification: qualification(domain),
 				sourceUrl: `https://${domain}/about`,
 			},
 		]);

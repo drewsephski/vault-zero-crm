@@ -22,18 +22,18 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  ownedCompanies Company[]           @relation("CompanyOwner")
-  ownedContacts  Contact[]           @relation("ContactOwner")
-  ownedDeals     Deal[]              @relation("DealOwner")
-  ownedAcquisitionEngagements AcquisitionEngagement[] @relation("AcquisitionEngagementOwner")
-  acquisitionResearchRuns AcquisitionResearchRun[] @relation("AcquisitionResearchRunTrigger")
-  requestedAgentTasks AgentTask[] @relation("AgentTaskRequester")
-  activities     Activity[]          @relation("ActivityAuthor")
-  mailboxSyncs   MailboxSync[]
-  factDecisions  ContactFact[]       @relation("FactDecider")
-  conversations  AgentConversation[] @relation("ConversationOwner")
-  outreachLeads  OutreachLead[]
-  emailSends     EmailSend[]
+  ownedCompanies              Company[]                @relation("CompanyOwner")
+  ownedContacts               Contact[]                @relation("ContactOwner")
+  ownedDeals                  Deal[]                   @relation("DealOwner")
+  ownedAcquisitionEngagements AcquisitionEngagement[]  @relation("AcquisitionEngagementOwner")
+  acquisitionResearchRuns     AcquisitionResearchRun[] @relation("AcquisitionResearchRunTrigger")
+  requestedAgentTasks         AgentTask[]              @relation("AgentTaskRequester")
+  activities                  Activity[]               @relation("ActivityAuthor")
+  mailboxSyncs                MailboxSync[]
+  factDecisions               ContactFact[]            @relation("FactDecider")
+  conversations               AgentConversation[]      @relation("ConversationOwner")
+  outreachLeads               OutreachLead[]
+  emailSends                  EmailSend[]
 
   members     Member[]
   invitations Invitation[]
@@ -258,24 +258,25 @@ model AcquisitionProfile {
 }
 
 model AcquisitionCandidate {
-  id          String                     @id @default(cuid())
-  name        String
-  domain      String
-  website     String
-  rationale   String
-  evidence    String
-  sourceUrl   String
-  sourceTitle String?
-  status      AcquisitionCandidateStatus @default(PROPOSED)
+  id            String                     @id @default(cuid())
+  name          String
+  domain        String
+  website       String
+  rationale     String
+  evidence      String
+  qualification Json                       @default("{}")
+  sourceUrl     String
+  sourceTitle   String?
+  status        AcquisitionCandidateStatus @default(PROPOSED)
 
-  dismissedAt              DateTime?
-  dismissedBuyBoxRevision  Int?
-  dismissedReason          String?
+  dismissedAt             DateTime?
+  dismissedBuyBoxRevision Int?
+  dismissedReason         String?
 
-	organizationId String @default("workspace")
-	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String       @default("workspace")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-	companyId String?  @unique
+  companyId String?  @unique
   company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   sourceSessionId String?
@@ -303,10 +304,10 @@ model OutreachLead {
   lastRespondedAt DateTime?
   nextActionAt    DateTime?
 
-	organizationId String @default("workspace")
-	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String       @default("workspace")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-	companyId String?
+  companyId String?
   company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   contactId String?  @unique
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
@@ -373,8 +374,8 @@ model Company {
   website     String?
   description String?
 
-	organizationId String @default("workspace")
-	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String       @default("workspace")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   logoUrl     String?
   logoDarkUrl String?
@@ -403,14 +404,14 @@ model Company {
   primaryContactId String?  @unique
   primaryContact   Contact? @relation("PrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
 
-  enrichmentStatus    EnrichmentStatus                @default(PENDING)
-  enrichedAt          DateTime?
-  enrichmentError     String?
-  enrichment          CompanyEnrichment?
-  acquisitionTarget   AcquisitionTarget?
-  targetCreateRequest AcquisitionTargetCreateRequest?
-  discoveryCandidate  AcquisitionCandidate?
-  acquisitionEngagements AcquisitionEngagement[]
+  enrichmentStatus        EnrichmentStatus                @default(PENDING)
+  enrichedAt              DateTime?
+  enrichmentError         String?
+  enrichment              CompanyEnrichment?
+  acquisitionTarget       AcquisitionTarget?
+  targetCreateRequest     AcquisitionTargetCreateRequest?
+  discoveryCandidate      AcquisitionCandidate?
+  acquisitionEngagements  AcquisitionEngagement[]
   acquisitionResearchRuns AcquisitionResearchRun[]
 
   source RecordSource @default(MANUAL)
@@ -439,19 +440,19 @@ model AcquisitionTarget {
   companyId String  @id
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  stage              AcquisitionStage  @default(DISCOVERED)
-  fit                AcquisitionFit    @default(UNKNOWN)
-  summary            String?
-  strengths          Json
-  concerns           Json
-  criteria           Json              @default("[]")
-  missingInformation String[]
-  recommendedAction  String?
-  recommendedStage   AcquisitionStage?
-  sourceUrls         String[]
-  researchedAt       DateTime?
+  stage                    AcquisitionStage  @default(DISCOVERED)
+  fit                      AcquisitionFit    @default(UNKNOWN)
+  summary                  String?
+  strengths                Json
+  concerns                 Json
+  criteria                 Json              @default("[]")
+  missingInformation       String[]
+  recommendedAction        String?
+  recommendedStage         AcquisitionStage?
+  sourceUrls               String[]
+  researchedAt             DateTime?
   researchedBuyBoxRevision Int?
-  sourceSessionId    String?
+  sourceSessionId          String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -501,8 +502,8 @@ model AcquisitionEngagement {
   dscr                        Decimal? @db.Decimal(8, 4)
   workingCapitalNeed          Decimal? @db.Decimal(18, 2)
 
-  activities     Activity[]
-  createRequest  AcquisitionEngagementCreateRequest?
+  activities    Activity[]
+  createRequest AcquisitionEngagementCreateRequest?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -514,30 +515,30 @@ model AcquisitionEngagement {
 }
 
 model AcquisitionEngagementCreateRequest {
-  idempotencyKey String              @id @db.Uuid
-  engagementId   String              @unique
+  idempotencyKey String                @id @db.Uuid
+  engagementId   String                @unique
   engagement     AcquisitionEngagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
-  createdAt      DateTime            @default(now())
+  createdAt      DateTime              @default(now())
 
   @@map("acquisitionEngagementCreateRequest")
 }
 
 model AcquisitionResearchRun {
-  id             String                       @id @default(cuid())
-  organizationId String                       @default("workspace")
-  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  companyId      String
-  company        Company                      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  kind           String
-  agentTaskId    String                       @unique
-  sessionId      String?
-  triggeredById  String?
-  triggeredBy    User?                        @relation("AcquisitionResearchRunTrigger", fields: [triggeredById], references: [id], onDelete: SetNull)
-  status         AcquisitionResearchRunStatus @default(RUNNING)
-  startedAt      DateTime                     @default(now())
-  finishedAt     DateTime?
-  outcome        String?
-  buyBoxRevision Int?
+  id              String                       @id @default(cuid())
+  organizationId  String                       @default("workspace")
+  organization    Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId       String
+  company         Company                      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  kind            String
+  agentTaskId     String                       @unique
+  sessionId       String?
+  triggeredById   String?
+  triggeredBy     User?                        @relation("AcquisitionResearchRunTrigger", fields: [triggeredById], references: [id], onDelete: SetNull)
+  status          AcquisitionResearchRunStatus @default(RUNNING)
+  startedAt       DateTime                     @default(now())
+  finishedAt      DateTime?
+  outcome         String?
+  buyBoxRevision  Int?
   dossierSnapshot Json?
 
   @@index([organizationId, companyId, startedAt])
@@ -586,8 +587,8 @@ model Contact {
 
   lastActivityAt DateTime?
 
-	organizationId String @default("workspace")
-	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String       @default("workspace")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   deals           DealContact[]
   activities      Activity[]
@@ -667,14 +668,14 @@ model ContactBrief {
 }
 
 model AgentTask {
-  id        String  @id @default(cuid())
-  contactId String?
-  companyId String?
+  id            String  @id @default(cuid())
+  contactId     String?
+  companyId     String?
   requestedById String?
-  requestedBy User? @relation("AgentTaskRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  requestedBy   User?   @relation("AgentTaskRequester", fields: [requestedById], references: [id], onDelete: SetNull)
 
-	organizationId String @default("workspace")
-	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String       @default("workspace")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   kind   String
   reason String
@@ -776,8 +777,8 @@ model VaultZeroEvent {
 model AgentConversation {
   id String @id @default(cuid())
 
-	organizationId String @default("workspace")
-	organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String       @default("workspace")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   contactId String?
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
@@ -807,16 +808,16 @@ model AgentConversation {
 }
 
 model Deal {
-  id            String              @id @default(cuid())
-  conversations AgentConversation[]
-  name          String
-  description   String?
-  organizationId String @default("workspace")
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  companyId     String
-  company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  ownerId       String
-  owner         User                @relation("DealOwner", fields: [ownerId], references: [id])
+  id             String              @id @default(cuid())
+  conversations  AgentConversation[]
+  name           String
+  description    String?
+  organizationId String              @default("workspace")
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId      String
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ownerId        String
+  owner          User                @relation("DealOwner", fields: [ownerId], references: [id])
 
   stage             DealStage @default(DEMO_BOOKED)
   stageChangedAt    DateTime  @default(now())
@@ -892,12 +893,12 @@ model Activity {
   dueAt       DateTime?
   completedAt DateTime?
 
-  companyId String?
-  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contactId String?
-  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  dealId    String?
-  deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  companyId    String?
+  company      Company?               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId    String?
+  contact      Contact?               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  dealId       String?
+  deal         Deal?                  @relation(fields: [dealId], references: [id], onDelete: Cascade)
   engagementId String?
   engagement   AcquisitionEngagement? @relation(fields: [engagementId], references: [id], onDelete: Cascade)
 
@@ -1120,25 +1121,25 @@ model TelemetryCounter {
 }
 
 model Organization {
-  id          String       @id
-  name        String
-  slug        String
-  logo        String?
-  createdAt   DateTime
-  metadata    String?
-  website     String?
-  members     Member[]
-  invitations Invitation[]
-  companies              Company[]
-  contacts               Contact[]
-  deals                  Deal[]
-  agentTasks             AgentTask[]
-  acquisitionCandidates  AcquisitionCandidate[]
-  acquisitionEngagements AcquisitionEngagement[]
+  id                      String                   @id
+  name                    String
+  slug                    String
+  logo                    String?
+  createdAt               DateTime
+  metadata                String?
+  website                 String?
+  members                 Member[]
+  invitations             Invitation[]
+  companies               Company[]
+  contacts                Contact[]
+  deals                   Deal[]
+  agentTasks              AgentTask[]
+  acquisitionCandidates   AcquisitionCandidate[]
+  acquisitionEngagements  AcquisitionEngagement[]
   acquisitionResearchRuns AcquisitionResearchRun[]
-  outreachLeads          OutreachLead[]
-  emailSends             EmailSend[]
-  conversations          AgentConversation[]
+  outreachLeads           OutreachLead[]
+  emailSends              EmailSend[]
+  conversations           AgentConversation[]
 
   @@unique([slug])
   @@map("organization")

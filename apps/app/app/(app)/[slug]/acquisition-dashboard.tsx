@@ -38,7 +38,10 @@ import {
 	AcquisitionStageIndicator,
 } from "@/components/crm/acquisition-status";
 import { RecordLink } from "@/components/crm/record-sheet/record-link";
-import { safeAcquisitionCandidateSource } from "@/lib/acquisition";
+import {
+	acquisitionCandidateQualification,
+	safeAcquisitionCandidateSource,
+} from "@/lib/acquisition";
 import { useCrmCache } from "@/lib/trpc/cache";
 import { useTRPC } from "@/lib/trpc/client";
 import type { RouterOutputs } from "@/lib/trpc/types";
@@ -288,6 +291,9 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 									const sourceUrl = safeAcquisitionCandidateSource(
 										candidate.sourceUrl,
 									);
+									const qualification = acquisitionCandidateQualification(
+										candidate.qualification,
+									);
 									return (
 										<SimpleTableRow key={candidate.id}>
 											<TableCell className={CELL}>
@@ -298,6 +304,17 @@ export function AcquisitionDashboard({ summary }: { summary: Summary }) {
 													<span className="truncate text-muted-foreground">
 														{candidate.rationale}
 													</span>
+													{qualification ? (
+														<StatusIndicator
+															size="sm"
+															tone={
+																qualification.smallBusinessStatus === "VERIFIED"
+																	? "success"
+																	: "info"
+															}
+															label={`${qualification.smallBusinessStatus === "VERIFIED" ? "Verified" : "Likely"} independent small business · ${formatCount(qualification.sourceCount, "source")}`}
+														/>
+													) : null}
 													<span className="mt-2 flex min-w-0 flex-col gap-1 whitespace-normal sm:hidden">
 														<span className="line-clamp-2 break-words">
 															{candidate.evidence}

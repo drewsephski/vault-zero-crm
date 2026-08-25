@@ -5,6 +5,47 @@ import {
 } from "@crm/db/acquisition";
 import type { StatusTone } from "@crm/ui/components/status-indicator";
 
+export type AcquisitionCandidateQualificationView = {
+	smallBusinessStatus: "VERIFIED" | "LIKELY";
+	independenceStatus: "INDEPENDENT";
+	sourceCount: number;
+};
+
+export function acquisitionCandidateQualification(
+	value: unknown,
+): AcquisitionCandidateQualificationView | null {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+	const candidate = value as Record<string, unknown>;
+	if (
+		(candidate.smallBusinessStatus !== "VERIFIED" &&
+			candidate.smallBusinessStatus !== "LIKELY") ||
+		candidate.independenceStatus !== "INDEPENDENT"
+	) {
+		return null;
+	}
+	if (typeof candidate.sourceCount === "number") {
+		return {
+			smallBusinessStatus: candidate.smallBusinessStatus,
+			independenceStatus: candidate.independenceStatus,
+			sourceCount: candidate.sourceCount,
+		};
+	}
+	if (!Array.isArray(candidate.signals)) return null;
+	const hosts = new Set<string>();
+	for (const signal of candidate.signals) {
+		if (!signal || typeof signal !== "object" || Array.isArray(signal))
+			continue;
+		const url = (signal as Record<string, unknown>).url;
+		if (typeof url !== "string" || !isAcquisitionEvidenceUrl(url)) continue;
+		hosts.add(new URL(url).hostname.toLowerCase().replace(/^www\./, ""));
+	}
+	return {
+		smallBusinessStatus: candidate.smallBusinessStatus,
+		independenceStatus: candidate.independenceStatus,
+		sourceCount: hosts.size,
+	};
+}
+
 const ACQUISITION_CRITERION_LABELS: Record<
 	AcquisitionCriterionAssessment["id"],
 	string

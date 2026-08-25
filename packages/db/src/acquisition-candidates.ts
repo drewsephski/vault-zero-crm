@@ -2,6 +2,30 @@ import type { Db } from "./client";
 import { Prisma } from "./generated/prisma/client";
 import { AcquisitionCandidateStatus } from "./generated/prisma/enums";
 
+export const ACQUISITION_CANDIDATE_SIGNAL_TYPES = [
+	"company-website",
+	"official-small-business-registry",
+	"government-registration",
+	"local-license",
+	"directory-listing",
+	"ownership",
+	"location-count",
+] as const;
+
+export type AcquisitionCandidateSignalType =
+	(typeof ACQUISITION_CANDIDATE_SIGNAL_TYPES)[number];
+
+export type AcquisitionCandidateQualification = {
+	smallBusinessStatus: "VERIFIED" | "LIKELY";
+	independenceStatus: "INDEPENDENT";
+	signals: {
+		type: AcquisitionCandidateSignalType;
+		claim: string;
+		url: string;
+		title: string | null;
+	}[];
+};
+
 const BLOCKED_STATUSES = new Set<AcquisitionCandidateStatus>([
 	AcquisitionCandidateStatus.PROPOSED,
 	AcquisitionCandidateStatus.APPROVED,
@@ -14,6 +38,7 @@ export type AcquisitionCandidateProposal = {
 	website: string;
 	rationale: string;
 	evidence: string;
+	qualification: AcquisitionCandidateQualification;
 	sourceUrl: string;
 	sourceTitle?: string | null;
 	sourceSessionId?: string | null;
@@ -37,6 +62,9 @@ export async function proposeAcquisitionCandidates(
 	organizationId: string,
 	candidates: AcquisitionCandidateProposal[],
 ): Promise<ProposeAcquisitionCandidatesResult> {
+	for (const candidate of candidates) {
+		assertCandidateQualification(candidate.domain, candidate.qualification);
+	}
 	const unique = [
 		...new Map(candidates.map((item) => [item.domain, item])).values(),
 	];
@@ -94,6 +122,135 @@ export async function proposeAcquisitionCandidates(
 	}
 
 	return { saved, revived, skipped };
+}
+
+export function assertCandidateQualification(
+	domain: string,
+	qualification: AcquisitionCandidateQualification,
+): void {
+	const signals = qualification.signals;
+	if (signals.length < 2 || signals.length > 8) {
+		throw new Error(
+			"Acquisition candidates require two to eight evidence signals.",
+		);
+	}
+
+	const sourceHosts = new Set<string>();
+	let websiteVerified = false;
+	for (const signal of signals) {
+		let url: URL;
+		try {
+			url = new URL(signal.url);
+		} catch {
+			throw new Error("Acquisition candidate evidence requires valid URLs.");
+		}
+		if (url.protocol !== "https:" && url.protocol !== "http:") {
+			throw new Error("Acquisition candidate evidence requires web URLs.");
+		}
+		const host = url.hostname.toLowerCase().replace(/^www\./, "");
+		sourceHosts.add(host);
+		if (
+			signal.type === "company-website" &&
+			(host === domain || host.endsWith(`.${domain}`))
+		) {
+			websiteVerified = true;
+		}
+	}
+
+	if (!websiteVerified) {
+		throw new Error(
+			"Acquisition candidates require a verified company website.",
+		);
+	}
+	if (sourceHosts.size < 2) {
+		throw new Error(
+			"Acquisition candidates require two independent web sources.",
+		);
+	}
+	if (
+		qualification.smallBusinessStatus === "VERIFIED" &&
+		!signals.some(
+			(signal) => signal.type === "official-small-business-registry",
+		)
+	) {
+		throw new Error(
+			"Verified small businesses require an official small-business registry source.",
+		);
+	}
+	if (
+		!signals.some(
+			(signal) =>
+				signal.type === "ownership" || signal.type === "location-count",
+		)
+	) {
+		throw new Error(
+			"Independent businesses require ownership or location-count evidence.",
+		);
+	}
+}
+
+export function acquisitionCandidateSourceUrls(
+	qualification: unknown,
+): string[] {
+	if (
+		!qualification ||
+		typeof qualification !== "object" ||
+		Array.isArray(qualification)
+	) {
+		return [];
+	}
+	const signals = (qualification as Record<string, unknown>).signals;
+	if (!Array.isArray(signals)) return [];
+
+	const urls = signals.flatMap((signal) => {
+		if (!signal || typeof signal !== "object" || Array.isArray(signal))
+			return [];
+		const value = (signal as Record<string, unknown>).url;
+		if (typeof value !== "string") return [];
+		try {
+			const url = new URL(value);
+			return url.protocol === "https:" || url.protocol === "http:"
+				? [value]
+				: [];
+		} catch {
+			return [];
+		}
+	});
+	return [...new Set(urls)];
+}
+
+export function acquisitionCandidateQualificationSummary(
+	qualification: unknown,
+): {
+	smallBusinessStatus: "VERIFIED" | "LIKELY";
+	independenceStatus: "INDEPENDENT";
+	sourceCount: number;
+} | null {
+	if (
+		!qualification ||
+		typeof qualification !== "object" ||
+		Array.isArray(qualification)
+	) {
+		return null;
+	}
+	const value = qualification as Record<string, unknown>;
+	if (
+		(value.smallBusinessStatus !== "VERIFIED" &&
+			value.smallBusinessStatus !== "LIKELY") ||
+		value.independenceStatus !== "INDEPENDENT"
+	) {
+		return null;
+	}
+	const hosts = new Set(
+		acquisitionCandidateSourceUrls(qualification).map((url) =>
+			new URL(url).hostname.toLowerCase().replace(/^www\./, ""),
+		),
+	);
+	return {
+		smallBusinessStatus: value.smallBusinessStatus,
+		independenceStatus: value.independenceStatus,
+		sourceCount: hosts.size,
+	};
 }
 
 async function proposeOneCandidate(

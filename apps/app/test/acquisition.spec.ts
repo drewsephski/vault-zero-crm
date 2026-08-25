@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { companiesSearchParams } from "../app/(app)/[slug]/companies/companies-search-params";
 import {
+	acquisitionCandidateQualification,
 	acquisitionCriterionLabel,
 	acquisitionResearchActivity,
 	acquisitionTargetCreateSubmission,
@@ -14,6 +15,22 @@ import {
 	safeAcquisitionEvidence,
 	targetResearchCopy,
 } from "../lib/acquisition";
+
+describe("acquisition candidate qualification", () => {
+	it("parses a dashboard qualification summary", () => {
+		expect(
+			acquisitionCandidateQualification({
+				smallBusinessStatus: "VERIFIED",
+				independenceStatus: "INDEPENDENT",
+				sourceCount: 3,
+			}),
+		).toEqual({
+			smallBusinessStatus: "VERIFIED",
+			independenceStatus: "INDEPENDENT",
+			sourceCount: 3,
+		});
+	});
+});
 
 describe("acquisition presentation", () => {
 	it("normalizes the primary target view to active for the API", () => {

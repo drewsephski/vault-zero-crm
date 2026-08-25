@@ -116,12 +116,31 @@ describe("agent tool contracts", () => {
 	});
 
 	it("requires real source URLs for discovery candidates", () => {
+		const qualification = {
+			smallBusinessStatus: "LIKELY",
+			independenceStatus: "INDEPENDENT",
+			signals: [
+				{
+					type: "company-website",
+					claim: "The company operates this website.",
+					url: "https://example-mechanical.test/about",
+					title: "Company website",
+				},
+				{
+					type: "ownership",
+					claim: "The directory identifies the local owner.",
+					url: "https://directory.test/example-mechanical",
+					title: "Business directory",
+				},
+			],
+		};
 		const candidate = {
 			name: "Example Mechanical",
 			domain: "example-mechanical.test",
 			rationale:
 				"Its service profile appears aligned with the current buy box.",
 			evidence: "The company website describes commercial HVAC maintenance.",
+			qualification,
 			sourceUrl: "not-a-url",
 			sourceTitle: "Company website",
 		};
@@ -154,6 +173,24 @@ describe("agent tool contracts", () => {
 			rationale:
 				"Its service profile appears aligned with the current buy box.",
 			evidence: "The company website describes commercial HVAC maintenance.",
+			qualification: {
+				smallBusinessStatus: "LIKELY",
+				independenceStatus: "INDEPENDENT",
+				signals: [
+					{
+						type: "company-website",
+						claim: "The company operates this website.",
+						url: "https://example-mechanical.test/about",
+						title: "Company website",
+					},
+					{
+						type: "location-count",
+						claim: "The directory shows one operating location.",
+						url: "https://directory.test/example-mechanical",
+						title: "Business directory",
+					},
+				],
+			},
 			sourceUrl: "https://example-mechanical.test",
 			sourceTitle: "Company website",
 		};
